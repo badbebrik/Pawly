@@ -7,8 +7,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:logger/logger.dart';
 
 import '../../app/router/app_router.dart';
-import '../network/auth_interceptor.dart';
-import '../network/dio_client.dart';
+import '../network/api_client.dart';
+import '../network/clients/acl_api_client.dart';
+import '../network/clients/auth_api_client.dart';
+import '../network/clients/catalog_api_client.dart';
+import '../network/clients/pets_api_client.dart';
+import '../network/clients/profile_api_client.dart';
+import '../network/dio_factory.dart';
+import '../network/session/auth_session_store.dart';
 import '../services/media_picker_service.dart';
 import '../storage/secure_storage_service.dart';
 
@@ -29,14 +35,49 @@ final secureStorageServiceProvider = Provider<SecureStorageService>((ref) {
   return SecureStorageService(storage);
 });
 
-final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
+final authSessionStoreProvider = Provider<AuthSessionStore>((ref) {
   final secureStorage = ref.watch(secureStorageServiceProvider);
-  return AuthInterceptor(secureStorage);
+  return AuthSessionStore(secureStorage);
+});
+
+final dioBundleProvider = Provider<DioBundle>((ref) {
+  final sessionStore = ref.watch(authSessionStoreProvider);
+  return DioFactory.create(sessionStore: sessionStore);
 });
 
 final dioProvider = Provider<Dio>((ref) {
-  final authInterceptor = ref.watch(authInterceptorProvider);
-  return DioClient.create(authInterceptor: authInterceptor);
+  final bundle = ref.watch(dioBundleProvider);
+  return bundle.dio;
+});
+
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final dio = ref.watch(dioProvider);
+  return ApiClient(dio);
+});
+
+final authApiClientProvider = Provider<AuthApiClient>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return AuthApiClient(apiClient);
+});
+
+final profileApiClientProvider = Provider<ProfileApiClient>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return ProfileApiClient(apiClient);
+});
+
+final petsApiClientProvider = Provider<PetsApiClient>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return PetsApiClient(apiClient);
+});
+
+final aclApiClientProvider = Provider<AclApiClient>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return AclApiClient(apiClient);
+});
+
+final catalogApiClientProvider = Provider<CatalogApiClient>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return CatalogApiClient(apiClient);
 });
 
 final imagePickerProvider = Provider<ImagePicker>((ref) {
