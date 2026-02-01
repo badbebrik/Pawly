@@ -15,6 +15,7 @@ import '../network/clients/pets_api_client.dart';
 import '../network/clients/profile_api_client.dart';
 import '../network/dio_factory.dart';
 import '../network/session/auth_session_store.dart';
+import '../services/google_sign_in_service.dart';
 import '../services/media_picker_service.dart';
 import '../storage/secure_storage_service.dart';
 
@@ -87,6 +88,10 @@ final imagePickerProvider = Provider<ImagePicker>((ref) {
 final mediaPickerServiceProvider = Provider<MediaPickerService>((ref) {
   final imagePicker = ref.watch(imagePickerProvider);
   return MediaPickerService(imagePicker);
+});
+
+final googleSignInServiceProvider = Provider<GoogleSignInService>((ref) {
+  return FallbackGoogleSignInService();
 });
 
 final appRouterProvider = Provider<GoRouter>((ref) {

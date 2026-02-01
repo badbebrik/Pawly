@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class PawlyTextField extends StatelessWidget {
   const PawlyTextField({
@@ -14,6 +15,12 @@ class PawlyTextField extends StatelessWidget {
     this.onChanged,
     this.enabled = true,
     this.maxLines = 1,
+    this.validator,
+    this.inputFormatters,
+    this.maxLength,
+    this.textCapitalization = TextCapitalization.none,
+    this.onFieldSubmitted,
+    this.autofillHints,
   });
 
   final TextEditingController? controller;
@@ -27,6 +34,12 @@ class PawlyTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final bool enabled;
   final int maxLines;
+  final FormFieldValidator<String>? validator;
+  final List<TextInputFormatter>? inputFormatters;
+  final int? maxLength;
+  final TextCapitalization textCapitalization;
+  final ValueChanged<String>? onFieldSubmitted;
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +51,12 @@ class PawlyTextField extends StatelessWidget {
       onChanged: onChanged,
       enabled: enabled,
       maxLines: maxLines,
+      validator: validator,
+      inputFormatters: inputFormatters,
+      maxLength: maxLength,
+      textCapitalization: textCapitalization,
+      onFieldSubmitted: onFieldSubmitted,
+      autofillHints: autofillHints,
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
