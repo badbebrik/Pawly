@@ -30,7 +30,7 @@ class PostRegisterChoicePage extends StatelessWidget {
               const Spacer(),
               PawlyButton(
                 label: 'Создать питомца сейчас',
-                onPressed: () => context.go(AppRoutes.home),
+                onPressed: () => context.go(AppRoutes.petCreate),
               ),
               const SizedBox(height: PawlySpacing.sm),
               PawlyButton(

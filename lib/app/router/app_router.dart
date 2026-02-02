@@ -5,6 +5,7 @@ import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
+import '../../features/pet_create/presentation/pages/pet_create_flow_page.dart';
 import 'app_routes.dart';
 
 GoRouter buildAppRouter() {
@@ -35,6 +36,11 @@ GoRouter buildAppRouter() {
         path: AppRoutes.home,
         name: 'home',
         builder: (_, __) => const HomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.petCreate,
+        name: "petCreate",
+        builder: (_, __) => const PetCreateFlowPage(),
       ),
     ],
   );

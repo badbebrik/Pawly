@@ -12,7 +12,10 @@ class PetCreateRepository {
     return _apiClient.post<PetEnvelopeResponse>(
       ApiEndpoints.pets,
       data: body,
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: const ApiRequestOptions(
+        requiresUserId: true,
+        requiresAccessToken: true,
+      ),
       decoder: PetEnvelopeResponse.fromJson,
     );
   }

@@ -36,6 +36,11 @@ class HomePage extends ConsumerWidget {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push(AppRoutes.petCreate),
+        tooltip: 'Создать питомца',
+        child: const Icon(Icons.add_rounded),
+      ),
     );
   }
 }
