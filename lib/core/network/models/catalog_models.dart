@@ -2,7 +2,6 @@ import 'json_parsers.dart';
 
 class CatalogVersionResponse {
   const CatalogVersionResponse({required this.version});
-
   final int version;
 
   factory CatalogVersionResponse.fromJson(Object? data) {
@@ -19,7 +18,7 @@ class SpeciesItem {
     required this.version,
   });
 
-  final int id;
+  final String id;
   final String name;
   final bool isActive;
   final int version;
@@ -27,7 +26,34 @@ class SpeciesItem {
   factory SpeciesItem.fromJson(Object? data) {
     final json = asJsonMap(data);
     return SpeciesItem(
-      id: asInt(json['id']),
+      id: asString(json['id']),
+      name: asString(json['name']),
+      isActive: asBool(json['is_active']),
+      version: asInt(json['version']),
+    );
+  }
+}
+
+class BreedItem {
+  const BreedItem({
+    required this.id,
+    required this.speciesId,
+    required this.name,
+    required this.isActive,
+    required this.version,
+  });
+
+  final String id;
+  final String speciesId;
+  final String name;
+  final bool isActive;
+  final int version;
+
+  factory BreedItem.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return BreedItem(
+      id: asString(json['id']),
+      speciesId: asString(json['species_id']),
       name: asString(json['name']),
       isActive: asBool(json['is_active']),
       version: asInt(json['version']),
@@ -44,7 +70,7 @@ class ColorItem {
     required this.version,
   });
 
-  final int id;
+  final String id;
   final String name;
   final String hex;
   final bool isActive;
@@ -53,7 +79,7 @@ class ColorItem {
   factory ColorItem.fromJson(Object? data) {
     final json = asJsonMap(data);
     return ColorItem(
-      id: asInt(json['id']),
+      id: asString(json['id']),
       name: asString(json['name']),
       hex: asString(json['hex']),
       isActive: asBool(json['is_active']),
@@ -71,7 +97,7 @@ class PatternItem {
     required this.version,
   });
 
-  final int id;
+  final String id;
   final String name;
   final String iconKey;
   final bool isActive;
@@ -80,7 +106,7 @@ class PatternItem {
   factory PatternItem.fromJson(Object? data) {
     final json = asJsonMap(data);
     return PatternItem(
-      id: asInt(json['id']),
+      id: asString(json['id']),
       name: asString(json['name']),
       iconKey: asString(json['icon_key']),
       isActive: asBool(json['is_active']),

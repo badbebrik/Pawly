@@ -57,6 +57,7 @@ class ApiEndpoints {
 
   static const String catalogVersion = '/catalog/version';
   static const String catalogSpecies = '/catalog/species';
+  static const String catalogBreeds = '/catalog/breeds';
   static const String catalogColors = '/catalog/colors';
   static const String catalogPatterns = '/catalog/patterns';
 }

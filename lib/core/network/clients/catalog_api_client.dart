@@ -24,14 +24,29 @@ class CatalogApiClient {
   Future<List<SpeciesItem>> listSpecies({bool activeOnly = true}) {
     return _apiClient.get<List<SpeciesItem>>(
       ApiEndpoints.catalogSpecies,
-      queryParameters: <String, dynamic>{'active': activeOnly ? 1 : 0},
+      queryParameters: <String, dynamic>{'active': activeOnly ? '1' : '0'},
       requestOptions: _options,
       decoder: (Object? data) {
-        if (data is! List) {
-          return const <SpeciesItem>[];
-        }
-
+        if (data is! List) return const <SpeciesItem>[];
         return data.map(SpeciesItem.fromJson).toList(growable: false);
+      },
+    );
+  }
+
+  Future<List<BreedItem>> listBreeds({
+    bool activeOnly = true,
+    String? speciesId,
+  }) {
+    return _apiClient.get<List<BreedItem>>(
+      ApiEndpoints.catalogBreeds,
+      queryParameters: <String, dynamic>{
+        'active': activeOnly ? '1' : '0',
+        if (speciesId != null && speciesId.isNotEmpty) 'species_id': speciesId,
+      },
+      requestOptions: _options,
+      decoder: (Object? data) {
+        if (data is! List) return const <BreedItem>[];
+        return data.map(BreedItem.fromJson).toList(growable: false);
       },
     );
   }
@@ -39,13 +54,10 @@ class CatalogApiClient {
   Future<List<ColorItem>> listColors({bool activeOnly = true}) {
     return _apiClient.get<List<ColorItem>>(
       ApiEndpoints.catalogColors,
-      queryParameters: <String, dynamic>{'active': activeOnly ? 1 : 0},
+      queryParameters: <String, dynamic>{'active': activeOnly ? '1' : '0'},
       requestOptions: _options,
       decoder: (Object? data) {
-        if (data is! List) {
-          return const <ColorItem>[];
-        }
-
+        if (data is! List) return const <ColorItem>[];
         return data.map(ColorItem.fromJson).toList(growable: false);
       },
     );
@@ -54,13 +66,10 @@ class CatalogApiClient {
   Future<List<PatternItem>> listPatterns({bool activeOnly = true}) {
     return _apiClient.get<List<PatternItem>>(
       ApiEndpoints.catalogPatterns,
-      queryParameters: <String, dynamic>{'active': activeOnly ? 1 : 0},
+      queryParameters: <String, dynamic>{'active': activeOnly ? '1' : '0'},
       requestOptions: _options,
       decoder: (Object? data) {
-        if (data is! List) {
-          return const <PatternItem>[];
-        }
-
+        if (data is! List) return const <PatternItem>[];
         return data.map(PatternItem.fromJson).toList(growable: false);
       },
     );
