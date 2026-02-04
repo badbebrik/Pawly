@@ -11,6 +11,7 @@ class SecureStorageService {
   static const String refreshTokenKey = 'refresh_token';
   static const String userIdKey = 'user_id';
   static const String localeKey = 'locale';
+  static const String _activePetIdKeyPrefix = 'active_pet_id';
 
   final FlutterSecureStorage _storage;
 
@@ -78,6 +79,21 @@ class SecureStorageService {
     await _storage.delete(key: localeKey);
   }
 
+  Future<void> saveActivePetId({
+    required String userId,
+    required String petId,
+  }) {
+    return _storage.write(key: _activePetIdKey(userId), value: petId);
+  }
+
+  Future<String?> getActivePetId(String userId) {
+    return _storage.read(key: _activePetIdKey(userId));
+  }
+
+  Future<void> clearActivePetId(String userId) {
+    return _storage.delete(key: _activePetIdKey(userId));
+  }
+
   Future<void> writeJson(String key, Map<String, dynamic> payload) {
     return _storage.write(key: key, value: jsonEncode(payload));
   }
@@ -93,4 +109,6 @@ class SecureStorageService {
     }
     return null;
   }
+
+  String _activePetIdKey(String userId) => '$_activePetIdKeyPrefix:$userId';
 }

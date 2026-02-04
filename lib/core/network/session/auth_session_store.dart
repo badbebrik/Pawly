@@ -22,8 +22,13 @@ class AuthSessionStore {
   }
 
   Future<void> clear() async {
+    final userId =
+        _cachedSession?.userId ?? await _secureStorageService.getUserId();
     _cachedSession = null;
     await _secureStorageService.clearSession();
+    if (userId != null && userId.isNotEmpty) {
+      await _secureStorageService.clearActivePetId(userId);
+    }
   }
 
   Future<void> updateTokens({

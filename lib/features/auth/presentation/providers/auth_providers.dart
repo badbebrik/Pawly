@@ -25,3 +25,9 @@ final appLaunchProvider = FutureProvider<AppLaunchDestination>((ref) async {
 
   return AppLaunchDestination.unauthenticated;
 });
+
+final currentUserIdProvider = FutureProvider<String?>((ref) async {
+  final sessionStore = ref.watch(authSessionStoreProvider);
+  final session = await sessionStore.read();
+  return session?.userId;
+});
