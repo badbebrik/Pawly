@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../catalog/data/catalog_cache_models.dart';
 import '../../data/pet_create_repository.dart';
@@ -143,8 +144,8 @@ class PetCreateState {
 }
 
 final petCreateRepositoryProvider = Provider<PetCreateRepository>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return PetCreateRepository(apiClient);
+  final petsApiClient = ref.watch(petsApiClientProvider);
+  return PetCreateRepository(petsApiClient);
 });
 
 final petCreateControllerProvider =
@@ -159,7 +160,8 @@ class PetCreateController extends Notifier<PetCreateState> {
   void setName(String value) =>
       state = state.copyWith(name: value, clearError: true);
 
-  void setSex(String value) => state = state.copyWith(sex: value, clearError: true);
+  void setSex(String value) =>
+      state = state.copyWith(sex: value, clearError: true);
 
   void setBirthDate(DateTime? value) =>
       state = state.copyWith(birthDate: value, clearError: true);
@@ -169,7 +171,8 @@ class PetCreateController extends Notifier<PetCreateState> {
       speciesMode: value,
       clearError: true,
       clearSpeciesId: value == CatalogPickMode.custom,
-      customSpeciesName: value == CatalogPickMode.catalog ? '' : state.customSpeciesName,
+      customSpeciesName:
+          value == CatalogPickMode.catalog ? '' : state.customSpeciesName,
     );
   }
 
@@ -184,7 +187,8 @@ class PetCreateController extends Notifier<PetCreateState> {
       breedMode: value,
       clearError: true,
       clearBreedId: value == CatalogPickMode.custom,
-      customBreedName: value == CatalogPickMode.catalog ? '' : state.customBreedName,
+      customBreedName:
+          value == CatalogPickMode.catalog ? '' : state.customBreedName,
     );
   }
 
@@ -199,7 +203,8 @@ class PetCreateController extends Notifier<PetCreateState> {
       patternMode: value,
       clearError: true,
       clearPatternId: value == CatalogPickMode.custom,
-      customPatternName: value == CatalogPickMode.catalog ? '' : state.customPatternName,
+      customPatternName:
+          value == CatalogPickMode.catalog ? '' : state.customPatternName,
     );
   }
 
@@ -270,11 +275,11 @@ class PetCreateController extends Notifier<PetCreateState> {
       return false;
     }
 
-    final body = _buildRequest();
+    final payload = _buildRequest();
     state = state.copyWith(isSubmitting: true, clearError: true);
 
     try {
-      await ref.read(petCreateRepositoryProvider).createPet(body);
+      await ref.read(petCreateRepositoryProvider).createPet(payload);
       state = state.copyWith(isSubmitting: false);
       return true;
     } catch (_) {
@@ -294,8 +299,8 @@ class PetCreateController extends Notifier<PetCreateState> {
       if (id == null || id.isEmpty) return 'Выберите вид питомца';
       final exists = catalog.species.any((item) => item.id == id);
       if (!exists) return 'Выбранный вид устарел. Обновите выбор.';
-    } else if (state.customSpeciesName.trim().isEmpty) {
-      return 'Введите свой вариант вида';
+    } else {
+      return 'Пользовательский вид пока не поддерживается API';
     }
 
     if (state.breedMode == CatalogPickMode.catalog) {
@@ -322,7 +327,9 @@ class PetCreateController extends Notifier<PetCreateState> {
 
     final invalidColorId = state.colorIds
         .any((id) => !catalog.colors.any((color) => color.id == id));
-    if (invalidColorId) return 'Один из выбранных цветов устарел. Обновите выбор.';
+    if (invalidColorId) {
+      return 'Один из выбранных цветов устарел. Обновите выбор.';
+    }
 
     if (state.customColorsHex.any((hex) => _normalizeHex(hex) == null)) {
       return 'Неверный формат пользовательского цвета';
@@ -331,69 +338,49 @@ class PetCreateController extends Notifier<PetCreateState> {
     return null;
   }
 
-  Map<String, dynamic> _buildRequest() {
-    final colors = <Map<String, dynamic>>[];
+  CreatePetPayload _buildRequest() {
+    final colors = <PetColor>[];
     var sortOrder = 0;
 
     for (final id in state.colorIds) {
-      colors.add(<String, dynamic>{
-        'preset_id': id,
-        'sort_order': sortOrder++,
-      });
+      colors.add(PetColor(presetId: id, sortOrder: sortOrder++));
     }
 
     for (final rawHex in state.customColorsHex) {
       final hex = _normalizeHex(rawHex)!;
-      colors.add(<String, dynamic>{
-        'hex_override': hex,
-        'sort_order': sortOrder++,
-      });
+      colors.add(PetColor(hexOverride: hex, sortOrder: sortOrder++));
     }
 
-    return <String, dynamic>{
-      'name': state.name.trim(),
-      'sex': state.sex,
-      if (state.birthDate != null) 'birth_date': _fmtDate(state.birthDate!),
-      if (state.speciesMode == CatalogPickMode.catalog && state.speciesId != null)
-        'species_id': state.speciesId,
-      if (state.speciesMode == CatalogPickMode.custom)
-        'species': <String, dynamic>{
-          'source': 'CUSTOM',
-          'custom_species_name': state.customSpeciesName.trim(),
-        },
-      'breed': state.breedMode == CatalogPickMode.catalog
-          ? <String, dynamic>{
-              'source': 'SYSTEM',
-              'system_breed_id': state.breedId,
-            }
-          : <String, dynamic>{
-              'source': 'CUSTOM',
-              'custom_breed_name': state.customBreedName.trim(),
-            },
-      'coat_pattern': state.patternMode == CatalogPickMode.catalog
-          ? <String, dynamic>{
-              'source': 'SYSTEM',
-              'system_coat_pattern_id': state.patternId,
-            }
-          : <String, dynamic>{
-              'source': 'CUSTOM',
-              'custom_coat_pattern_name': state.customPatternName.trim(),
-            },
-      'colors': colors,
-      'is_neutered': state.isNeutered,
-      'is_outdoor': state.isOutdoor,
-      if (state.microchipId.trim().isNotEmpty)
-        'microchip_id': state.microchipId.trim(),
-      if (state.microchipInstalledAt != null)
-        'microchip_installed_at': _fmtDate(state.microchipInstalledAt!),
-    };
-  }
-
-  String _fmtDate(DateTime date) {
-    final yyyy = date.year.toString().padLeft(4, '0');
-    final mm = date.month.toString().padLeft(2, '0');
-    final dd = date.day.toString().padLeft(2, '0');
-    return '$yyyy-$mm-$dd';
+    return CreatePetPayload(
+      name: state.name.trim(),
+      speciesId: state.speciesId!,
+      sex: state.sex,
+      birthDate: state.birthDate,
+      breed: state.breedMode == CatalogPickMode.catalog
+          ? PetBreed(
+              source: 'SYSTEM',
+              systemBreedId: state.breedId,
+            )
+          : PetBreed(
+              source: 'CUSTOM',
+              customBreedName: state.customBreedName.trim(),
+            ),
+      colors: colors,
+      coatPattern: state.patternMode == CatalogPickMode.catalog
+          ? PetCoatPattern(
+              source: 'SYSTEM',
+              systemCoatPatternId: state.patternId,
+            )
+          : PetCoatPattern(
+              source: 'CUSTOM',
+              customCoatPatternName: state.customPatternName.trim(),
+            ),
+      isNeutered: state.isNeutered,
+      isOutdoor: state.isOutdoor,
+      microchipId:
+          state.microchipId.trim().isEmpty ? null : state.microchipId.trim(),
+      microchipInstalledAt: state.microchipInstalledAt,
+    );
   }
 
   String? _normalizeHex(String input) {

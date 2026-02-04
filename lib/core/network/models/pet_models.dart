@@ -1,3 +1,4 @@
+import 'acl_models.dart';
 import 'common_models.dart';
 import 'json_map.dart';
 import 'json_parsers.dart';
@@ -103,6 +104,7 @@ class Pet {
     required this.isNeutered,
     required this.isOutdoor,
     this.profilePhotoFileId,
+    this.profilePhotoDownloadUrl,
     this.microchipId,
     this.microchipInstalledAt,
     required this.status,
@@ -125,6 +127,7 @@ class Pet {
   final String isNeutered;
   final bool isOutdoor;
   final String? profilePhotoFileId;
+  final String? profilePhotoDownloadUrl;
   final String? microchipId;
   final DateTime? microchipInstalledAt;
   final String status;
@@ -154,6 +157,9 @@ class Pet {
       isNeutered: asString(json['is_neutered']),
       isOutdoor: asBool(json['is_outdoor']),
       profilePhotoFileId: asNullableString(json['profile_photo_file_id']),
+      profilePhotoDownloadUrl: asNullableString(
+        json['profile_photo_download_url'],
+      ),
       microchipId: asNullableString(json['microchip_id']),
       microchipInstalledAt: asDateTime(json['microchip_installed_at']),
       status: asString(json['status']),
@@ -199,7 +205,7 @@ class CreatePetPayload {
       'name': name,
       'species_id': speciesId,
       'sex': sex,
-      'birth_date': birthDate?.toIso8601String(),
+      'birth_date': birthDate == null ? null : formatDate(birthDate!),
       'breed': breed.toJson(),
       'colors': colors.map((item) => item.toJson()).toList(growable: false),
       'coat_pattern': coatPattern.toJson(),
@@ -207,7 +213,9 @@ class CreatePetPayload {
       'is_outdoor': isOutdoor,
       'profile_photo_file_id': profilePhotoFileId,
       'microchip_id': microchipId,
-      'microchip_installed_at': microchipInstalledAt?.toIso8601String(),
+      'microchip_installed_at': microchipInstalledAt == null
+          ? null
+          : formatDate(microchipInstalledAt!),
     }..removeWhere((_, dynamic value) => value == null);
   }
 }
@@ -298,13 +306,22 @@ class PetEnvelopeResponse {
 }
 
 class PetListItem {
-  const PetListItem({required this.pet});
+  const PetListItem({
+    required this.pet,
+    required this.myAccess,
+  });
 
   final Pet pet;
+  final AclMyAccess? myAccess;
 
   factory PetListItem.fromJson(Object? data) {
     final json = asJsonMap(data);
-    return PetListItem(pet: Pet.fromJson(json['pet']));
+    return PetListItem(
+      pet: Pet.fromJson(json['pet']),
+      myAccess: json['my_access'] == null
+          ? null
+          : AclMyAccess.fromJson(json['my_access']),
+    );
   }
 }
 

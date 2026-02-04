@@ -1,22 +1,12 @@
-import '../../../core/network/api_client.dart';
-import '../../../core/network/api_context.dart';
-import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/clients/pets_api_client.dart';
 import '../../../core/network/models/pet_models.dart';
 
 class PetCreateRepository {
-  PetCreateRepository(this._apiClient);
+  PetCreateRepository(this._petsApiClient);
 
-  final ApiClient _apiClient;
+  final PetsApiClient _petsApiClient;
 
-  Future<PetEnvelopeResponse> createPet(Map<String, dynamic> body) {
-    return _apiClient.post<PetEnvelopeResponse>(
-      ApiEndpoints.pets,
-      data: body,
-      requestOptions: const ApiRequestOptions(
-        requiresUserId: true,
-        requiresAccessToken: true,
-      ),
-      decoder: PetEnvelopeResponse.fromJson,
-    );
+  Future<PetEnvelopeResponse> createPet(CreatePetPayload payload) {
+    return _petsApiClient.createPet(payload);
   }
 }

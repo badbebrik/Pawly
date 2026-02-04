@@ -69,6 +69,13 @@ DateTime? asDateTime(Object? value) {
   return DateTime.tryParse(value);
 }
 
+String formatDate(DateTime value) {
+  final yyyy = value.year.toString().padLeft(4, '0');
+  final mm = value.month.toString().padLeft(2, '0');
+  final dd = value.day.toString().padLeft(2, '0');
+  return '$yyyy-$mm-$dd';
+}
+
 Map<String, String> asStringMap(Object? value) {
   if (value is! Map) {
     return const <String, String>{};

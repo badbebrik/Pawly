@@ -254,6 +254,33 @@ class AclInviteListResponse {
   }
 }
 
+class AclMyAccess {
+  const AclMyAccess({
+    required this.memberId,
+    required this.status,
+    required this.isPrimaryOwner,
+    required this.role,
+    required this.policy,
+  });
+
+  final String memberId;
+  final String status;
+  final bool isPrimaryOwner;
+  final AclRole role;
+  final AclPolicy policy;
+
+  factory AclMyAccess.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return AclMyAccess(
+      memberId: asString(json['member_id']),
+      status: asString(json['status']),
+      isPrimaryOwner: asBool(json['is_primary_owner']),
+      role: AclRole.fromJson(json['role']),
+      policy: AclPolicy.fromJson(json['policy']),
+    );
+  }
+}
+
 class AclAccessResponse {
   const AclAccessResponse({required this.petId, required this.member});
 
