@@ -6,5 +6,9 @@ class AppRoutes {
   static const String register = '/auth/register';
   static const String postRegisterChoice = '/auth/post-register-choice';
   static const String home = '/home';
+  static const String guides = '/home/guides';
+  static const String calendar = '/home/calendar';
+  static const String pets = '/home/pets';
+  static const String settings = '/home/settings';
   static const String petCreate = '/pets/create';
 }

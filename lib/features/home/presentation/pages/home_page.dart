@@ -1,45 +1,48 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/app_routes.dart';
-import '../../../../design_system/design_system.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
+class HomePage extends StatelessWidget {
+  const HomePage({
+    required this.navigationShell,
+    super.key,
+  });
 
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+  final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pawly Home'),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () async {
-              await ref.read(authRepositoryProvider).logout();
-              if (context.mounted) {
-                context.go(AppRoutes.login);
-              }
-            },
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Выйти',
+      body: navigationShell,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (index) {
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
+        destinations: const <NavigationDestination>[
+          NavigationDestination(
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book_rounded),
+            label: 'Гайды',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month_rounded),
+            label: 'Календарь',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.pets_outlined),
+            selectedIcon: Icon(Icons.pets_rounded),
+            label: 'Питомцы',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.menu_rounded),
+            selectedIcon: Icon(Icons.menu_open_rounded),
+            label: 'Настройки',
           ),
         ],
-      ),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(PawlySpacing.lg),
-          child: Text(
-            'Главный экран приложения',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push(AppRoutes.petCreate),
-        tooltip: 'Создать питомца',
-        child: const Icon(Icons.add_rounded),
       ),
     );
   }
