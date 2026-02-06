@@ -1,3 +1,6 @@
+import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../../../core/network/clients/acl_api_client.dart';
 import '../../../core/network/clients/pets_api_client.dart';
 import '../../../core/network/models/acl_models.dart';
@@ -8,11 +11,14 @@ class PetsRepository {
   PetsRepository({
     required PetsApiClient petsApiClient,
     required AclApiClient aclApiClient,
+    required Dio uploadDio,
   })  : _petsApiClient = petsApiClient,
-        _aclApiClient = aclApiClient;
+        _aclApiClient = aclApiClient,
+        _uploadDio = uploadDio;
 
   final PetsApiClient _petsApiClient;
   final AclApiClient _aclApiClient;
+  final Dio _uploadDio;
 
   Future<List<PetListEntry>> listAvailablePets({
     required String currentUserId,
@@ -61,6 +67,69 @@ class PetsRepository {
       roleTitle: response.member.role.title,
       isPrimaryOwner: response.member.isPrimaryOwner,
     );
+  }
+
+  Future<Pet> uploadPetPhoto({
+    required Pet pet,
+    required XFile file,
+  }) async {
+    final mimeType = _resolveImageMimeType(file.path);
+    if (mimeType == null) {
+      throw StateError('Поддерживаются только JPG и PNG изображения.');
+    }
+
+    final bytes = await file.readAsBytes();
+    final initResponse = await _petsApiClient.initPhotoUpload(
+      pet.id,
+      InitPetPhotoUploadPayload(
+        mimeType: mimeType,
+        originalFilename: _fileNameFromPath(file.path),
+        expectedSizeBytes: bytes.length,
+      ),
+    );
+
+    await _uploadDio.request<Object?>(
+      initResponse.upload.url,
+      data: bytes,
+      options: Options(
+        method: initResponse.upload.method,
+        headers: <String, dynamic>{
+          ...initResponse.upload.headers,
+          if (!initResponse.upload.headers.containsKey('Content-Type'))
+            'Content-Type': mimeType,
+        },
+        responseType: ResponseType.plain,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 300,
+      ),
+    );
+
+    final confirmResponse = await _petsApiClient.confirmPhotoUpload(
+      pet.id,
+      ConfirmPetPhotoUploadPayload(
+        rowVersion: pet.rowVersion,
+        fileId: initResponse.fileId,
+        sizeBytes: bytes.length,
+      ),
+    );
+
+    return confirmResponse.pet;
+  }
+
+  String _fileNameFromPath(String path) {
+    final segments = path.split(RegExp(r'[\\/]'));
+    return segments.isEmpty ? 'pet_photo.jpg' : segments.last;
+  }
+
+  String? _resolveImageMimeType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (lower.endsWith('.png')) {
+      return 'image/png';
+    }
+    return null;
   }
 }
 

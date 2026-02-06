@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/pets_repository.dart';
 import '../providers/active_pet_controller.dart';
+import '../providers/active_pet_details_controller.dart';
 import '../providers/pets_controller.dart';
 
 class PetsPage extends ConsumerWidget {
@@ -33,15 +35,7 @@ class PetsPage extends ConsumerWidget {
                 return _PetsListView(state: petsState);
               }
 
-              final activeEntry = _findActiveEntry(
-                items: petsState.items,
-                activePetId: activePetId,
-              );
-
-              return _ActivePetView(
-                activePetId: activePetId,
-                activeEntry: activeEntry,
-              );
+              return const _ActivePetView();
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => _PetsErrorView(
@@ -59,18 +53,6 @@ class PetsPage extends ConsumerWidget {
       ),
     );
   }
-}
-
-PetListEntry? _findActiveEntry({
-  required List<PetListEntry> items,
-  required String activePetId,
-}) {
-  for (final item in items) {
-    if (item.id == activePetId) {
-      return item;
-    }
-  }
-  return null;
 }
 
 class _PetsListView extends ConsumerWidget {
@@ -244,9 +226,13 @@ class _PetListCard extends StatelessWidget {
 }
 
 class _PetAvatar extends StatelessWidget {
-  const _PetAvatar({required this.photoUrl});
+  const _PetAvatar({
+    required this.photoUrl,
+    this.size = 110,
+  });
 
   final String? photoUrl;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -254,8 +240,8 @@ class _PetAvatar extends StatelessWidget {
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
 
     return Container(
-      width: 110,
-      height: 110,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: colorScheme.onSurface, width: 2.2),
@@ -294,77 +280,335 @@ class _PetAvatarFallback extends StatelessWidget {
   }
 }
 
-class _ActivePetView extends ConsumerWidget {
-  const _ActivePetView({
-    required this.activePetId,
-    required this.activeEntry,
+class _PetFeatureCard extends StatelessWidget {
+  const _PetFeatureCard({
+    required this.title,
+    required this.icon,
   });
 
-  final String activePetId;
-  final PetListEntry? activeEntry;
+  final String title;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(PawlySpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(color: colorScheme.outline, width: 1.4),
+        boxShadow: PawlyElevation.soft(colorScheme.shadow),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 28, color: colorScheme.primary),
+          const SizedBox(height: PawlySpacing.sm),
+          Text(
+            title,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PetFeatureWideCard extends StatelessWidget {
+  const _PetFeatureWideCard({
+    required this.title,
+    required this.icon,
+  });
+
+  final String title;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(PawlySpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(color: colorScheme.outline, width: 1.4),
+        boxShadow: PawlyElevation.soft(colorScheme.shadow),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 28, color: colorScheme.primary),
+          const SizedBox(width: PawlySpacing.sm),
+          Text(
+            title,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivePetView extends ConsumerWidget {
+  const _ActivePetView();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final entry = activeEntry;
+    final petDetailsAsync = ref.watch(activePetDetailsControllerProvider);
 
-    if (entry == null) {
-      return Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: Text('Активный питомец не найден',
-              style: theme.textTheme.titleLarge),
-          footer: PawlyButton(
-            label: 'Сбросить активного питомца',
-            onPressed: () =>
+    return petDetailsAsync.when(
+      data: (details) {
+        if (details == null) {
+          return _PetsErrorView(
+            message: 'Активный питомец не найден.',
+            onRetry: () =>
                 ref.read(activePetControllerProvider.notifier).clear(),
-            variant: PawlyButtonVariant.secondary,
+          );
+        }
+
+        final pet = details.pet;
+        final ageLabel = _petAgeLabel(pet.birthDate);
+
+        return ListView(
+          padding: const EdgeInsets.all(PawlySpacing.lg),
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Stack(
+                  children: <Widget>[
+                    _PetAvatar(
+                      photoUrl: pet.profilePhotoDownloadUrl,
+                      size: 112,
+                    ),
+                    if (details.isUploadingPhoto)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.28),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2.6),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: PawlySpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        pet.name,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: PawlySpacing.xxs),
+                      Text(
+                        '${details.speciesName} · $ageLabel',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: PawlySpacing.sm),
+                IconButton.outlined(
+                  onPressed: () => _showPhotoActionsSheet(context, ref),
+                  icon: const Icon(Icons.edit_rounded),
+                  tooltip: 'Изменить фото питомца',
+                ),
+              ],
+            ),
+            const SizedBox(height: PawlySpacing.xl),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: PawlySpacing.md,
+              crossAxisSpacing: PawlySpacing.md,
+              childAspectRatio: 1.18,
+              children: const <Widget>[
+                _PetFeatureCard(
+                  title: 'Записи',
+                  icon: Icons.edit_note_rounded,
+                ),
+                _PetFeatureCard(
+                  title: 'Здоровье',
+                  icon: Icons.health_and_safety_rounded,
+                ),
+                _PetFeatureCard(
+                  title: 'Совместный доступ',
+                  icon: Icons.group_rounded,
+                ),
+                _PetFeatureCard(
+                  title: 'Аналитика',
+                  icon: Icons.bar_chart_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            const _PetFeatureWideCard(
+              title: 'Документы',
+              icon: Icons.folder_copy_rounded,
+            ),
+            const SizedBox(height: PawlySpacing.lg),
+            PawlyButton(
+              label: 'Сменить питомца',
+              onPressed: () =>
+                  ref.read(activePetControllerProvider.notifier).clear(),
+              variant: PawlyButtonVariant.secondary,
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _PetsErrorView(
+        message: 'Не удалось загрузить карточку питомца.',
+        onRetry: () =>
+            ref.read(activePetDetailsControllerProvider.notifier).reload(),
+      ),
+    );
+  }
+}
+
+String _petAgeLabel(DateTime? birthDate) {
+  if (birthDate == null) {
+    return 'возраст неизвестен';
+  }
+
+  final now = DateTime.now();
+  var years = now.year - birthDate.year;
+  var months = now.month - birthDate.month;
+
+  if (now.day < birthDate.day) {
+    months -= 1;
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  if (years > 0) {
+    return '$years ${_yearsWord(years)}';
+  }
+  if (months > 0) {
+    return '$months ${_monthsWord(months)}';
+  }
+  return 'меньше месяца';
+}
+
+String _yearsWord(int value) {
+  final mod10 = value % 10;
+  final mod100 = value % 100;
+  if (mod10 == 1 && mod100 != 11) {
+    return 'год';
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return 'года';
+  }
+  return 'лет';
+}
+
+String _monthsWord(int value) {
+  final mod10 = value % 10;
+  final mod100 = value % 100;
+  if (mod10 == 1 && mod100 != 11) {
+    return 'месяц';
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return 'месяца';
+  }
+  return 'месяцев';
+}
+
+Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(PawlyRadius.xl)),
+    ),
+    builder: (context) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PawlySpacing.md,
+            PawlySpacing.md,
+            PawlySpacing.md,
+            PawlySpacing.lg,
           ),
-          child: Text(
-            'В storage сохранен id `$activePetId`, но в текущем списке питомцев его нет.',
-            style: theme.textTheme.bodyMedium,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Выбрать из галереи'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _uploadPetPhoto(context, ref, ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded),
+                title: const Text('Сделать фото'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _uploadPetPhoto(context, ref, ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _uploadPetPhoto(
+  BuildContext context,
+  WidgetRef ref,
+  ImageSource source,
+) async {
+  try {
+    await ref
+        .read(activePetDetailsControllerProvider.notifier)
+        .uploadPhoto(source);
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось установить фото питомца.',
           ),
         ),
       );
     }
-
-    return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
-      children: <Widget>[
-        PawlyCard(
-          title: Text(entry.name, style: theme.textTheme.headlineSmall),
-          trailing: Chip(label: Text(entry.roleTitle)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(entry.speciesName, style: theme.textTheme.titleMedium),
-              const SizedBox(height: PawlySpacing.sm),
-              Text(
-                entry.isOwnedByMe
-                    ? 'Активный питомец принадлежит вам.'
-                    : 'Активный питомец доступен вам по роли.',
-                style: theme.textTheme.bodyMedium,
-              ),
-              if (entry.photoUrl != null &&
-                  entry.photoUrl!.isNotEmpty) ...<Widget>[
-                const SizedBox(height: PawlySpacing.md),
-                Text(
-                  'Фото уже доступно в API и будет подключено на следующем шаге.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        PawlyButton(
-          label: 'Сменить питомца',
-          onPressed: () =>
-              ref.read(activePetControllerProvider.notifier).clear(),
-          variant: PawlyButtonVariant.secondary,
-        ),
-      ],
-    );
   }
 }
 
