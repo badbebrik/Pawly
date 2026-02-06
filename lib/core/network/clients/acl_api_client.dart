@@ -9,12 +9,15 @@ class AclApiClient {
 
   final ApiClient _apiClient;
 
-  static const _withUser = ApiRequestOptions(requiresUserId: true);
+  static const _withUserAndToken = ApiRequestOptions(
+    requiresUserId: true,
+    requiresAccessToken: true,
+  );
 
   Future<AclPresetListResponse> listPresets() {
     return _apiClient.get<AclPresetListResponse>(
       ApiEndpoints.aclPresets,
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclPresetListResponse.fromJson,
     );
   }
@@ -22,7 +25,7 @@ class AclApiClient {
   Future<AclAccessResponse> getMyAccess(String petId) {
     return _apiClient.get<AclAccessResponse>(
       ApiEndpoints.aclMe(petId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclAccessResponse.fromJson,
     );
   }
@@ -30,7 +33,7 @@ class AclApiClient {
   Future<AclMemberListResponse> listMembers(String petId) {
     return _apiClient.get<AclMemberListResponse>(
       ApiEndpoints.aclMembers(petId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclMemberListResponse.fromJson,
     );
   }
@@ -43,7 +46,7 @@ class AclApiClient {
     return _apiClient.patch<AclMemberEnvelope>(
       ApiEndpoints.aclMemberById(petId, memberId),
       data: payload.toJson(),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclMemberEnvelope.fromJson,
     );
   }
@@ -51,7 +54,7 @@ class AclApiClient {
   Future<AclMemberEnvelope> removeMember(String petId, String memberId) {
     return _apiClient.delete<AclMemberEnvelope>(
       ApiEndpoints.aclMemberById(petId, memberId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclMemberEnvelope.fromJson,
     );
   }
@@ -59,7 +62,7 @@ class AclApiClient {
   Future<AclRoleListResponse> listRoles(String petId) {
     return _apiClient.get<AclRoleListResponse>(
       ApiEndpoints.aclRoles(petId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclRoleListResponse.fromJson,
     );
   }
@@ -68,7 +71,7 @@ class AclApiClient {
     return _apiClient.post<AclRoleEnvelope>(
       ApiEndpoints.aclRoles(petId),
       data: payload.toJson(),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclRoleEnvelope.fromJson,
     );
   }
@@ -76,7 +79,7 @@ class AclApiClient {
   Future<EmptyResponse> deleteRole(String petId, String roleId) {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.aclRoleById(petId, roleId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -84,7 +87,7 @@ class AclApiClient {
   Future<AclInviteListResponse> listInvites(String petId) {
     return _apiClient.get<AclInviteListResponse>(
       ApiEndpoints.aclInvites(petId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclInviteListResponse.fromJson,
     );
   }
@@ -96,7 +99,7 @@ class AclApiClient {
     return _apiClient.post<AclInviteEnvelope>(
       ApiEndpoints.aclInvites(petId),
       data: payload.toJson(),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AclInviteEnvelope.fromJson,
     );
   }
@@ -104,7 +107,7 @@ class AclApiClient {
   Future<EmptyResponse> revokeInvite(String petId, String inviteId) {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.aclInviteById(petId, inviteId),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -115,7 +118,7 @@ class AclApiClient {
     return _apiClient.post<AcceptInviteResponse>(
       ApiEndpoints.aclAcceptInviteByCode,
       data: payload.toJson(),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AcceptInviteResponse.fromJson,
     );
   }
@@ -126,7 +129,7 @@ class AclApiClient {
     return _apiClient.post<AcceptInviteResponse>(
       ApiEndpoints.aclAcceptInviteByToken,
       data: payload.toJson(),
-      requestOptions: _withUser,
+      requestOptions: _withUserAndToken,
       decoder: AcceptInviteResponse.fromJson,
     );
   }

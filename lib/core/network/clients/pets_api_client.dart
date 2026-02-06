@@ -8,12 +8,16 @@ class PetsApiClient {
   PetsApiClient(this._apiClient);
 
   final ApiClient _apiClient;
+  static const _withUserAndToken = ApiRequestOptions(
+    requiresUserId: true,
+    requiresAccessToken: true,
+  );
 
   Future<PetEnvelopeResponse> createPet(CreatePetPayload payload) {
     return _apiClient.post<PetEnvelopeResponse>(
       ApiEndpoints.pets,
       data: payload.toJson(),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: PetEnvelopeResponse.fromJson,
     );
   }
@@ -30,7 +34,7 @@ class PetsApiClient {
         'offset': offset,
         'limit': limit,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: PetListResponse.fromJson,
     );
   }
@@ -38,7 +42,7 @@ class PetsApiClient {
   Future<PetEnvelopeResponse> getPet(String petId) {
     return _apiClient.get<PetEnvelopeResponse>(
       ApiEndpoints.petById(petId),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: PetEnvelopeResponse.fromJson,
     );
   }
@@ -48,7 +52,7 @@ class PetsApiClient {
     return _apiClient.put<PetEnvelopeResponse>(
       ApiEndpoints.petById(petId),
       data: payload.toJson(),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: PetEnvelopeResponse.fromJson,
     );
   }
@@ -60,7 +64,7 @@ class PetsApiClient {
     return _apiClient.post<PetEnvelopeResponse>(
       ApiEndpoints.petStatus(petId),
       data: payload.toJson(),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: PetEnvelopeResponse.fromJson,
     );
   }
@@ -72,7 +76,7 @@ class PetsApiClient {
     return _apiClient.post<InitUploadResponse>(
       ApiEndpoints.petPhotoInitUpload(petId),
       data: payload.toJson(),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: InitUploadResponse.fromJson,
     );
   }
@@ -84,7 +88,7 @@ class PetsApiClient {
     return _apiClient.post<PetEnvelopeResponse>(
       ApiEndpoints.petPhotoConfirmUpload(petId),
       data: payload.toJson(),
-      requestOptions: const ApiRequestOptions(requiresUserId: true),
+      requestOptions: _withUserAndToken,
       decoder: PetEnvelopeResponse.fromJson,
     );
   }

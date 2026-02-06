@@ -65,7 +65,10 @@ class AuthApiClient {
     return _apiClient.post<AuthTokensResponse>(
       ApiEndpoints.authRefresh,
       data: payload.toJson(),
-      requestOptions: const ApiRequestOptions(skipTokenRefresh: true),
+      requestOptions: const ApiRequestOptions(
+        requiresAccessToken: true,
+        skipTokenRefresh: true,
+      ),
       decoder: AuthTokensResponse.fromJson,
     );
   }

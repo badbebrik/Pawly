@@ -98,6 +98,14 @@ class PetsController extends AsyncNotifier<PetsState> {
     await reload();
   }
 
+  Future<String> acceptInviteByCode(String code) async {
+    final result = await ref.read(petsRepositoryProvider).acceptInviteByCode(
+          code.trim().toUpperCase(),
+        );
+    await reload();
+    return result.petId;
+  }
+
   Future<PetsState> _loadState({required PetsState base}) async {
     final currentUserId = await ref.read(currentUserIdProvider.future);
     if (currentUserId == null || currentUserId.isEmpty) {

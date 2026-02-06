@@ -266,28 +266,30 @@ class PetCreateController extends Notifier<PetCreateState> {
     );
   }
 
-  Future<bool> submit(CatalogSnapshot catalog) async {
-    if (state.isSubmitting) return false;
+  Future<Pet?> submit(CatalogSnapshot catalog) async {
+    if (state.isSubmitting) return null;
 
     final validationError = _validate(catalog);
     if (validationError != null) {
       state = state.copyWith(error: validationError);
-      return false;
+      return null;
     }
 
     final payload = _buildRequest();
     state = state.copyWith(isSubmitting: true, clearError: true);
 
     try {
-      await ref.read(petCreateRepositoryProvider).createPet(payload);
+      final response = await ref.read(petCreateRepositoryProvider).createPet(
+            payload,
+          );
       state = state.copyWith(isSubmitting: false);
-      return true;
+      return response.pet;
     } catch (_) {
       state = state.copyWith(
         isSubmitting: false,
         error: 'Не удалось создать питомца. Попробуйте снова.',
       );
-      return false;
+      return null;
     }
   }
 
