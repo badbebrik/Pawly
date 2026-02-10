@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../api_context.dart';
 import '../api_endpoints.dart';
+import '../models/auth_models.dart';
 import '../session/auth_session_store.dart';
 
 class AuthRefreshInterceptor extends Interceptor {
@@ -92,24 +93,17 @@ class AuthRefreshInterceptor extends Interceptor {
       );
 
       final data = response.data;
-      if (data is! Map<String, dynamic>) {
-        return false;
-      }
-
-      final accessToken = data['access_token']?.toString();
-      final refreshToken = data['refresh_token']?.toString();
-
-      if (accessToken == null || refreshToken == null) {
-        return false;
-      }
+      final tokens = AuthTokensResponse.fromJson(data);
 
       await _sessionStore.updateTokens(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       );
 
       return true;
     } on DioException {
+      return false;
+    } on FormatException {
       return false;
     }
   }

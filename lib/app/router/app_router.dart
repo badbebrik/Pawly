@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../../core/network/session/auth_session_store.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
@@ -14,9 +15,31 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import 'app_routes.dart';
 
-GoRouter buildAppRouter() {
+GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
+    redirect: (context, state) async {
+      final location = state.matchedLocation;
+      final session = await authSessionStore.read();
+      final isAuthenticated =
+          session != null &&
+          session.accessToken.isNotEmpty &&
+          session.refreshToken.isNotEmpty;
+
+      if (_isSplashRoute(location)) {
+        return null;
+      }
+
+      if (!isAuthenticated && _isProtectedRoute(location)) {
+        return AppRoutes.login;
+      }
+
+      if (isAuthenticated && _isPublicAuthRoute(location)) {
+        return AppRoutes.home;
+      }
+
+      return null;
+    },
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.splash,
@@ -119,4 +142,26 @@ GoRouter buildAppRouter() {
       ),
     ],
   );
+}
+
+bool _isSplashRoute(String location) => location == AppRoutes.splash;
+
+bool _isPublicAuthRoute(String location) {
+  return location == AppRoutes.login || location == AppRoutes.register;
+}
+
+bool _isProtectedRoute(String location) {
+  return location == AppRoutes.postRegisterChoice ||
+      location == AppRoutes.home ||
+      location.startsWith('${AppRoutes.home}/') ||
+      location == AppRoutes.guides ||
+      location.startsWith('${AppRoutes.guides}/') ||
+      location == AppRoutes.calendar ||
+      location.startsWith('${AppRoutes.calendar}/') ||
+      location == AppRoutes.pets ||
+      location.startsWith('${AppRoutes.pets}/') ||
+      location == AppRoutes.settings ||
+      location.startsWith('${AppRoutes.settings}/') ||
+      location == AppRoutes.petCreate ||
+      location.startsWith('${AppRoutes.petCreate}/');
 }

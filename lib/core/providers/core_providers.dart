@@ -91,11 +91,12 @@ final mediaPickerServiceProvider = Provider<MediaPickerService>((ref) {
 });
 
 final googleSignInServiceProvider = Provider<GoogleSignInService>((ref) {
-  return FallbackGoogleSignInService();
+  return AppGoogleSignInService();
 });
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final router = buildAppRouter();
+  final authSessionStore = ref.watch(authSessionStoreProvider);
+  final router = buildAppRouter(authSessionStore: authSessionStore);
   ref.onDispose(router.dispose);
   return router;
 });

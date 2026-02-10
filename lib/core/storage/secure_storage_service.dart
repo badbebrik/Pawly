@@ -11,6 +11,7 @@ class SecureStorageService {
   static const String refreshTokenKey = 'refresh_token';
   static const String userIdKey = 'user_id';
   static const String localeKey = 'locale';
+  static const String themeModeKey = 'theme_mode';
   static const String _activePetIdKeyPrefix = 'active_pet_id';
 
   final FlutterSecureStorage _storage;
@@ -70,6 +71,14 @@ class SecureStorageService {
 
   Future<String?> getLocale() {
     return _storage.read(key: localeKey);
+  }
+
+  Future<void> saveThemeMode(String themeMode) {
+    return _storage.write(key: themeModeKey, value: themeMode);
+  }
+
+  Future<String?> getThemeMode() {
+    return _storage.read(key: themeModeKey);
   }
 
   Future<void> clearSession() async {

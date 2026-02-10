@@ -1,4 +1,4 @@
-package com.example.pawly
+package com.hse.pawly
 
 import io.flutter.embedding.android.FlutterActivity
 

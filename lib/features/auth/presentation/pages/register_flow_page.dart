@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../app/providers/session_state_reset.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/auth_providers.dart';
 import '../utils/auth_error_message.dart';
@@ -307,7 +308,10 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
       });
     } catch (error) {
       if (mounted) {
-        _showError(authErrorMessage(error));
+        final message = authErrorMessage(error);
+        if (message != null) {
+          _showError(message);
+        }
       }
     } finally {
       if (mounted) {
@@ -337,6 +341,7 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
             email: _emailController.text.trim(),
             code: _codeController.text.trim(),
           );
+      resetSessionState(ref);
 
       if (!mounted) {
         return;
@@ -345,7 +350,10 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
       context.go(AppRoutes.postRegisterChoice);
     } catch (error) {
       if (mounted) {
-        _showError(authErrorMessage(error));
+        final message = authErrorMessage(error);
+        if (message != null) {
+          _showError(message);
+        }
       }
     } finally {
       if (mounted) {

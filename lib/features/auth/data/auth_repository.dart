@@ -3,16 +3,20 @@ import '../../../core/network/clients/auth_api_client.dart';
 import '../../../core/network/models/auth_models.dart';
 import '../../../core/network/session/auth_session.dart';
 import '../../../core/network/session/auth_session_store.dart';
+import '../../../core/services/google_sign_in_service.dart';
 
 class AuthRepository {
   AuthRepository({
     required AuthApiClient authApiClient,
     required AuthSessionStore authSessionStore,
+    required GoogleSignInService googleSignInService,
   })  : _authApiClient = authApiClient,
-        _authSessionStore = authSessionStore;
+        _authSessionStore = authSessionStore,
+        _googleSignInService = googleSignInService;
 
   final AuthApiClient _authApiClient;
   final AuthSessionStore _authSessionStore;
+  final GoogleSignInService _googleSignInService;
 
   Future<bool> tryRestoreSession() async {
     final existingSession = await _authSessionStore.read();
@@ -90,6 +94,7 @@ class AuthRepository {
       // Clear local session even if backend logout fails.
     }
 
+    await _googleSignInService.signOut();
     await _authSessionStore.clear();
   }
 

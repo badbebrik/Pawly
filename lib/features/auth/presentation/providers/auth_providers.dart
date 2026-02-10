@@ -8,10 +8,12 @@ enum AppLaunchDestination { authenticated, unauthenticated }
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final authApiClient = ref.watch(authApiClientProvider);
   final sessionStore = ref.watch(authSessionStoreProvider);
+  final googleSignInService = ref.watch(googleSignInServiceProvider);
 
   return AuthRepository(
     authApiClient: authApiClient,
     authSessionStore: sessionStore,
+    googleSignInService: googleSignInService,
   );
 });
 

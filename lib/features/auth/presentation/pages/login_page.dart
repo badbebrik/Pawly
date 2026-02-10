@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../app/providers/session_state_reset.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/auth_providers.dart';
@@ -123,6 +124,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      resetSessionState(ref);
 
       if (!mounted) {
         return;
@@ -134,7 +136,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return;
       }
 
-      _showError(authErrorMessage(error));
+      final message = authErrorMessage(error);
+      if (message != null) {
+        _showError(message);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -162,6 +167,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
 
       await ref.read(authRepositoryProvider).loginWithGoogle(idToken: idToken);
+      resetSessionState(ref);
 
       if (!mounted) {
         return;
@@ -173,7 +179,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return;
       }
 
-      _showError(authErrorMessage(error));
+      final message = authErrorMessage(error);
+      if (message != null) {
+        _showError(message);
+      }
     } finally {
       if (mounted) {
         setState(() {

@@ -2,46 +2,6 @@ import 'common_models.dart';
 import 'json_map.dart';
 import 'json_parsers.dart';
 
-class PublicContactSettings {
-  const PublicContactSettings({
-    required this.showOwnerName,
-    required this.showPhone,
-    required this.showEmail,
-    required this.showExtraContacts,
-    this.publicDisplayNameOverride,
-  });
-
-  final bool showOwnerName;
-  final bool showPhone;
-  final bool showEmail;
-  final bool showExtraContacts;
-  final String? publicDisplayNameOverride;
-
-  factory PublicContactSettings.fromJson(Object? data) {
-    final json = asJsonMap(data);
-
-    return PublicContactSettings(
-      showOwnerName: asBool(json['show_owner_name']),
-      showPhone: asBool(json['show_phone']),
-      showEmail: asBool(json['show_email']),
-      showExtraContacts: asBool(json['show_extra_contacts']),
-      publicDisplayNameOverride: asNullableString(
-        json['public_display_name_override'],
-      ),
-    );
-  }
-
-  JsonMap toJson() {
-    return <String, dynamic>{
-      'show_owner_name': showOwnerName,
-      'show_phone': showPhone,
-      'show_email': showEmail,
-      'show_extra_contacts': showExtraContacts,
-      'public_display_name_override': publicDisplayNameOverride,
-    };
-  }
-}
-
 class ProfileResponse {
   const ProfileResponse({
     required this.userId,
@@ -53,8 +13,6 @@ class ProfileResponse {
     required this.locale,
     required this.timeZone,
     required this.dateFormat,
-    required this.publicContactSettings,
-    required this.extraContacts,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -68,8 +26,6 @@ class ProfileResponse {
   final String locale;
   final String timeZone;
   final String dateFormat;
-  final PublicContactSettings publicContactSettings;
-  final Map<String, String> extraContacts;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -86,10 +42,6 @@ class ProfileResponse {
       locale: asString(json['locale']),
       timeZone: asString(json['time_zone']),
       dateFormat: asString(json['date_format']),
-      publicContactSettings: PublicContactSettings.fromJson(
-        json['public_contact_settings'],
-      ),
-      extraContacts: asStringMap(json['extra_contacts']),
       createdAt: asDateTime(json['created_at']),
       updatedAt: asDateTime(json['updated_at']),
     );
@@ -104,8 +56,6 @@ class UpdateProfilePayload {
     this.locale,
     this.timeZone,
     this.dateFormat,
-    this.publicContactSettings,
-    this.extraContacts,
   });
 
   final String? firstName;
@@ -114,8 +64,6 @@ class UpdateProfilePayload {
   final String? locale;
   final String? timeZone;
   final String? dateFormat;
-  final PublicContactSettings? publicContactSettings;
-  final Map<String, String>? extraContacts;
 
   JsonMap toJson() {
     return <String, dynamic>{
@@ -125,8 +73,6 @@ class UpdateProfilePayload {
       'locale': locale,
       'time_zone': timeZone,
       'date_format': dateFormat,
-      'public_contact_settings': publicContactSettings?.toJson(),
-      'extra_contacts': extraContacts,
     }..removeWhere((_, dynamic value) => value == null);
   }
 }
