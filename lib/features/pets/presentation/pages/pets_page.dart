@@ -385,9 +385,14 @@ class _ActivePetView extends ConsumerWidget {
               children: <Widget>[
                 Stack(
                   children: <Widget>[
-                    _PetAvatar(
-                      photoUrl: pet.profilePhotoDownloadUrl,
-                      size: 112,
+                    GestureDetector(
+                      onTap: details.isUploadingPhoto
+                          ? null
+                          : () => _showPhotoActionsSheet(context, ref),
+                      child: _PetAvatar(
+                        photoUrl: pet.profilePhotoDownloadUrl,
+                        size: 112,
+                      ),
                     ),
                     if (details.isUploadingPhoto)
                       Positioned.fill(
@@ -437,9 +442,12 @@ class _ActivePetView extends ConsumerWidget {
                 ),
                 const SizedBox(width: PawlySpacing.sm),
                 IconButton.outlined(
-                  onPressed: () => _showPhotoActionsSheet(context, ref),
+                  onPressed: () => context.pushNamed(
+                    'petEdit',
+                    pathParameters: {'petId': pet.id},
+                  ),
                   icon: const Icon(Icons.edit_rounded),
-                  tooltip: 'Изменить фото питомца',
+                  tooltip: 'Редактировать питомца',
                 ),
               ],
             ),
