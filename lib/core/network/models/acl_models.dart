@@ -48,6 +48,30 @@ class AclRole {
   }
 }
 
+class AclMemberProfile {
+  const AclMemberProfile({
+    required this.firstName,
+    required this.lastName,
+    required this.displayName,
+    required this.avatarDownloadUrl,
+  });
+
+  final String? firstName;
+  final String? lastName;
+  final String? displayName;
+  final String? avatarDownloadUrl;
+
+  factory AclMemberProfile.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return AclMemberProfile(
+      firstName: asNullableString(json['first_name']),
+      lastName: asNullableString(json['last_name']),
+      displayName: asNullableString(json['display_name']),
+      avatarDownloadUrl: asNullableString(json['avatar_download_url']),
+    );
+  }
+}
+
 class AclMember {
   const AclMember({
     required this.id,
@@ -57,6 +81,7 @@ class AclMember {
     required this.isPrimaryOwner,
     required this.role,
     required this.policy,
+    required this.profile,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -68,6 +93,7 @@ class AclMember {
   final bool isPrimaryOwner;
   final AclRole role;
   final AclPolicy policy;
+  final AclMemberProfile? profile;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -82,6 +108,9 @@ class AclMember {
       isPrimaryOwner: asBool(json['is_primary_owner']),
       role: AclRole.fromJson(json['role']),
       policy: AclPolicy.fromJson(json['policy']),
+      profile: json['profile'] == null
+          ? null
+          : AclMemberProfile.fromJson(json['profile']),
       createdAt: asDateTime(json['created_at']),
       updatedAt: asDateTime(json['updated_at']),
     );
@@ -296,6 +325,65 @@ class AclAccessResponse {
   }
 }
 
+class AclCapabilities {
+  const AclCapabilities({
+    required this.membersRead,
+    required this.membersWrite,
+  });
+
+  final bool membersRead;
+  final bool membersWrite;
+
+  factory AclCapabilities.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return AclCapabilities(
+      membersRead: asBool(json['members_read']),
+      membersWrite: asBool(json['members_write']),
+    );
+  }
+}
+
+class AclBootstrapResponse {
+  const AclBootstrapResponse({
+    required this.petId,
+    required this.me,
+    required this.capabilities,
+    required this.members,
+    required this.roles,
+    required this.presets,
+    required this.invites,
+  });
+
+  final String petId;
+  final AclMember me;
+  final AclCapabilities capabilities;
+  final List<AclMember> members;
+  final List<AclRole> roles;
+  final List<AclPreset> presets;
+  final List<AclInvite> invites;
+
+  factory AclBootstrapResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return AclBootstrapResponse(
+      petId: asString(json['pet_id']),
+      me: AclMember.fromJson(json['me']),
+      capabilities: AclCapabilities.fromJson(json['capabilities']),
+      members: asJsonMapList(json['members'])
+          .map(AclMember.fromJson)
+          .toList(growable: false),
+      roles: asJsonMapList(json['roles'])
+          .map(AclRole.fromJson)
+          .toList(growable: false),
+      presets: asJsonMapList(json['presets'])
+          .map(AclPreset.fromJson)
+          .toList(growable: false),
+      invites: asJsonMapList(json['invites'])
+          .map(AclInvite.fromJson)
+          .toList(growable: false),
+    );
+  }
+}
+
 class AcceptInviteResponse {
   const AcceptInviteResponse({required this.petId, required this.member});
 
@@ -307,6 +395,19 @@ class AcceptInviteResponse {
     return AcceptInviteResponse(
       petId: asString(json['pet_id']),
       member: AclMember.fromJson(json['member']),
+    );
+  }
+}
+
+class AclInvitePreviewResponse {
+  const AclInvitePreviewResponse({required this.invite});
+
+  final AclInvite invite;
+
+  factory AclInvitePreviewResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return AclInvitePreviewResponse(
+      invite: AclInvite.fromJson(json['invite']),
     );
   }
 }

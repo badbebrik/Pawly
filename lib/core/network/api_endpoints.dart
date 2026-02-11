@@ -34,6 +34,8 @@ class ApiEndpoints {
 
   static const String aclPresets = '/v1/acl/presets';
 
+  static String aclBootstrap(String petId) => '/v1/pets/$petId/acl/bootstrap';
+
   static String aclMe(String petId) => '/v1/pets/$petId/acl/me';
 
   static String aclMembers(String petId) => '/v1/pets/$petId/acl/members';
@@ -51,6 +53,8 @@ class ApiEndpoints {
   static String aclInviteById(String petId, String inviteId) =>
       '/v1/pets/$petId/acl/invites/$inviteId';
 
+  static const String aclPreviewInviteByToken =
+      '/v1/acl/invites/preview-by-token';
   static const String aclAcceptInviteByCode = '/v1/acl/invites/accept-by-code';
   static const String aclAcceptInviteByToken =
       '/v1/acl/invites/accept-by-token';
