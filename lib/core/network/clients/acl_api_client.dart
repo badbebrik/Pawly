@@ -14,6 +14,16 @@ class AclApiClient {
     requiresAccessToken: true,
   );
 
+  static const _public = ApiRequestOptions();
+
+  Future<AclBootstrapResponse> getBootstrap(String petId) {
+    return _apiClient.get<AclBootstrapResponse>(
+      ApiEndpoints.aclBootstrap(petId),
+      requestOptions: _withUserAndToken,
+      decoder: AclBootstrapResponse.fromJson,
+    );
+  }
+
   Future<AclPresetListResponse> listPresets() {
     return _apiClient.get<AclPresetListResponse>(
       ApiEndpoints.aclPresets,
@@ -109,6 +119,17 @@ class AclApiClient {
       ApiEndpoints.aclInviteById(petId, inviteId),
       requestOptions: _withUserAndToken,
       decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<AclInvitePreviewResponse> previewInviteByToken(
+    PreviewInviteByTokenPayload payload,
+  ) {
+    return _apiClient.post<AclInvitePreviewResponse>(
+      ApiEndpoints.aclPreviewInviteByToken,
+      data: payload.toJson(),
+      requestOptions: _public,
+      decoder: AclInvitePreviewResponse.fromJson,
     );
   }
 

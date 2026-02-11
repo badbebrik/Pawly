@@ -468,6 +468,14 @@ class AcceptInviteByCodePayload {
   JsonMap toJson() => <String, dynamic>{'code': code};
 }
 
+class PreviewInviteByTokenPayload {
+  const PreviewInviteByTokenPayload({required this.token});
+
+  final String token;
+
+  JsonMap toJson() => <String, dynamic>{'token': token};
+}
+
 class AcceptInviteByTokenPayload {
   const AcceptInviteByTokenPayload({required this.token});
 
