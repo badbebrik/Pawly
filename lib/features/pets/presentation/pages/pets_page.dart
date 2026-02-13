@@ -284,36 +284,45 @@ class _PetFeatureCard extends StatelessWidget {
   const _PetFeatureCard({
     required this.title,
     required this.icon,
+    this.onTap,
   });
 
   final String title;
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(PawlySpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(PawlyRadius.xl),
-        border: Border.all(color: colorScheme.outline, width: 1.4),
-        boxShadow: PawlyElevation.soft(colorScheme.shadow),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(icon, size: 28, color: colorScheme.primary),
-          const SizedBox(height: PawlySpacing.sm),
-          Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        child: Ink(
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(color: colorScheme.outline, width: 1.4),
+            boxShadow: PawlyElevation.soft(colorScheme.shadow),
           ),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(icon, size: 28, color: colorScheme.primary),
+              const SizedBox(height: PawlySpacing.sm),
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -459,7 +468,7 @@ class _ActivePetView extends ConsumerWidget {
               mainAxisSpacing: PawlySpacing.md,
               crossAxisSpacing: PawlySpacing.md,
               childAspectRatio: 1.18,
-              children: const <Widget>[
+              children: <Widget>[
                 _PetFeatureCard(
                   title: 'Записи',
                   icon: Icons.edit_note_rounded,
@@ -471,6 +480,10 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Совместный доступ',
                   icon: Icons.group_rounded,
+                  onTap: () => context.pushNamed(
+                    'aclAccess',
+                    pathParameters: <String, String>{'petId': pet.id},
+                  ),
                 ),
                 _PetFeatureCard(
                   title: 'Аналитика',
