@@ -1,6 +1,10 @@
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/session/auth_session_store.dart';
+import '../../features/acl/presentation/pages/acl_access_page.dart';
+import '../../features/acl/presentation/pages/acl_create_invite_page.dart';
+import '../../features/acl/presentation/pages/acl_invite_details_page.dart';
+import '../../features/acl/presentation/pages/acl_invite_preview_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
@@ -117,6 +121,32 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                     builder: (_, state) => PetDetailsPage(
                       petId: state.pathParameters['petId']!,
                     ),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'access',
+                        name: 'aclAccess',
+                        builder: (_, state) => AclAccessPage(
+                          petId: state.pathParameters['petId']!,
+                        ),
+                        routes: <RouteBase>[
+                          GoRoute(
+                            path: 'invite',
+                            name: 'aclCreateInvite',
+                            builder: (_, state) => AclCreateInvitePage(
+                              petId: state.pathParameters['petId']!,
+                            ),
+                          ),
+                          GoRoute(
+                            path: 'invites/:inviteId',
+                            name: 'aclInviteDetails',
+                            builder: (_, state) => AclInviteDetailsPage(
+                              petId: state.pathParameters['petId']!,
+                              inviteId: state.pathParameters['inviteId']!,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -139,6 +169,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
         path: AppRoutes.petCreate,
         name: "petCreate",
         builder: (_, __) => const PetCreateFlowPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.aclInvitePreview,
+        name: 'aclInvitePreview',
+        builder: (_, state) => AclInvitePreviewPage(
+          token: state.uri.queryParameters['token'] ?? '',
+        ),
       ),
     ],
   );
