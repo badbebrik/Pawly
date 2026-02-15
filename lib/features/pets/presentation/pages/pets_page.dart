@@ -776,12 +776,13 @@ Future<void> _showJoinByCodeDialog(BuildContext context, WidgetRef ref) async {
                           if (dialogContext.mounted) {
                             Navigator.of(dialogContext).pop();
                           }
-                        } catch (_) {
+                        } catch (error) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content:
-                                    Text('Не удалось присоединиться по коду.'),
+                              SnackBar(
+                                content: Text(
+                                  _acceptInviteByCodeErrorMessage(error),
+                                ),
                               ),
                             );
                           }
@@ -800,4 +801,11 @@ Future<void> _showJoinByCodeDialog(BuildContext context, WidgetRef ref) async {
   );
 
   controller.dispose();
+}
+
+String _acceptInviteByCodeErrorMessage(Object error) {
+  if (error is StateError) {
+    return error.message.toString();
+  }
+  return 'Не удалось присоединиться по коду.';
 }
