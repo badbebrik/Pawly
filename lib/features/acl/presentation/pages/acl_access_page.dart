@@ -95,34 +95,42 @@ class _AclAccessContent extends StatelessWidget {
                   meUserId: state.me.userId,
                 ),
               )),
-        const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          title: Text(
-            'Активные приглашения',
-            style: theme.textTheme.titleLarge,
-          ),
-          trailing: Text(
-            '${invites.length}',
-            style: theme.textTheme.titleMedium,
-          ),
-          footer: onCreateInvite == null
-              ? null
-              : PawlyButton(
-                  label: 'Создать приглашение',
-                  onPressed: onCreateInvite,
-                  icon: Icons.person_add_alt_1_rounded,
+        const SizedBox(height: PawlySpacing.lg),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                'Активные приглашения',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-          child: invites.isEmpty
-              ? const Text('Активных приглашений пока нет.')
-              : Column(
-                  children: invites
-                      .map((invite) => _AclInviteTile(
-                            invite: invite,
-                            onTap: () => onInviteTap(invite.id),
-                          ))
-                      .toList(growable: false),
-                ),
+              ),
+            ),
+            Text(
+              '${invites.length}',
+              style: theme.textTheme.titleMedium,
+            ),
+          ],
         ),
+        const SizedBox(height: PawlySpacing.md),
+        if (invites.isEmpty)
+          const Text('Активных приглашений пока нет.')
+        else
+          ...invites.map((invite) => Padding(
+                padding: const EdgeInsets.only(bottom: PawlySpacing.md),
+                child: _AclInviteTile(
+                  invite: invite,
+                  onTap: () => onInviteTap(invite.id),
+                ),
+              )),
+        if (onCreateInvite != null) ...<Widget>[
+          const SizedBox(height: PawlySpacing.sm),
+          PawlyButton(
+            label: 'Создать приглашение',
+            onPressed: onCreateInvite,
+            icon: Icons.person_add_alt_1_rounded,
+          ),
+        ],
       ],
     );
   }
@@ -232,73 +240,55 @@ class _AclInviteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final expiresAt = invite.expiresAt;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PawlyRadius.lg),
-        child: Ink(
-          padding: const EdgeInsets.all(PawlySpacing.sm),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(PawlyRadius.md),
-                ),
-                child: Icon(
-                  Icons.mail_outline_rounded,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: PawlySpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      _localizedRoleTitle(invite.role),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: PawlySpacing.xxs),
-                    Text(
-                      'Код: ${invite.code}',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    if (expiresAt != null)
-                      Text(
-                        'Действует до ${_formatDate(expiresAt)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ],
+    return PawlyCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(PawlySpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(PawlyRadius.md),
+            ),
+            child: Icon(
+              Icons.mail_outline_rounded,
+              color: colorScheme.primary,
+            ),
           ),
-        ),
+          const SizedBox(width: PawlySpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  _localizedRoleTitle(invite.role),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xxs),
+                Text(
+                  'Код: ${invite.code}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ],
       ),
     );
-  }
-
-  String _formatDate(DateTime value) {
-    final day = value.day.toString().padLeft(2, '0');
-    final month = value.month.toString().padLeft(2, '0');
-    final year = value.year.toString();
-    return '$day.$month.$year';
   }
 }
 

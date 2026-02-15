@@ -6,7 +6,6 @@ enum AclPermissionDomain {
   pet,
   log,
   health,
-  task,
   members,
 }
 
@@ -227,6 +226,35 @@ class AclCreateInviteState {
     return roles
         .where((role) => role.kind == 'CUSTOM')
         .toList(growable: false);
+  }
+
+  AclRole? roleById(String? roleId) {
+    if (roleId == null || roleId.isEmpty) {
+      return null;
+    }
+
+    for (final role in roles) {
+      if (role.id == roleId) {
+        return role;
+      }
+    }
+
+    return null;
+  }
+
+  AclPreset? presetForRole(AclRole role) {
+    final roleCode = role.code;
+    if (roleCode == null || roleCode.isEmpty) {
+      return null;
+    }
+
+    for (final preset in presets) {
+      if (preset.roleCode == roleCode) {
+        return preset;
+      }
+    }
+
+    return null;
   }
 
   String? get normalizedCustomRoleTitle {

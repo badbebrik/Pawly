@@ -115,10 +115,17 @@ class AclCreateInviteController
       return;
     }
 
+    final role = current.roleById(roleId);
+    final preset = role == null ? null : current.presetForRole(role);
+
     state = AsyncData(
       current.copyWith(
         selectedRoleId: roleId,
         customRoleTitle: '',
+        selectedPresetId: preset?.id,
+        permissions: preset == null
+            ? current.permissions
+            : AclPermissionDraft.fromPolicy(preset.policy),
       ),
     );
   }
@@ -133,6 +140,7 @@ class AclCreateInviteController
       current.copyWith(
         selectedRoleId: null,
         customRoleTitle: value,
+        selectedPresetId: null,
       ),
     );
   }
