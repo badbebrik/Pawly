@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
@@ -79,7 +80,10 @@ class _AclInviteDetailsContent extends StatelessWidget {
           label: 'Поделиться ссылкой',
           onPressed: invite.deeplinkUrl == null
               ? null
-              : () => _showSharePlaceholder(context),
+              : () => _shareLink(
+                    context,
+                    invite.deeplinkUrl!,
+                  ),
           variant: PawlyButtonVariant.secondary,
           icon: Icons.ios_share_rounded,
         ),
@@ -142,12 +146,20 @@ class _AclInviteDetailsContent extends StatelessWidget {
     );
   }
 
-  void _showSharePlaceholder(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Системный share пока не подключен в приложении.'),
-      ),
+  Future<void> _shareLink(
+    BuildContext context,
+    String url,
+  ) async {
+    final box = context.findRenderObject() as RenderBox?;
+    await Share.share(
+      url,
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
     );
+    if (!context.mounted) {
+      return;
+    }
   }
 }
 
