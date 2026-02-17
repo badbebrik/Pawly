@@ -11,7 +11,12 @@ import '../utils/auth_error_message.dart';
 import '../utils/auth_validators.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({
+    this.redirectLocation,
+    super.key,
+  });
+
+  final String? redirectLocation;
 
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
@@ -130,7 +135,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return;
       }
 
-      context.go(AppRoutes.home);
+      _goAfterLogin();
     } catch (error) {
       if (!mounted) {
         return;
@@ -173,7 +178,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return;
       }
 
-      context.go(AppRoutes.home);
+      _goAfterLogin();
     } catch (error) {
       if (!mounted) {
         return;
@@ -196,5 +201,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _goAfterLogin() {
+    final redirectLocation = widget.redirectLocation;
+    if (redirectLocation != null && redirectLocation.isNotEmpty) {
+      context.go(redirectLocation);
+      return;
+    }
+    context.go(AppRoutes.home);
   }
 }

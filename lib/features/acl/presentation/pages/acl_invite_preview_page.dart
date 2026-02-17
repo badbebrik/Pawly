@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../pets/presentation/providers/active_pet_controller.dart';
 import '../../../pets/presentation/providers/pets_controller.dart';
 import '../models/acl_screen_models.dart';
@@ -62,6 +63,24 @@ class AclInvitePreviewPage extends ConsumerWidget {
     WidgetRef ref,
     String token,
   ) async {
+    final currentUserId = await ref.read(currentUserIdProvider.future);
+    if (currentUserId == null || currentUserId.isEmpty) {
+      if (!context.mounted) {
+        return;
+      }
+      final redirectLocation = Uri(
+        path: AppRoutes.aclInvitePreview,
+        queryParameters: <String, String>{'token': token},
+      ).toString();
+      context.push(
+        Uri(
+          path: AppRoutes.login,
+          queryParameters: <String, String>{'redirect': redirectLocation},
+        ).toString(),
+      );
+      return;
+    }
+
     try {
       final response = await ref
           .read(aclInvitePreviewControllerProvider(token).notifier)

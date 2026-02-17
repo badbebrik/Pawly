@@ -32,6 +32,16 @@
 				<string>com.googleusercontent.apps.924161373583-08tc3gb7qhfvnku046oj13qulugo6ak9</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>pawly.deep_links</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pawly</string>
+			</array>
+		</dict>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

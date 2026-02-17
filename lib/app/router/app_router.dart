@@ -53,7 +53,9 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
-        builder: (_, __) => const LoginPage(),
+        builder: (_, state) => LoginPage(
+          redirectLocation: state.uri.queryParameters['redirect'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.register,
