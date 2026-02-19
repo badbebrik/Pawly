@@ -32,6 +32,29 @@ class ApiEndpoints {
   static String petPhotoConfirmUpload(String petId) =>
       '/v1/pets/$petId/photo:confirm-upload';
 
+  static String petLogsBootstrap(String petId) => '/v1/pets/$petId/logs/bootstrap';
+
+  static String petLogs(String petId) => '/v1/pets/$petId/logs';
+
+  static String petLogById(String petId, String logId) =>
+      '/v1/pets/$petId/logs/$logId';
+
+  static String petLogTypes(String petId) => '/v1/pets/$petId/log-types';
+
+  static String petLogTypeById(String petId, String logTypeId) =>
+      '/v1/pets/$petId/log-types/$logTypeId';
+
+  static String petMetrics(String petId) => '/v1/pets/$petId/metrics';
+
+  static String petMetricById(String petId, String metricId) =>
+      '/v1/pets/$petId/metrics/$metricId';
+
+  static String petAnalyticsMetrics(String petId) =>
+      '/v1/pets/$petId/analytics/metrics';
+
+  static String petAnalyticsMetricSeries(String petId, String metricId) =>
+      '/v1/pets/$petId/analytics/metrics/$metricId/series';
+
   static const String aclPresets = '/v1/acl/presets';
 
   static String aclBootstrap(String petId) => '/v1/pets/$petId/acl/bootstrap';
