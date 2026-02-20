@@ -20,6 +20,14 @@ final petLogDetailsControllerProvider = AsyncNotifierProvider.autoDispose
   PetLogDetailsController.new,
 );
 
+final petLogComposerBootstrapProvider =
+    FutureProvider.autoDispose.family<LogComposerBootstrapResponse, String>((
+      ref,
+      petId,
+    ) {
+      return ref.read(healthRepositoryProvider).getLogsBootstrap(petId);
+    });
+
 class PetLogRef {
   const PetLogRef({
     required this.petId,

@@ -20,6 +20,18 @@ class PetLogsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Записи')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final created = await context.pushNamed<bool>(
+            'petLogCreate',
+            pathParameters: <String, String>{'petId': petId},
+          );
+          if (created == true && context.mounted) {
+            await ref.read(petLogsControllerProvider(petId).notifier).reload();
+          }
+        },
+        child: const Icon(Icons.add_rounded),
+      ),
       body: logsState.when(
         data: (state) => _PetLogsView(
           petId: petId,

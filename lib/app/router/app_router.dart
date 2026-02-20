@@ -15,6 +15,7 @@ import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/pets/presentation/pages/pet_details_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
 import '../../features/pet_create/presentation/pages/pet_create_flow_page.dart';
+import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
 import '../../features/pet_care/presentation/pages/pet_logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
@@ -133,6 +134,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
+                          GoRoute(
+                            path: 'create',
+                            name: 'petLogCreate',
+                            builder: (_, state) => PetLogCreatePage(
+                              petId: state.pathParameters['petId']!,
+                            ),
+                          ),
                           GoRoute(
                             path: ':logId',
                             name: 'petLogDetails',
