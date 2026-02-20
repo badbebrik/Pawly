@@ -472,6 +472,10 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Записи',
                   icon: Icons.edit_note_rounded,
+                  onTap: () => context.pushNamed(
+                    'petLogs',
+                    pathParameters: <String, String>{'petId': pet.id},
+                  ),
                 ),
                 _PetFeatureCard(
                   title: 'Здоровье',
