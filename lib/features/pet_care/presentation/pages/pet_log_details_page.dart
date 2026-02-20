@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
@@ -17,35 +18,123 @@ class PetLogDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final logRef = PetLogRef(petId: petId, logId: logId);
     final logAsync = ref.watch(
-      petLogDetailsControllerProvider(PetLogRef(petId: petId, logId: logId)),
+      petLogDetailsControllerProvider(logRef),
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Запись')),
+      appBar: AppBar(
+        title: const Text('Запись'),
+        actions: logAsync.maybeWhen(
+          data: (log) => <Widget>[
+            if (log.canEdit)
+              IconButton(
+                onPressed: () async {
+                  final updated = await context.pushNamed<bool>(
+                    'petLogEdit',
+                    pathParameters: <String, String>{
+                      'petId': petId,
+                      'logId': logId,
+                    },
+                  );
+                  if (updated == true && context.mounted) {
+                    await ref
+                        .read(petLogDetailsControllerProvider(logRef).notifier)
+                        .reload();
+                  }
+                },
+                icon: const Icon(Icons.edit_rounded),
+                tooltip: 'Редактировать',
+              ),
+            if (log.canDelete)
+              IconButton(
+                onPressed: () => _deleteLog(context, ref, log),
+                icon: const Icon(Icons.delete_outline_rounded),
+                tooltip: 'Удалить',
+              ),
+          ],
+          orElse: () => const <Widget>[],
+        ),
+      ),
       body: logAsync.when(
         data: (log) => _PetLogDetailsView(
           log: log,
           onRefresh: () => ref
-              .read(
-                petLogDetailsControllerProvider(
-                  PetLogRef(petId: petId, logId: logId),
-                ).notifier,
-              )
+              .read(petLogDetailsControllerProvider(logRef).notifier)
               .reload(),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _LogDetailsErrorView(
           onRetry: () => ref
-              .read(
-                petLogDetailsControllerProvider(
-                  PetLogRef(petId: petId, logId: logId),
-                ).notifier,
-              )
+              .read(petLogDetailsControllerProvider(logRef).notifier)
               .reload(),
         ),
       ),
     );
+  }
+
+  Future<void> _deleteLog(
+    BuildContext context,
+    WidgetRef ref,
+    LogEntry log,
+  ) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Удалить запись?'),
+              content: const Text(
+                'Запись будет удалена из ленты питомца. Это действие нельзя отменить.',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Удалить'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!confirmed || !context.mounted) {
+      return;
+    }
+
+    try {
+      await ref.read(healthRepositoryProvider).deleteLog(
+            petId,
+            logId,
+            rowVersion: log.rowVersion,
+          );
+      ref.invalidate(petLogsControllerProvider(petId));
+      ref.invalidate(petLogDetailsControllerProvider(PetLogRef(
+        petId: petId,
+        logId: logId,
+      )));
+      if (!context.mounted) {
+        return;
+      }
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось удалить запись.',
+          ),
+        ),
+      );
+    }
   }
 }
 

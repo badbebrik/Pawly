@@ -17,6 +17,7 @@ import '../../features/pets/presentation/pages/pets_page.dart';
 import '../../features/pet_create/presentation/pages/pet_create_flow_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
+import '../../features/pet_care/presentation/pages/pet_log_edit_page.dart';
 import '../../features/pet_care/presentation/pages/pet_logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
@@ -148,6 +149,16 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                               petId: state.pathParameters['petId']!,
                               logId: state.pathParameters['logId']!,
                             ),
+                            routes: <RouteBase>[
+                              GoRoute(
+                                path: 'edit',
+                                name: 'petLogEdit',
+                                builder: (_, state) => PetLogEditPage(
+                                  petId: state.pathParameters['petId']!,
+                                  logId: state.pathParameters['logId']!,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

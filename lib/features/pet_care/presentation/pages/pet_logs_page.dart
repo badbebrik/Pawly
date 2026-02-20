@@ -163,13 +163,18 @@ class _PetLogsView extends StatelessWidget {
             ...state.logs.map(
               (log) => _LogCardItem(
                 log: log,
-                onTap: () => context.pushNamed(
-                  'petLogDetails',
-                  pathParameters: <String, String>{
-                    'petId': petId,
-                    'logId': log.id,
-                  },
-                ),
+                onTap: () async {
+                  final changed = await context.pushNamed<bool>(
+                    'petLogDetails',
+                    pathParameters: <String, String>{
+                      'petId': petId,
+                      'logId': log.id,
+                    },
+                  );
+                  if (changed == true && context.mounted) {
+                    await onRefresh();
+                  }
+                },
               ),
             ),
           if (state.nextCursor != null) ...<Widget>[
