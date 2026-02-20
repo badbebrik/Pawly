@@ -15,6 +15,32 @@ final petLogsControllerProvider = AsyncNotifierProvider.autoDispose
   PetLogsController.new,
 );
 
+final petLogDetailsControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<PetLogDetailsController, LogEntry, PetLogRef>(
+  PetLogDetailsController.new,
+);
+
+class PetLogRef {
+  const PetLogRef({
+    required this.petId,
+    required this.logId,
+  });
+
+  final String petId;
+  final String logId;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PetLogRef &&
+            other.petId == petId &&
+            other.logId == logId;
+  }
+
+  @override
+  int get hashCode => Object.hash(petId, logId);
+}
+
 class PetLogsState {
   const PetLogsState({
     required this.bootstrap,
@@ -247,5 +273,27 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
       sort: 'occurred_at_desc',
       isLoadingMore: false,
     );
+  }
+}
+
+class PetLogDetailsController extends AsyncNotifier<LogEntry> {
+  PetLogDetailsController(this._refValue);
+
+  final PetLogRef _refValue;
+
+  @override
+  Future<LogEntry> build() {
+    return _load();
+  }
+
+  Future<void> reload() async {
+    state = const AsyncLoading();
+    state = AsyncData(await _load());
+  }
+
+  Future<LogEntry> _load() {
+    return ref
+        .read(healthRepositoryProvider)
+        .getLog(_refValue.petId, _refValue.logId);
   }
 }

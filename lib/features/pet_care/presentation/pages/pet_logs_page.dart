@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../../../core/network/models/log_models.dart';
@@ -21,6 +22,7 @@ class PetLogsPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('Записи')),
       body: logsState.when(
         data: (state) => _PetLogsView(
+          petId: petId,
           state: state,
           onRefresh: () =>
               ref.read(petLogsControllerProvider(petId).notifier).reload(),
@@ -54,6 +56,7 @@ class PetLogsPage extends ConsumerWidget {
 
 class _PetLogsView extends StatelessWidget {
   const _PetLogsView({
+    required this.petId,
     required this.state,
     required this.onRefresh,
     required this.onSearchChanged,
@@ -64,6 +67,7 @@ class _PetLogsView extends StatelessWidget {
     required this.onLoadMore,
   });
 
+  final String petId;
   final PetLogsState state;
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onSearchChanged;
@@ -144,7 +148,18 @@ class _PetLogsView extends StatelessWidget {
               child: Text('По выбранным фильтрам записей пока нет.'),
             )
           else
-            ...state.logs.map(_LogCardItem.new),
+            ...state.logs.map(
+              (log) => _LogCardItem(
+                log: log,
+                onTap: () => context.pushNamed(
+                  'petLogDetails',
+                  pathParameters: <String, String>{
+                    'petId': petId,
+                    'logId': log.id,
+                  },
+                ),
+              ),
+            ),
           if (state.nextCursor != null) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
             PawlyButton(
@@ -160,9 +175,13 @@ class _PetLogsView extends StatelessWidget {
 }
 
 class _LogCardItem extends StatelessWidget {
-  const _LogCardItem(this.log);
+  const _LogCardItem({
+    required this.log,
+    required this.onTap,
+  });
 
   final LogCard log;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +190,7 @@ class _LogCardItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: PawlySpacing.md),
       child: PawlyCard(
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
