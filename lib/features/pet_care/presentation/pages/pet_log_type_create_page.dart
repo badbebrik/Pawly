@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
@@ -84,6 +85,15 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
           'Выбери, какие метрики будут доступны в этом типе записи.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: PawlySpacing.xs),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: canSubmit ? _openCreateMetric : null,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Создать свою метрику'),
           ),
         ),
         if (bootstrap.systemMetrics.isNotEmpty) ...<Widget>[
@@ -182,6 +192,26 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
         });
       }
     }
+  }
+
+  Future<void> _openCreateMetric() async {
+    final createdMetricId = await context.pushNamed<String>(
+      'petMetricCreate',
+      pathParameters: <String, String>{'petId': widget.petId},
+    );
+    if (createdMetricId == null || !mounted) {
+      return;
+    }
+
+    ref.invalidate(petLogComposerBootstrapProvider(widget.petId));
+    await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedMetrics.putIfAbsent(createdMetricId, () => false);
+    });
   }
 
   void _showError(String message) {
