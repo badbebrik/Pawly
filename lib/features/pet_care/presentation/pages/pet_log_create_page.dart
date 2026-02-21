@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
@@ -93,6 +94,15 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
               : null,
           decoration: const InputDecoration(
             labelText: 'Тип записи',
+          ),
+        ),
+        const SizedBox(height: PawlySpacing.xs),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: canCreate ? _openCreateType : null,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Создать свой тип'),
           ),
         ),
         const SizedBox(height: PawlySpacing.md),
@@ -215,6 +225,25 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
         time.hour,
         time.minute,
       );
+    });
+  }
+
+  Future<void> _openCreateType() async {
+    final createdTypeId = await context.pushNamed<String>(
+      'petLogTypeCreate',
+      pathParameters: <String, String>{'petId': widget.petId},
+    );
+    if (createdTypeId == null || !mounted) {
+      return;
+    }
+
+    ref.invalidate(petLogComposerBootstrapProvider(widget.petId));
+    await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedTypeId = createdTypeId;
     });
   }
 
