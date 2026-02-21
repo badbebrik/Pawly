@@ -181,6 +181,13 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
     await _reloadLogs();
   }
 
+  Future<void> setTypeFilters(Set<String> typeIds) async {
+    final current = state.asData?.value;
+    if (current == null) return;
+    state = AsyncData(current.copyWith(selectedTypeIds: Set<String>.from(typeIds)));
+    await _reloadLogs();
+  }
+
   Future<void> setSourceFilter(String? value) async {
     final current = state.asData?.value;
     if (current == null) return;

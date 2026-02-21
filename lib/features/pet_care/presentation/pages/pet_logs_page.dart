@@ -44,6 +44,9 @@ class PetLogsPage extends ConsumerWidget {
           onToggleType: (typeId) => ref
               .read(petLogsControllerProvider(petId).notifier)
               .toggleTypeFilter(typeId),
+          onApplyTypeFilters: (typeIds) => ref
+              .read(petLogsControllerProvider(petId).notifier)
+              .setTypeFilters(typeIds),
           onSetSource: (source) => ref
               .read(petLogsControllerProvider(petId).notifier)
               .setSourceFilter(source),
@@ -73,6 +76,7 @@ class _PetLogsView extends StatelessWidget {
     required this.onRefresh,
     required this.onSearchChanged,
     required this.onToggleType,
+    required this.onApplyTypeFilters,
     required this.onSetSource,
     required this.onSetWithAttachmentsOnly,
     required this.onSetWithMetricsOnly,
@@ -84,6 +88,7 @@ class _PetLogsView extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onToggleType;
+  final ValueChanged<Set<String>> onApplyTypeFilters;
   final ValueChanged<String?> onSetSource;
   final ValueChanged<bool> onSetWithAttachmentsOnly;
   final ValueChanged<bool> onSetWithMetricsOnly;
@@ -92,7 +97,10 @@ class _PetLogsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facets = state.facets;
-    final typeFacets = facets?.types.take(6).toList(growable: false) ?? const [];
+    final allTypes = _allFilterTypes(state);
+    final selectedTypes = allTypes
+        .where((type) => state.selectedTypeIds.contains(type.id))
+        .toList(growable: false);
 
     return RefreshIndicator(
       onRefresh: onRefresh,
@@ -123,6 +131,15 @@ class _PetLogsView extends StatelessWidget {
                   ),
                 ),
               FilterChip(
+                label: Text(
+                  state.selectedTypeIds.isEmpty
+                      ? 'Типы'
+                      : 'Типы (${state.selectedTypeIds.length})',
+                ),
+                selected: state.selectedTypeIds.isNotEmpty,
+                onSelected: (_) => _openTypeFilterSheet(context),
+              ),
+              FilterChip(
                 label: const Text('С файлами'),
                 selected: state.withAttachmentsOnly,
                 onSelected: onSetWithAttachmentsOnly,
@@ -134,22 +151,16 @@ class _PetLogsView extends StatelessWidget {
               ),
             ],
           ),
-          if (typeFacets.isNotEmpty) ...<Widget>[
+          if (selectedTypes.isNotEmpty) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            Text(
-              'Типы',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: PawlySpacing.xs),
             Wrap(
               spacing: PawlySpacing.xs,
               runSpacing: PawlySpacing.xs,
               children: <Widget>[
-                for (final type in typeFacets)
-                  FilterChip(
+                for (final type in selectedTypes)
+                  InputChip(
                     label: Text(type.name),
-                    selected: state.selectedTypeIds.contains(type.id),
-                    onSelected: (_) => onToggleType(type.id),
+                    onDeleted: () => onToggleType(type.id),
                   ),
               ],
             ),
@@ -188,6 +199,53 @@ class _PetLogsView extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  List<_TypeFilterItem> _allFilterTypes(PetLogsState state) {
+    final result = <_TypeFilterItem>[];
+    final seenIds = <String>{};
+
+    void addType({
+      required String id,
+      required String name,
+      required String scope,
+    }) {
+      if (!seenIds.add(id)) {
+        return;
+      }
+      result.add(_TypeFilterItem(id: id, name: name, scope: scope));
+    }
+
+    for (final type in state.bootstrap.systemLogTypes) {
+      addType(id: type.id, name: type.name, scope: type.scope);
+    }
+    for (final type in state.bootstrap.customLogTypes) {
+      addType(id: type.id, name: type.name, scope: type.scope);
+    }
+    for (final type in state.facets?.types ?? const <LogTypeFacet>[]) {
+      addType(id: type.id, name: type.name, scope: type.scope);
+    }
+
+    return result;
+  }
+
+  Future<void> _openTypeFilterSheet(BuildContext context) async {
+    final selectedTypeIds = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _TypeFilterSheet(
+          allTypes: _allFilterTypes(state),
+          initialSelectedIds: state.selectedTypeIds,
+        );
+      },
+    );
+
+    if (selectedTypeIds == null) {
+      return;
+    }
+    onApplyTypeFilters(selectedTypeIds);
   }
 }
 
@@ -292,6 +350,157 @@ class _LogsErrorView extends StatelessWidget {
             variant: PawlyButtonVariant.secondary,
           ),
           child: const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeFilterItem {
+  const _TypeFilterItem({
+    required this.id,
+    required this.name,
+    required this.scope,
+  });
+
+  final String id;
+  final String name;
+  final String scope;
+}
+
+class _TypeFilterSheet extends StatefulWidget {
+  const _TypeFilterSheet({
+    required this.allTypes,
+    required this.initialSelectedIds,
+  });
+
+  final List<_TypeFilterItem> allTypes;
+  final Set<String> initialSelectedIds;
+
+  @override
+  State<_TypeFilterSheet> createState() => _TypeFilterSheetState();
+}
+
+class _TypeFilterSheetState extends State<_TypeFilterSheet> {
+  late final TextEditingController _searchController;
+  late Set<String> _selectedIds;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _selectedIds = Set<String>.from(widget.initialSelectedIds);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredTypes = widget.allTypes.where((type) {
+      final query = _searchQuery.trim().toLowerCase();
+      if (query.isEmpty) {
+        return true;
+      }
+      return type.name.toLowerCase().contains(query);
+    }).toList(growable: false);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: PawlySpacing.lg,
+          right: PawlySpacing.lg,
+          top: PawlySpacing.md,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + PawlySpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Фильтр по типам',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            PawlyTextField(
+              controller: _searchController,
+              hintText: 'Поиск по типам',
+              prefixIcon: const Icon(Icons.search_rounded),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            Flexible(
+              child: filteredTypes.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: PawlySpacing.xl),
+                        child: Text('Типы не найдены.'),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: filteredTypes.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: PawlySpacing.xs),
+                      itemBuilder: (context, index) {
+                        final type = filteredTypes[index];
+                        final selected = _selectedIds.contains(type.id);
+
+                        return CheckboxListTile(
+                          value: selected,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.trailing,
+                          onChanged: (value) {
+                            setState(() {
+                              if (value ?? false) {
+                                _selectedIds.add(type.id);
+                              } else {
+                                _selectedIds.remove(type.id);
+                              }
+                            });
+                          },
+                          title: Text(type.name),
+                          subtitle: Text(
+                            type.scope == 'SYSTEM' ? 'Системный' : 'Мой',
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: PawlyButton(
+                    label: 'Сбросить',
+                    onPressed: () {
+                      Navigator.of(context).pop(<String>{});
+                    },
+                    variant: PawlyButtonVariant.secondary,
+                  ),
+                ),
+                const SizedBox(width: PawlySpacing.md),
+                Expanded(
+                  child: PawlyButton(
+                    label: 'Применить (${_selectedIds.length})',
+                    onPressed: () {
+                      Navigator.of(context).pop(_selectedIds);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
