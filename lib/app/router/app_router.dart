@@ -19,6 +19,7 @@ import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_edit_page.dart';
+import '../../features/pet_care/presentation/pages/pet_log_type_picker_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_type_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
@@ -134,6 +135,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                         path: 'log-types/create',
                         name: 'petLogTypeCreate',
                         builder: (_, state) => PetLogTypeCreatePage(
+                          petId: state.pathParameters['petId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'log-types/pick',
+                        name: 'petLogTypePicker',
+                        builder: (_, state) => PetLogTypePickerPage(
                           petId: state.pathParameters['petId']!,
                         ),
                       ),

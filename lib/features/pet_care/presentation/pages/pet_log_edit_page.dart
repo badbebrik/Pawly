@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/health_repository_models.dart';
+import 'pet_log_type_picker_page.dart';
 import '../providers/health_controllers.dart';
 
 class PetLogEditPage extends ConsumerStatefulWidget {
@@ -99,34 +100,43 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
               child: Text('Эту запись нельзя редактировать.'),
             ),
           ),
-        DropdownButtonFormField<String?>(
-          value: _selectedTypeId,
-          items: <DropdownMenuItem<String?>>[
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('Без типа'),
-            ),
-            ...allTypes.map(
-              (type) => DropdownMenuItem<String?>(
-                value: type.id,
-                child: Text(_typeLabel(type)),
+        PawlyCard(
+          onTap: canEdit ? _openTypePicker : null,
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Тип записи',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      selectedType == null
+                          ? 'Без типа'
+                          : '${selectedType.name} · ${_scopeLabel(selectedType.scope)}',
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      selectedType == null
+                          ? 'Можно оставить запись без типа'
+                          : _typeMetricsLabel(selectedType),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-          onChanged: canEdit
-              ? (value) => setState(() {
-                  _selectedTypeId = value;
-                })
-              : null,
-          decoration: const InputDecoration(labelText: 'Тип записи'),
-        ),
-        const SizedBox(height: PawlySpacing.xs),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: canEdit ? _openCreateType : null,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Создать свой тип'),
+              const SizedBox(width: PawlySpacing.md),
+              const Icon(Icons.chevron_right_rounded),
+            ],
           ),
         ),
         const SizedBox(height: PawlySpacing.md),
@@ -257,12 +267,12 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     });
   }
 
-  Future<void> _openCreateType() async {
-    final createdTypeId = await context.pushNamed<String>(
-      'petLogTypeCreate',
+  Future<void> _openTypePicker() async {
+    final selectedTypeId = await context.pushNamed<String>(
+      'petLogTypePicker',
       pathParameters: <String, String>{'petId': widget.petId},
     );
-    if (createdTypeId == null || !mounted) {
+    if (selectedTypeId == null || !mounted) {
       return;
     }
 
@@ -272,7 +282,9 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
       return;
     }
     setState(() {
-      _selectedTypeId = createdTypeId;
+      _selectedTypeId = selectedTypeId == noLogTypeSelectionId
+          ? null
+          : selectedTypeId;
     });
   }
 
@@ -379,11 +391,6 @@ class _EditLogErrorView extends StatelessWidget {
   }
 }
 
-String _typeLabel(LogType type) {
-  final scope = type.scope == 'SYSTEM' ? 'Системный' : 'Мой';
-  return '${type.name} • $scope';
-}
-
 String _metricHint(LogTypeMetricRequirement requirement) {
   final parts = <String>[];
   if (requirement.unitCode != null && requirement.unitCode!.isNotEmpty) {
@@ -403,4 +410,18 @@ String _formatOccurredAt(DateTime value) {
   final hour = value.hour.toString().padLeft(2, '0');
   final minute = value.minute.toString().padLeft(2, '0');
   return '$day.$month.${value.year} $hour:$minute';
+}
+
+String _scopeLabel(String scope) {
+  return scope == 'SYSTEM' ? 'Системный' : 'Мой';
+}
+
+String _typeMetricsLabel(LogType type) {
+  if (type.metricRequirements.isEmpty) {
+    return 'Метрики не заданы';
+  }
+  final metrics = type.metricRequirements
+      .map((metric) => metric.metricName)
+      .join(', ');
+  return 'Метрики: $metrics';
 }
