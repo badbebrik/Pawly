@@ -87,35 +87,27 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: PawlySpacing.xs),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: canSubmit ? _openCreateMetric : null,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Создать свою метрику'),
-          ),
+        const SizedBox(height: PawlySpacing.sm),
+        PawlyButton(
+          label: 'Выбрать метрику',
+          onPressed: canSubmit ? _openMetricPicker : null,
+          variant: PawlyButtonVariant.secondary,
+          icon: Icons.add_rounded,
         ),
-        if (bootstrap.systemMetrics.isNotEmpty) ...<Widget>[
+        if (_selectedMetrics.isNotEmpty) ...<Widget>[
           const SizedBox(height: PawlySpacing.md),
-          _MetricSelectionSection(
-            title: 'Системные метрики',
-            metrics: bootstrap.systemMetrics,
-            selectedMetrics: _selectedMetrics,
-            enabled: canSubmit,
-            onChanged: _setMetricSelected,
-            onRequiredChanged: _setMetricRequired,
-          ),
-        ],
-        if (bootstrap.customMetrics.isNotEmpty) ...<Widget>[
-          const SizedBox(height: PawlySpacing.md),
-          _MetricSelectionSection(
-            title: 'Мои метрики',
-            metrics: bootstrap.customMetrics,
-            selectedMetrics: _selectedMetrics,
-            enabled: canSubmit,
-            onChanged: _setMetricSelected,
-            onRequiredChanged: _setMetricRequired,
+          ..._selectedMetricEntries(bootstrap).map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
+              child: _SelectedMetricCard(
+                metric: entry.metric,
+                isRequired: entry.isRequired,
+                enabled: canSubmit,
+                onRequiredChanged: (value) =>
+                    _setMetricRequired(entry.metric.id, value),
+                onRemove: () => _removeMetric(entry.metric.id),
+              ),
+            ),
           ),
         ],
         const SizedBox(height: PawlySpacing.lg),
@@ -128,20 +120,39 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
     );
   }
 
-  void _setMetricSelected(String metricId, bool selected) {
-    setState(() {
-      if (!selected) {
-        _selectedMetrics.remove(metricId);
-      } else {
-        _selectedMetrics.putIfAbsent(metricId, () => false);
-      }
-    });
-  }
-
   void _setMetricRequired(String metricId, bool isRequired) {
     setState(() {
       _selectedMetrics[metricId] = isRequired;
     });
+  }
+
+  void _removeMetric(String metricId) {
+    setState(() {
+      _selectedMetrics.remove(metricId);
+    });
+  }
+
+  List<_SelectedMetricEntry> _selectedMetricEntries(
+    LogComposerBootstrapResponse bootstrap,
+  ) {
+    final allMetrics = <String, Metric>{
+      for (final metric in <Metric>[
+        ...bootstrap.systemMetrics,
+        ...bootstrap.customMetrics,
+      ])
+        metric.id: metric,
+    };
+
+    return _selectedMetrics.entries
+        .map((entry) {
+          final metric = allMetrics[entry.key];
+          if (metric == null) {
+            return null;
+          }
+          return _SelectedMetricEntry(metric: metric, isRequired: entry.value);
+        })
+        .whereType<_SelectedMetricEntry>()
+        .toList(growable: false);
   }
 
   Future<void> _submit() async {
@@ -194,12 +205,12 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
     }
   }
 
-  Future<void> _openCreateMetric() async {
-    final createdMetricId = await context.pushNamed<String>(
-      'petMetricCreate',
+  Future<void> _openMetricPicker() async {
+    final selectedMetricId = await context.pushNamed<String>(
+      'petMetricPicker',
       pathParameters: <String, String>{'petId': widget.petId},
     );
-    if (createdMetricId == null || !mounted) {
+    if (selectedMetricId == null || !mounted) {
       return;
     }
 
@@ -210,76 +221,13 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
     }
 
     setState(() {
-      _selectedMetrics.putIfAbsent(createdMetricId, () => false);
+      _selectedMetrics.putIfAbsent(selectedMetricId, () => false);
     });
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
-    );
-  }
-}
-
-class _MetricSelectionSection extends StatelessWidget {
-  const _MetricSelectionSection({
-    required this.title,
-    required this.metrics,
-    required this.selectedMetrics,
-    required this.enabled,
-    required this.onChanged,
-    required this.onRequiredChanged,
-  });
-
-  final String title;
-  final List<Metric> metrics;
-  final Map<String, bool> selectedMetrics;
-  final bool enabled;
-  final void Function(String metricId, bool selected) onChanged;
-  final void Function(String metricId, bool isRequired) onRequiredChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return PawlyCard(
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
-      child: Column(
-        children: metrics.map((metric) {
-          final isSelected = selectedMetrics.containsKey(metric.id);
-          final isRequired = selectedMetrics[metric.id] ?? false;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
-            child: Column(
-              children: <Widget>[
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: isSelected,
-                  onChanged: enabled
-                      ? (value) => onChanged(metric.id, value ?? false)
-                      : null,
-                  title: Text(metric.name),
-                  subtitle: Text(_metricSubtitle(metric)),
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-                if (isSelected)
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: PawlySpacing.md,
-                    ),
-                    value: isRequired,
-                    onChanged: enabled
-                        ? (value) => onRequiredChanged(metric.id, value)
-                        : null,
-                    title: const Text('Обязательная метрика'),
-                  ),
-              ],
-            ),
-          );
-        }).toList(growable: false),
-      ),
     );
   }
 }
@@ -308,10 +256,89 @@ class _TypeCreateErrorView extends StatelessWidget {
   }
 }
 
-String _metricSubtitle(Metric metric) {
-  final parts = <String>[metric.inputKind];
-  if (metric.unitCode != null && metric.unitCode!.isNotEmpty) {
-    parts.add(metric.unitCode!);
+class _SelectedMetricEntry {
+  const _SelectedMetricEntry({
+    required this.metric,
+    required this.isRequired,
+  });
+
+  final Metric metric;
+  final bool isRequired;
+}
+
+class _SelectedMetricCard extends StatelessWidget {
+  const _SelectedMetricCard({
+    required this.metric,
+    required this.isRequired,
+    required this.enabled,
+    required this.onRequiredChanged,
+    required this.onRemove,
+  });
+
+  final Metric metric;
+  final bool isRequired;
+  final bool enabled;
+  final ValueChanged<bool> onRequiredChanged;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return PawlyCard(
+      trailing: IconButton(
+        onPressed: enabled ? onRemove : null,
+        icon: const Icon(Icons.close_rounded),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            metric.name,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: PawlySpacing.xs),
+          Text(
+            _metricSubtitle(metric),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: isRequired,
+            onChanged: enabled ? onRequiredChanged : null,
+            title: const Text('Обязательная метрика'),
+          ),
+        ],
+      ),
+    );
   }
-  return parts.join(' · ');
+}
+
+String _metricSubtitle(Metric metric) {
+  final kind = metric.inputKind == 'NUMERIC' ? 'Число' : 'Шкала';
+  final unit = metric.unitCode == null || metric.unitCode!.isEmpty
+      ? 'без единиц'
+      : metric.unitCode!;
+  final hasRange = metric.minValue != null || metric.maxValue != null;
+  final range = hasRange
+      ? ' · ${_formatRange(metric.minValue, metric.maxValue)}'
+      : '';
+  return '$kind · $unit$range';
+}
+
+String _formatRange(double? minValue, double? maxValue) {
+  final min = minValue == null
+      ? '...'
+      : (minValue % 1 == 0
+            ? minValue.toStringAsFixed(0)
+            : minValue.toStringAsFixed(1));
+  final max = maxValue == null
+      ? '...'
+      : (maxValue % 1 == 0
+            ? maxValue.toStringAsFixed(0)
+            : maxValue.toStringAsFixed(1));
+  return '$min-$max';
 }
