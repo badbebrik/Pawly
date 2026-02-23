@@ -492,6 +492,10 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Аналитика',
                   icon: Icons.bar_chart_rounded,
+                  onTap: () => context.pushNamed(
+                    'petAnalytics',
+                    pathParameters: <String, String>{'petId': pet.id},
+                  ),
                 ),
               ],
             ),

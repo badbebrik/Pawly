@@ -28,6 +28,26 @@ final petLogComposerBootstrapProvider =
       return ref.read(healthRepositoryProvider).getLogsBootstrap(petId);
     });
 
+final petAnalyticsMetricsProvider =
+    FutureProvider.autoDispose.family<AnalyticsMetricSummaryListResponse, String>((
+      ref,
+      petId,
+    ) {
+      return ref.read(healthRepositoryProvider).listAnalyticsMetrics(petId);
+    });
+
+final petMetricSeriesProvider =
+    FutureProvider.autoDispose.family<MetricSeriesResponse, PetMetricSeriesRef>((
+      ref,
+      args,
+    ) {
+      return ref.read(healthRepositoryProvider).getMetricSeries(
+            args.petId,
+            args.metricId,
+            query: AnalyticsSeriesQuery(range: args.range),
+          );
+    });
+
 class PetLogRef {
   const PetLogRef({
     required this.petId,
@@ -47,6 +67,30 @@ class PetLogRef {
 
   @override
   int get hashCode => Object.hash(petId, logId);
+}
+
+class PetMetricSeriesRef {
+  const PetMetricSeriesRef({
+    required this.petId,
+    required this.metricId,
+    required this.range,
+  });
+
+  final String petId;
+  final String metricId;
+  final String range;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PetMetricSeriesRef &&
+            other.petId == petId &&
+            other.metricId == metricId &&
+            other.range == range;
+  }
+
+  @override
+  int get hashCode => Object.hash(petId, metricId, range);
 }
 
 class PetLogsState {
