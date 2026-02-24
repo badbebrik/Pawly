@@ -9,8 +9,6 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
 import '../../features/calendar/presentation/pages/calendar_page.dart';
-import '../../features/guides/presentation/pages/guide_details_page.dart';
-import '../../features/guides/presentation/pages/guides_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/pets/presentation/pages/pet_details_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
@@ -34,8 +32,7 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
     redirect: (context, state) async {
       final location = state.matchedLocation;
       final session = await authSessionStore.read();
-      final isAuthenticated =
-          session != null &&
+      final isAuthenticated = session != null &&
           session.accessToken.isNotEmpty &&
           session.refreshToken.isNotEmpty;
 
@@ -79,33 +76,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        redirect: (_, __) => AppRoutes.guides,
+        redirect: (_, __) => AppRoutes.pets,
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return HomePage(navigationShell: navigationShell);
         },
         branches: <StatefulShellBranch>[
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: AppRoutes.guides,
-                name: 'guides',
-                pageBuilder: (_, __) => const NoTransitionPage<void>(
-                  child: GuidesPage(),
-                ),
-                routes: <RouteBase>[
-                  GoRoute(
-                    path: ':guideId',
-                    name: 'guideDetails',
-                    builder: (_, state) => GuideDetailsPage(
-                      guideId: state.pathParameters['guideId']!,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
@@ -271,8 +248,6 @@ bool _isProtectedRoute(String location) {
   return location == AppRoutes.postRegisterChoice ||
       location == AppRoutes.home ||
       location.startsWith('${AppRoutes.home}/') ||
-      location == AppRoutes.guides ||
-      location.startsWith('${AppRoutes.guides}/') ||
       location == AppRoutes.calendar ||
       location.startsWith('${AppRoutes.calendar}/') ||
       location == AppRoutes.pets ||
