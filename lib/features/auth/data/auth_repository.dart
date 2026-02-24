@@ -90,9 +90,7 @@ class AuthRepository {
   Future<void> logout() async {
     try {
       await _authApiClient.logout();
-    } catch (_) {
-      // Clear local session even if backend logout fails.
-    }
+    } catch (_) {}
 
     await _googleSignInService.signOut();
     await _authSessionStore.clear();

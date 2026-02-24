@@ -26,7 +26,8 @@ class AppGoogleSignInService implements GoogleSignInService {
     try {
       final GoogleSignInAccount account;
 
-      final cachedAccount = await _googleSignIn.attemptLightweightAuthentication(
+      final cachedAccount =
+          await _googleSignIn.attemptLightweightAuthentication(
         reportAllExceptions: false,
       );
 
@@ -68,7 +69,7 @@ class AppGoogleSignInService implements GoogleSignInService {
       await _ensureInitialized();
       await _googleSignIn.signOut();
     } on GoogleSignInException {
-      // Backend session logout remains the source of truth for app auth.
+      return;
     }
   }
 
@@ -78,7 +79,8 @@ class AppGoogleSignInService implements GoogleSignInService {
 
   Future<void> _initialize() async {
     if (kIsWeb) {
-      throw StateError('Google Sign-In пока настроен только для мобильных платформ.');
+      throw StateError(
+          'Google Sign-In пока настроен только для мобильных платформ.');
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {

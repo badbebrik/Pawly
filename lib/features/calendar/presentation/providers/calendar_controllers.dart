@@ -1,0 +1,73 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../core/network/models/health_models.dart';
+import '../../../pet_care/presentation/providers/health_controllers.dart';
+
+final calendarSelectedDateProvider =
+    NotifierProvider.autoDispose<CalendarSelectedDateController, DateTime>(
+  CalendarSelectedDateController.new,
+);
+
+final calendarDayProvider = FutureProvider.autoDispose
+    .family<HealthDayResponse, CalendarDayRef>((ref, args) {
+  return ref.read(healthRepositoryProvider).getHealthDay(
+        args.petId,
+        date: _formatApiDate(args.date),
+      );
+});
+
+class CalendarDayRef {
+  const CalendarDayRef({
+    required this.petId,
+    required this.date,
+  });
+
+  final String petId;
+  final DateTime date;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CalendarDayRef && other.petId == petId && other.date == date;
+  }
+
+  @override
+  int get hashCode => Object.hash(petId, date);
+}
+
+class CalendarSelectedDateController extends Notifier<DateTime> {
+  @override
+  DateTime build() => _normalizeDate(DateTime.now());
+
+  void setDate(DateTime value) {
+    state = _normalizeDate(value);
+  }
+
+  void jumpToToday() {
+    state = _normalizeDate(DateTime.now());
+  }
+}
+
+DateTime normalizeCalendarDate(DateTime value) => _normalizeDate(value);
+
+List<DateTime> buildWeekStripDates(DateTime selectedDate) {
+  final normalized = _normalizeDate(selectedDate);
+  final start = normalized.subtract(Duration(days: normalized.weekday - 1));
+
+  return List<DateTime>.generate(
+    7,
+    (index) => start.add(Duration(days: index)),
+    growable: false,
+  );
+}
+
+String formatCalendarApiDate(DateTime value) => _formatApiDate(value);
+
+DateTime _normalizeDate(DateTime value) {
+  return DateTime(value.year, value.month, value.day);
+}
+
+String _formatApiDate(DateTime value) {
+  return DateFormat('yyyy-MM-dd').format(_normalizeDate(value));
+}
