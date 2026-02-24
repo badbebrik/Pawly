@@ -16,6 +16,7 @@ import '../../features/pet_create/presentation/pages/pet_create_flow_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_picker_page.dart';
 import '../../features/pet_care/presentation/pages/pet_analytics_page.dart';
+import '../../features/pet_care/presentation/pages/pet_health_home_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_edit_page.dart';
@@ -135,6 +136,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                         path: 'metrics/pick',
                         name: 'petMetricPicker',
                         builder: (_, state) => PetMetricPickerPage(
+                          petId: state.pathParameters['petId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'health',
+                        name: 'petHealthHome',
+                        builder: (_, state) => PetHealthHomePage(
                           petId: state.pathParameters['petId']!,
                         ),
                       ),
