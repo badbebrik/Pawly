@@ -132,3 +132,193 @@ class AnalyticsSeriesQuery {
   final String sort;
   final bool includeSummary;
 }
+
+class VetVisitListQuery {
+  const VetVisitListQuery({
+    this.cursor,
+    this.limit = 20,
+    this.status,
+    this.bucket,
+    this.dateFrom,
+    this.dateTo,
+    this.sort,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? status;
+  final String? bucket;
+  final String? dateFrom;
+  final String? dateTo;
+  final String? sort;
+}
+
+class UpsertVetVisitInput {
+  const UpsertVetVisitInput({
+    required this.status,
+    required this.visitType,
+    this.scheduledAtIso,
+    this.completedAtIso,
+    this.reasonText,
+    this.resultText,
+    this.clinicName,
+    this.vetName,
+    this.attachmentFileIds = const <String>[],
+    this.rowVersion,
+  });
+
+  final String status;
+  final String visitType;
+  final String? scheduledAtIso;
+  final String? completedAtIso;
+  final String? reasonText;
+  final String? resultText;
+  final String? clinicName;
+  final String? vetName;
+  final List<String> attachmentFileIds;
+  final int? rowVersion;
+}
+
+class VaccinationListQuery {
+  const VaccinationListQuery({
+    this.cursor,
+    this.limit = 20,
+    this.status,
+    this.bucket,
+    this.dateFrom,
+    this.dateTo,
+    this.sort,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? status;
+  final String? bucket;
+  final String? dateFrom;
+  final String? dateTo;
+  final String? sort;
+}
+
+class UpsertVaccinationInput {
+  const UpsertVaccinationInput({
+    required this.status,
+    required this.vaccineName,
+    this.catalogMedicationId,
+    this.scheduledAtIso,
+    this.administeredAtIso,
+    this.nextDueAtIso,
+    this.vetVisitId,
+    this.clinicName,
+    this.vetName,
+    this.notes,
+    this.attachmentFileIds = const <String>[],
+    this.rowVersion,
+  });
+
+  final String status;
+  final String vaccineName;
+  final String? catalogMedicationId;
+  final String? scheduledAtIso;
+  final String? administeredAtIso;
+  final String? nextDueAtIso;
+  final String? vetVisitId;
+  final String? clinicName;
+  final String? vetName;
+  final String? notes;
+  final List<String> attachmentFileIds;
+  final int? rowVersion;
+}
+
+class ProcedureListQuery {
+  const ProcedureListQuery({
+    this.cursor,
+    this.limit = 20,
+    this.status,
+    this.bucket,
+    this.procedureType,
+    this.dateFrom,
+    this.dateTo,
+    this.sort,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? status;
+  final String? bucket;
+  final String? procedureType;
+  final String? dateFrom;
+  final String? dateTo;
+  final String? sort;
+}
+
+class UpsertProcedureInput {
+  const UpsertProcedureInput({
+    required this.status,
+    required this.procedureType,
+    required this.title,
+    this.description,
+    this.catalogMedicationId,
+    this.productName,
+    this.scheduledAtIso,
+    this.performedAtIso,
+    this.nextDueAtIso,
+    this.vetVisitId,
+    this.notes,
+    this.attachmentFileIds = const <String>[],
+    this.rowVersion,
+  });
+
+  final String status;
+  final String procedureType;
+  final String title;
+  final String? description;
+  final String? catalogMedicationId;
+  final String? productName;
+  final String? scheduledAtIso;
+  final String? performedAtIso;
+  final String? nextDueAtIso;
+  final String? vetVisitId;
+  final String? notes;
+  final List<String> attachmentFileIds;
+  final int? rowVersion;
+}
+
+class MedicalRecordListQuery {
+  const MedicalRecordListQuery({
+    this.cursor,
+    this.limit = 20,
+    this.status,
+    this.bucket,
+    this.recordType,
+    this.sort,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? status;
+  final String? bucket;
+  final String? recordType;
+  final String? sort;
+}
+
+class UpsertMedicalRecordInput {
+  const UpsertMedicalRecordInput({
+    required this.recordType,
+    required this.status,
+    required this.title,
+    this.description,
+    this.startedAtIso,
+    this.resolvedAtIso,
+    this.attachmentFileIds = const <String>[],
+    this.rowVersion,
+  });
+
+  final String recordType;
+  final String status;
+  final String title;
+  final String? description;
+  final String? startedAtIso;
+  final String? resolvedAtIso;
+  final List<String> attachmentFileIds;
+  final int? rowVersion;
+}

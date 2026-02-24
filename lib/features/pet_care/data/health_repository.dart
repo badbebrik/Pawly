@@ -1,5 +1,6 @@
 import '../../../core/network/clients/health_api_client.dart';
 import '../../../core/network/models/common_models.dart';
+import '../../../core/network/models/health_models.dart';
 import '../../../core/network/models/log_models.dart';
 import 'health_repository_models.dart';
 
@@ -18,6 +19,10 @@ class HealthRepository {
       petId,
       includeCatalog: includeCatalog,
     );
+  }
+
+  Future<HealthBootstrapResponse> getHealthBootstrap(String petId) {
+    return _healthApiClient.getHealthBootstrap(petId);
   }
 
   Future<LogListResponse> listLogs(
@@ -238,6 +243,249 @@ class HealthRepository {
     );
   }
 
+  Future<VetVisitListResponse> listVetVisits(
+    String petId, {
+    required VetVisitListQuery query,
+  }) {
+    return _healthApiClient.listVetVisits(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      status: query.status,
+      bucket: query.bucket,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      sort: query.sort,
+    );
+  }
+
+  Future<VetVisit> getVetVisit(String petId, String visitId) {
+    return _healthApiClient.getVetVisit(petId, visitId);
+  }
+
+  Future<VetVisit> createVetVisit(
+    String petId, {
+    required UpsertVetVisitInput input,
+  }) {
+    return _healthApiClient.createVetVisit(
+      petId,
+      _toUpsertVetVisitPayload(input),
+    );
+  }
+
+  Future<VetVisit> updateVetVisit(
+    String petId,
+    String visitId, {
+    required UpsertVetVisitInput input,
+  }) {
+    return _healthApiClient.updateVetVisit(
+      petId,
+      visitId,
+      _toUpsertVetVisitPayload(input),
+    );
+  }
+
+  Future<EmptyResponse> deleteVetVisit(
+    String petId,
+    String visitId, {
+    required int rowVersion,
+  }) {
+    return _healthApiClient.deleteVetVisit(
+      petId,
+      visitId,
+      DeleteEntityPayload(rowVersion: rowVersion),
+    );
+  }
+
+  Future<RelatedLog> linkLogToVetVisit(
+    String petId,
+    String visitId, {
+    required String logId,
+  }) {
+    return _healthApiClient.linkLogToVetVisit(
+      petId,
+      visitId,
+      LinkVetVisitLogPayload(logId: logId),
+    );
+  }
+
+  Future<EmptyResponse> unlinkLogFromVetVisit(
+    String petId,
+    String visitId, {
+    required String logId,
+  }) {
+    return _healthApiClient.unlinkLogFromVetVisit(petId, visitId, logId);
+  }
+
+  Future<VaccinationListResponse> listVaccinations(
+    String petId, {
+    required VaccinationListQuery query,
+  }) {
+    return _healthApiClient.listVaccinations(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      status: query.status,
+      bucket: query.bucket,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      sort: query.sort,
+    );
+  }
+
+  Future<Vaccination> getVaccination(String petId, String vaccinationId) {
+    return _healthApiClient.getVaccination(petId, vaccinationId);
+  }
+
+  Future<Vaccination> createVaccination(
+    String petId, {
+    required UpsertVaccinationInput input,
+  }) {
+    return _healthApiClient.createVaccination(
+      petId,
+      _toUpsertVaccinationPayload(input),
+    );
+  }
+
+  Future<Vaccination> updateVaccination(
+    String petId,
+    String vaccinationId, {
+    required UpsertVaccinationInput input,
+  }) {
+    return _healthApiClient.updateVaccination(
+      petId,
+      vaccinationId,
+      _toUpsertVaccinationPayload(input),
+    );
+  }
+
+  Future<EmptyResponse> deleteVaccination(
+    String petId,
+    String vaccinationId, {
+    required int rowVersion,
+  }) {
+    return _healthApiClient.deleteVaccination(
+      petId,
+      vaccinationId,
+      DeleteEntityPayload(rowVersion: rowVersion),
+    );
+  }
+
+  Future<ProcedureListResponse> listProcedures(
+    String petId, {
+    required ProcedureListQuery query,
+  }) {
+    return _healthApiClient.listProcedures(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      status: query.status,
+      bucket: query.bucket,
+      procedureType: query.procedureType,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      sort: query.sort,
+    );
+  }
+
+  Future<Procedure> getProcedure(String petId, String procedureId) {
+    return _healthApiClient.getProcedure(petId, procedureId);
+  }
+
+  Future<Procedure> createProcedure(
+    String petId, {
+    required UpsertProcedureInput input,
+  }) {
+    return _healthApiClient.createProcedure(
+      petId,
+      _toUpsertProcedurePayload(input),
+    );
+  }
+
+  Future<Procedure> updateProcedure(
+    String petId,
+    String procedureId, {
+    required UpsertProcedureInput input,
+  }) {
+    return _healthApiClient.updateProcedure(
+      petId,
+      procedureId,
+      _toUpsertProcedurePayload(input),
+    );
+  }
+
+  Future<EmptyResponse> deleteProcedure(
+    String petId,
+    String procedureId, {
+    required int rowVersion,
+  }) {
+    return _healthApiClient.deleteProcedure(
+      petId,
+      procedureId,
+      DeleteEntityPayload(rowVersion: rowVersion),
+    );
+  }
+
+  Future<MedicalRecordListResponse> listMedicalRecords(
+    String petId, {
+    required MedicalRecordListQuery query,
+  }) {
+    return _healthApiClient.listMedicalRecords(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      status: query.status,
+      bucket: query.bucket,
+      recordType: query.recordType,
+      sort: query.sort,
+    );
+  }
+
+  Future<MedicalRecord> getMedicalRecord(String petId, String recordId) {
+    return _healthApiClient.getMedicalRecord(petId, recordId);
+  }
+
+  Future<MedicalRecord> createMedicalRecord(
+    String petId, {
+    required UpsertMedicalRecordInput input,
+  }) {
+    return _healthApiClient.createMedicalRecord(
+      petId,
+      _toUpsertMedicalRecordPayload(input),
+    );
+  }
+
+  Future<MedicalRecord> updateMedicalRecord(
+    String petId,
+    String recordId, {
+    required UpsertMedicalRecordInput input,
+  }) {
+    return _healthApiClient.updateMedicalRecord(
+      petId,
+      recordId,
+      _toUpsertMedicalRecordPayload(input),
+    );
+  }
+
+  Future<EmptyResponse> deleteMedicalRecord(
+    String petId,
+    String recordId, {
+    required int rowVersion,
+  }) {
+    return _healthApiClient.deleteMedicalRecord(
+      petId,
+      recordId,
+      DeleteEntityPayload(rowVersion: rowVersion),
+    );
+  }
+
+  Future<HealthDayResponse> getHealthDay(
+    String petId, {
+    required String date,
+  }) {
+    return _healthApiClient.getHealthDay(petId, date: date);
+  }
+
   UpsertLogPayload _toUpsertLogPayload(UpsertLogInput input) {
     return UpsertLogPayload(
       occurredAt: DateTime.parse(input.occurredAtIso),
@@ -258,6 +506,75 @@ class HealthRepository {
     );
   }
 
+  UpsertVetVisitPayload _toUpsertVetVisitPayload(UpsertVetVisitInput input) {
+    return UpsertVetVisitPayload(
+      status: input.status,
+      visitType: input.visitType,
+      scheduledAt: _parseDateTime(input.scheduledAtIso),
+      completedAt: _parseDateTime(input.completedAtIso),
+      reasonText: input.reasonText,
+      resultText: input.resultText,
+      clinicName: input.clinicName,
+      vetName: input.vetName,
+      attachmentFileIds: input.attachmentFileIds,
+      rowVersion: input.rowVersion,
+    );
+  }
+
+  UpsertVaccinationPayload _toUpsertVaccinationPayload(
+    UpsertVaccinationInput input,
+  ) {
+    return UpsertVaccinationPayload(
+      status: input.status,
+      vaccineName: input.vaccineName,
+      catalogMedicationId: input.catalogMedicationId,
+      scheduledAt: _parseDateTime(input.scheduledAtIso),
+      administeredAt: _parseDateTime(input.administeredAtIso),
+      nextDueAt: _parseDateTime(input.nextDueAtIso),
+      vetVisitId: input.vetVisitId,
+      clinicName: input.clinicName,
+      vetName: input.vetName,
+      notes: input.notes,
+      attachmentFileIds: input.attachmentFileIds,
+      rowVersion: input.rowVersion,
+    );
+  }
+
+  UpsertProcedurePayload _toUpsertProcedurePayload(
+    UpsertProcedureInput input,
+  ) {
+    return UpsertProcedurePayload(
+      status: input.status,
+      procedureType: input.procedureType,
+      title: input.title,
+      description: input.description,
+      catalogMedicationId: input.catalogMedicationId,
+      productName: input.productName,
+      scheduledAt: _parseDateTime(input.scheduledAtIso),
+      performedAt: _parseDateTime(input.performedAtIso),
+      nextDueAt: _parseDateTime(input.nextDueAtIso),
+      vetVisitId: input.vetVisitId,
+      notes: input.notes,
+      attachmentFileIds: input.attachmentFileIds,
+      rowVersion: input.rowVersion,
+    );
+  }
+
+  UpsertMedicalRecordPayload _toUpsertMedicalRecordPayload(
+    UpsertMedicalRecordInput input,
+  ) {
+    return UpsertMedicalRecordPayload(
+      recordType: input.recordType,
+      status: input.status,
+      title: input.title,
+      description: input.description,
+      startedAt: _parseDateTime(input.startedAtIso),
+      resolvedAt: _parseDateTime(input.resolvedAtIso),
+      attachmentFileIds: input.attachmentFileIds,
+      rowVersion: input.rowVersion,
+    );
+  }
+
   LogTypeMetricRequirementPayload _toLogTypeMetricRequirementPayload(
     LogTypeMetricRequirementInput input,
   ) {
@@ -265,5 +582,12 @@ class HealthRepository {
       metricId: input.metricId,
       isRequired: input.isRequired,
     );
+  }
+
+  DateTime? _parseDateTime(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return DateTime.parse(value);
   }
 }

@@ -14,6 +14,7 @@ export 'models/acl_models.dart';
 export 'models/auth_models.dart';
 export 'models/catalog_models.dart';
 export 'models/common_models.dart';
+export 'models/health_models.dart';
 export 'models/log_models.dart';
 export 'models/pet_models.dart';
 export 'models/profile_models.dart';

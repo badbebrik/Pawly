@@ -2,6 +2,7 @@ import '../api_client.dart';
 import '../api_context.dart';
 import '../api_endpoints.dart';
 import '../models/common_models.dart';
+import '../models/health_models.dart';
 import '../models/log_models.dart';
 
 class HealthApiClient {
@@ -25,6 +26,14 @@ class HealthApiClient {
       }..removeWhere((_, dynamic value) => value == null),
       requestOptions: _withUserAndToken,
       decoder: LogComposerBootstrapResponse.fromJson,
+    );
+  }
+
+  Future<HealthBootstrapResponse> getHealthBootstrap(String petId) {
+    return _apiClient.get<HealthBootstrapResponse>(
+      ApiEndpoints.petHealthBootstrap(petId),
+      requestOptions: _withUserAndToken,
+      decoder: HealthBootstrapResponse.fromJson,
     );
   }
 
@@ -261,6 +270,328 @@ class HealthApiClient {
       }..removeWhere((_, dynamic value) => value == null),
       requestOptions: _withUserAndToken,
       decoder: MetricSeriesResponse.fromJson,
+    );
+  }
+
+  Future<VetVisitListResponse> listVetVisits(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? status,
+    String? bucket,
+    String? dateFrom,
+    String? dateTo,
+    String? sort,
+  }) {
+    return _apiClient.get<VetVisitListResponse>(
+      ApiEndpoints.petVetVisits(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'status': status,
+        'bucket': bucket,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'sort': sort,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withUserAndToken,
+      decoder: VetVisitListResponse.fromJson,
+    );
+  }
+
+  Future<VetVisit> getVetVisit(String petId, String visitId) {
+    return _apiClient.get<VetVisit>(
+      ApiEndpoints.petVetVisitById(petId, visitId),
+      requestOptions: _withUserAndToken,
+      decoder: VetVisit.fromJson,
+    );
+  }
+
+  Future<VetVisit> createVetVisit(String petId, UpsertVetVisitPayload payload) {
+    return _apiClient.post<VetVisit>(
+      ApiEndpoints.petVetVisits(petId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: VetVisit.fromJson,
+    );
+  }
+
+  Future<VetVisit> updateVetVisit(
+    String petId,
+    String visitId,
+    UpsertVetVisitPayload payload,
+  ) {
+    return _apiClient.patch<VetVisit>(
+      ApiEndpoints.petVetVisitById(petId, visitId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: VetVisit.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> deleteVetVisit(
+    String petId,
+    String visitId,
+    DeleteEntityPayload payload,
+  ) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.petVetVisitById(petId, visitId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<RelatedLog> linkLogToVetVisit(
+    String petId,
+    String visitId,
+    LinkVetVisitLogPayload payload,
+  ) {
+    return _apiClient.post<RelatedLog>(
+      ApiEndpoints.petVetVisitLogs(petId, visitId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: RelatedLog.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> unlinkLogFromVetVisit(
+    String petId,
+    String visitId,
+    String logId,
+  ) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.petVetVisitLogById(petId, visitId, logId),
+      requestOptions: _withUserAndToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<VaccinationListResponse> listVaccinations(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? status,
+    String? bucket,
+    String? dateFrom,
+    String? dateTo,
+    String? sort,
+  }) {
+    return _apiClient.get<VaccinationListResponse>(
+      ApiEndpoints.petVaccinations(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'status': status,
+        'bucket': bucket,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'sort': sort,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withUserAndToken,
+      decoder: VaccinationListResponse.fromJson,
+    );
+  }
+
+  Future<Vaccination> getVaccination(String petId, String vaccinationId) {
+    return _apiClient.get<Vaccination>(
+      ApiEndpoints.petVaccinationById(petId, vaccinationId),
+      requestOptions: _withUserAndToken,
+      decoder: Vaccination.fromJson,
+    );
+  }
+
+  Future<Vaccination> createVaccination(
+    String petId,
+    UpsertVaccinationPayload payload,
+  ) {
+    return _apiClient.post<Vaccination>(
+      ApiEndpoints.petVaccinations(petId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: Vaccination.fromJson,
+    );
+  }
+
+  Future<Vaccination> updateVaccination(
+    String petId,
+    String vaccinationId,
+    UpsertVaccinationPayload payload,
+  ) {
+    return _apiClient.patch<Vaccination>(
+      ApiEndpoints.petVaccinationById(petId, vaccinationId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: Vaccination.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> deleteVaccination(
+    String petId,
+    String vaccinationId,
+    DeleteEntityPayload payload,
+  ) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.petVaccinationById(petId, vaccinationId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<ProcedureListResponse> listProcedures(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? status,
+    String? bucket,
+    String? procedureType,
+    String? dateFrom,
+    String? dateTo,
+    String? sort,
+  }) {
+    return _apiClient.get<ProcedureListResponse>(
+      ApiEndpoints.petProcedures(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'status': status,
+        'bucket': bucket,
+        'procedure_type': procedureType,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'sort': sort,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withUserAndToken,
+      decoder: ProcedureListResponse.fromJson,
+    );
+  }
+
+  Future<Procedure> getProcedure(String petId, String procedureId) {
+    return _apiClient.get<Procedure>(
+      ApiEndpoints.petProcedureById(petId, procedureId),
+      requestOptions: _withUserAndToken,
+      decoder: Procedure.fromJson,
+    );
+  }
+
+  Future<Procedure> createProcedure(
+    String petId,
+    UpsertProcedurePayload payload,
+  ) {
+    return _apiClient.post<Procedure>(
+      ApiEndpoints.petProcedures(petId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: Procedure.fromJson,
+    );
+  }
+
+  Future<Procedure> updateProcedure(
+    String petId,
+    String procedureId,
+    UpsertProcedurePayload payload,
+  ) {
+    return _apiClient.patch<Procedure>(
+      ApiEndpoints.petProcedureById(petId, procedureId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: Procedure.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> deleteProcedure(
+    String petId,
+    String procedureId,
+    DeleteEntityPayload payload,
+  ) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.petProcedureById(petId, procedureId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<MedicalRecordListResponse> listMedicalRecords(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? status,
+    String? bucket,
+    String? recordType,
+    String? sort,
+  }) {
+    return _apiClient.get<MedicalRecordListResponse>(
+      ApiEndpoints.petMedicalRecords(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'status': status,
+        'bucket': bucket,
+        'record_type': recordType,
+        'sort': sort,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withUserAndToken,
+      decoder: MedicalRecordListResponse.fromJson,
+    );
+  }
+
+  Future<MedicalRecord> getMedicalRecord(String petId, String recordId) {
+    return _apiClient.get<MedicalRecord>(
+      ApiEndpoints.petMedicalRecordById(petId, recordId),
+      requestOptions: _withUserAndToken,
+      decoder: MedicalRecord.fromJson,
+    );
+  }
+
+  Future<MedicalRecord> createMedicalRecord(
+    String petId,
+    UpsertMedicalRecordPayload payload,
+  ) {
+    return _apiClient.post<MedicalRecord>(
+      ApiEndpoints.petMedicalRecords(petId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: MedicalRecord.fromJson,
+    );
+  }
+
+  Future<MedicalRecord> updateMedicalRecord(
+    String petId,
+    String recordId,
+    UpsertMedicalRecordPayload payload,
+  ) {
+    return _apiClient.patch<MedicalRecord>(
+      ApiEndpoints.petMedicalRecordById(petId, recordId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: MedicalRecord.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> deleteMedicalRecord(
+    String petId,
+    String recordId,
+    DeleteEntityPayload payload,
+  ) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.petMedicalRecordById(petId, recordId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<HealthDayResponse> getHealthDay(
+    String petId, {
+    required String date,
+  }) {
+    return _apiClient.get<HealthDayResponse>(
+      ApiEndpoints.petHealthDay(petId),
+      queryParameters: <String, dynamic>{'date': date},
+      requestOptions: _withUserAndToken,
+      decoder: HealthDayResponse.fromJson,
     );
   }
 

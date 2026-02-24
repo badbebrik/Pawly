@@ -32,7 +32,8 @@ class ApiEndpoints {
   static String petPhotoConfirmUpload(String petId) =>
       '/v1/pets/$petId/photo:confirm-upload';
 
-  static String petLogsBootstrap(String petId) => '/v1/pets/$petId/logs/bootstrap';
+  static String petLogsBootstrap(String petId) =>
+      '/v1/pets/$petId/logs/bootstrap';
 
   static String petLogs(String petId) => '/v1/pets/$petId/logs';
 
@@ -54,6 +55,39 @@ class ApiEndpoints {
 
   static String petAnalyticsMetricSeries(String petId, String metricId) =>
       '/v1/pets/$petId/analytics/metrics/$metricId/series';
+
+  static String petHealthBootstrap(String petId) =>
+      '/v1/pets/$petId/health/bootstrap';
+
+  static String petHealthDay(String petId) => '/v1/pets/$petId/health/day';
+
+  static String petVetVisits(String petId) => '/v1/pets/$petId/vet-visits';
+
+  static String petVetVisitById(String petId, String visitId) =>
+      '/v1/pets/$petId/vet-visits/$visitId';
+
+  static String petVetVisitLogs(String petId, String visitId) =>
+      '/v1/pets/$petId/vet-visits/$visitId/logs';
+
+  static String petVetVisitLogById(
+          String petId, String visitId, String logId) =>
+      '/v1/pets/$petId/vet-visits/$visitId/logs/$logId';
+
+  static String petVaccinations(String petId) => '/v1/pets/$petId/vaccinations';
+
+  static String petVaccinationById(String petId, String vaccinationId) =>
+      '/v1/pets/$petId/vaccinations/$vaccinationId';
+
+  static String petProcedures(String petId) => '/v1/pets/$petId/procedures';
+
+  static String petProcedureById(String petId, String procedureId) =>
+      '/v1/pets/$petId/procedures/$procedureId';
+
+  static String petMedicalRecords(String petId) =>
+      '/v1/pets/$petId/medical-records';
+
+  static String petMedicalRecordById(String petId, String recordId) =>
+      '/v1/pets/$petId/medical-records/$recordId';
 
   static const String aclPresets = '/v1/acl/presets';
 
