@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/pets_repository.dart';
 import '../providers/active_pet_controller.dart';
@@ -238,6 +240,7 @@ class _PetAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
+    final resolvedPhotoUrl = hasPhoto ? _normalizeStorageUrl(photoUrl!) : null;
 
     return Container(
       width: size,
@@ -249,15 +252,25 @@ class _PetAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
-          ? Image.network(
-              photoUrl!,
+          ? CachedNetworkImage(
+              imageUrl: resolvedPhotoUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _PetAvatarFallback(
+              errorWidget: (_, __, ___) => _PetAvatarFallback(
                 colorScheme: colorScheme,
               ),
             )
           : _PetAvatarFallback(colorScheme: colorScheme),
     );
+  }
+
+  String _normalizeStorageUrl(String url) {
+    final uri = Uri.tryParse(url);
+    final apiUri = Uri.tryParse(ApiConstants.baseUrl);
+    if (uri == null || apiUri == null || uri.host != 'minio') {
+      return url;
+    }
+
+    return uri.replace(host: apiUri.host).toString();
   }
 }
 
@@ -323,44 +336,6 @@ class _PetFeatureCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PetFeatureWideCard extends StatelessWidget {
-  const _PetFeatureWideCard({
-    required this.title,
-    required this.icon,
-  });
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(PawlySpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(PawlyRadius.xl),
-        border: Border.all(color: colorScheme.outline, width: 1.4),
-        boxShadow: PawlyElevation.soft(colorScheme.shadow),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(icon, size: 28, color: colorScheme.primary),
-          const SizedBox(width: PawlySpacing.sm),
-          Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -480,6 +455,10 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Здоровье',
                   icon: Icons.health_and_safety_rounded,
+                  onTap: () => context.pushNamed(
+                    'petHealthHome',
+                    pathParameters: <String, String>{'petId': pet.id},
+                  ),
                 ),
                 _PetFeatureCard(
                   title: 'Совместный доступ',
@@ -498,11 +477,6 @@ class _ActivePetView extends ConsumerWidget {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: PawlySpacing.md),
-            const _PetFeatureWideCard(
-              title: 'Документы',
-              icon: Icons.folder_copy_rounded,
             ),
             const SizedBox(height: PawlySpacing.lg),
             PawlyButton(

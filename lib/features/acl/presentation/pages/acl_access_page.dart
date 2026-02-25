@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../models/acl_screen_models.dart';
@@ -307,6 +309,7 @@ class _AclAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
+    final resolvedPhotoUrl = hasPhoto ? _normalizeStorageUrl(photoUrl!) : null;
 
     return SizedBox(
       width: 72,
@@ -323,10 +326,10 @@ class _AclAvatar extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: hasPhoto
-                ? Image.network(
-                    photoUrl!,
+                ? CachedNetworkImage(
+                    imageUrl: resolvedPhotoUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorWidget: (_, __, ___) =>
                         _AclAvatarFallback(label: fallbackLabel),
                   )
                 : _AclAvatarFallback(label: fallbackLabel),
@@ -353,6 +356,16 @@ class _AclAvatar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _normalizeStorageUrl(String url) {
+    final uri = Uri.tryParse(url);
+    final apiUri = Uri.tryParse(ApiConstants.baseUrl);
+    if (uri == null || apiUri == null || uri.host != 'minio') {
+      return url;
+    }
+
+    return uri.replace(host: apiUri.host).toString();
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../app/providers/session_state_reset.dart';
 import '../../../../app/providers/theme_mode_controller.dart';
@@ -409,10 +410,10 @@ class _ProfileAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
-          ? Image.network(
-              resolvedPhotoUrl!,
+          ? CachedNetworkImage(
+              imageUrl: resolvedPhotoUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _ProfileAvatarFallback(
+              errorWidget: (_, __, ___) => _ProfileAvatarFallback(
                 initials: initials,
               ),
             )

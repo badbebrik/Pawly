@@ -11,6 +11,7 @@ import '../../features/auth/presentation/pages/register_flow_page.dart';
 import '../../features/calendar/presentation/pages/calendar_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/pets/presentation/pages/pet_details_page.dart';
+import '../../features/pets/presentation/pages/pet_edit_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
 import '../../features/pet_create/presentation/pages/pet_create_flow_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
@@ -111,6 +112,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                       petId: state.pathParameters['petId']!,
                     ),
                     routes: <RouteBase>[
+                      GoRoute(
+                        path: 'edit',
+                        name: 'petEdit',
+                        builder: (_, state) => PetEditPage(
+                          petId: state.pathParameters['petId']!,
+                        ),
+                      ),
                       GoRoute(
                         path: 'log-types/create',
                         name: 'petLogTypeCreate',
