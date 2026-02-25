@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'deep_links/pawly_deep_link_listener.dart';
@@ -21,6 +22,15 @@ class PawlyApp extends ConsumerWidget {
       theme: PawlyTheme.light(),
       darkTheme: PawlyTheme.dark(),
       themeMode: themeMode,
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const <Locale>[
+        Locale('ru'),
+        Locale('en'),
+      ],
       routerConfig: router,
       builder: (context, child) {
         return PawlyDeepLinkListener(

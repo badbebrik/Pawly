@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../providers/pet_health_home_controllers.dart';
@@ -20,6 +21,7 @@ class PetHealthHomePage extends ConsumerWidget {
       appBar: AppBar(title: const Text('Здоровье')),
       body: stateAsync.when(
         data: (state) => _PetHealthHomeView(
+          petId: petId,
           state: state,
           onRetry: () => ref.invalidate(petHealthHomeProvider(petId)),
         ),
@@ -34,10 +36,12 @@ class PetHealthHomePage extends ConsumerWidget {
 
 class _PetHealthHomeView extends StatelessWidget {
   const _PetHealthHomeView({
+    required this.petId,
     required this.state,
     required this.onRetry,
   });
 
+  final String petId;
   final PetHealthHomeState state;
   final VoidCallback onRetry;
 
@@ -74,7 +78,7 @@ class _PetHealthHomeView extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: PawlySpacing.md),
             child: _HealthEntityCard(
               section: section,
-              onTap: () => _showComingSoon(context, section.type),
+              onTap: () => _handleSectionTap(context, section.type),
             ),
           ),
         ),
@@ -82,7 +86,15 @@ class _PetHealthHomeView extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context, PetHealthSectionType type) {
+  void _handleSectionTap(BuildContext context, PetHealthSectionType type) {
+    if (type == PetHealthSectionType.vaccinations) {
+      context.pushNamed(
+        'petVaccinations',
+        pathParameters: <String, String>{'petId': petId},
+      );
+      return;
+    }
+
     final label = switch (type) {
       PetHealthSectionType.vetVisits => 'Визиты',
       PetHealthSectionType.vaccinations => 'Вакцинации',

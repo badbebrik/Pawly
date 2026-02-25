@@ -18,6 +18,7 @@ import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_picker_page.dart';
 import '../../features/pet_care/presentation/pages/pet_analytics_page.dart';
 import '../../features/pet_care/presentation/pages/pet_health_home_page.dart';
+import '../../features/pet_care/presentation/pages/pet_vaccinations_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_edit_page.dart';
@@ -153,6 +154,27 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                         builder: (_, state) => PetHealthHomePage(
                           petId: state.pathParameters['petId']!,
                         ),
+                        routes: <RouteBase>[
+                          GoRoute(
+                            path: 'vaccinations',
+                            name: 'petVaccinations',
+                            builder: (_, state) => PetVaccinationsPage(
+                              petId: state.pathParameters['petId']!,
+                            ),
+                            routes: <RouteBase>[
+                              GoRoute(
+                                path: ':vaccinationId',
+                                name: 'petVaccinationDetails',
+                                builder: (_, state) =>
+                                    PetVaccinationDetailsPage(
+                                  petId: state.pathParameters['petId']!,
+                                  vaccinationId:
+                                      state.pathParameters['vaccinationId']!,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       GoRoute(
                         path: 'analytics',

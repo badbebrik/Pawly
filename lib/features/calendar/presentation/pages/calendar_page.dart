@@ -7,7 +7,6 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../pets/presentation/providers/active_pet_controller.dart';
-import '../../../pets/presentation/providers/active_pet_details_controller.dart';
 import '../providers/calendar_controllers.dart';
 
 class CalendarPage extends ConsumerStatefulWidget {
@@ -21,7 +20,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     final activePetAsync = ref.watch(activePetControllerProvider);
-    final activePetDetailsAsync = ref.watch(activePetDetailsControllerProvider);
     final selectedDate = ref.watch(calendarSelectedDateProvider);
 
     return Scaffold(
@@ -54,17 +52,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             child: ListView(
               padding: const EdgeInsets.all(PawlySpacing.lg),
               children: <Widget>[
-                _CalendarHeader(
-                  selectedDate: selectedDate,
-                  petName: activePetDetailsAsync.asData?.value?.pet.name,
-                  petSubtitle: activePetDetailsAsync.asData?.value?.speciesName,
-                  onPickDate: _pickDate,
-                  onJumpToToday: _jumpToToday,
-                ),
-                const SizedBox(height: PawlySpacing.lg),
                 _WeekStrip(
                   selectedDate: selectedDate,
                   onSelectDate: _selectDate,
+                ),
+                const SizedBox(height: PawlySpacing.lg),
+                _CalendarDatePickerCard(
+                  selectedDate: selectedDate,
+                  onPickDate: _pickDate,
                 ),
                 const SizedBox(height: PawlySpacing.lg),
                 dayAsync.when(
@@ -115,29 +110,19 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     ref.read(calendarSelectedDateProvider.notifier).setDate(pickedDate);
   }
 
-  void _jumpToToday() {
-    ref.read(calendarSelectedDateProvider.notifier).jumpToToday();
-  }
-
   void _selectDate(DateTime value) {
     ref.read(calendarSelectedDateProvider.notifier).setDate(value);
   }
 }
 
-class _CalendarHeader extends StatelessWidget {
-  const _CalendarHeader({
+class _CalendarDatePickerCard extends StatelessWidget {
+  const _CalendarDatePickerCard({
     required this.selectedDate,
     required this.onPickDate,
-    required this.onJumpToToday,
-    this.petName,
-    this.petSubtitle,
   });
 
   final DateTime selectedDate;
-  final String? petName;
-  final String? petSubtitle;
   final Future<void> Function() onPickDate;
-  final VoidCallback onJumpToToday;
 
   @override
   Widget build(BuildContext context) {
@@ -151,41 +136,16 @@ class _CalendarHeader extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: theme.textTheme.headlineSmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: PawlySpacing.xs),
-          Text(
-            petName == null || petName!.isEmpty
-                ? 'События здоровья на выбранный день'
-                : petSubtitle == null || petSubtitle!.isEmpty
-                    ? 'Питомец: $petName'
-                    : '$petName • $petSubtitle',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
           const SizedBox(height: PawlySpacing.md),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: PawlyButton(
-                  label: 'Выбрать дату',
-                  onPressed: onPickDate,
-                  variant: PawlyButtonVariant.secondary,
-                  icon: Icons.event_rounded,
-                ),
-              ),
-              const SizedBox(width: PawlySpacing.sm),
-              Expanded(
-                child: PawlyButton(
-                  label: 'Сегодня',
-                  onPressed: onJumpToToday,
-                  variant: PawlyButtonVariant.ghost,
-                ),
-              ),
-            ],
+          PawlyButton(
+            label: 'Выбрать дату',
+            onPressed: onPickDate,
+            variant: PawlyButtonVariant.secondary,
+            icon: Icons.event_rounded,
           ),
         ],
       ),
