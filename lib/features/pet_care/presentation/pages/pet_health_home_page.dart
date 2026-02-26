@@ -87,6 +87,14 @@ class _PetHealthHomeView extends StatelessWidget {
   }
 
   void _handleSectionTap(BuildContext context, PetHealthSectionType type) {
+    if (type == PetHealthSectionType.vetVisits) {
+      context.pushNamed(
+        'petVetVisits',
+        pathParameters: <String, String>{'petId': petId},
+      );
+      return;
+    }
+
     if (type == PetHealthSectionType.vaccinations) {
       context.pushNamed(
         'petVaccinations',

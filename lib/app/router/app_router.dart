@@ -18,6 +18,7 @@ import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_picker_page.dart';
 import '../../features/pet_care/presentation/pages/pet_analytics_page.dart';
 import '../../features/pet_care/presentation/pages/pet_health_home_page.dart';
+import '../../features/pet_care/presentation/pages/pet_vet_visits_page.dart';
 import '../../features/pet_care/presentation/pages/pet_vaccinations_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
@@ -155,6 +156,23 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
+                          GoRoute(
+                            path: 'visits',
+                            name: 'petVetVisits',
+                            builder: (_, state) => PetVetVisitsPage(
+                              petId: state.pathParameters['petId']!,
+                            ),
+                            routes: <RouteBase>[
+                              GoRoute(
+                                path: ':visitId',
+                                name: 'petVetVisitDetails',
+                                builder: (_, state) => PetVetVisitDetailsPage(
+                                  petId: state.pathParameters['petId']!,
+                                  visitId: state.pathParameters['visitId']!,
+                                ),
+                              ),
+                            ],
+                          ),
                           GoRoute(
                             path: 'vaccinations',
                             name: 'petVaccinations',
