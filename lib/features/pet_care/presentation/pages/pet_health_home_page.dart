@@ -103,6 +103,14 @@ class _PetHealthHomeView extends StatelessWidget {
       return;
     }
 
+    if (type == PetHealthSectionType.medicalRecords) {
+      context.pushNamed(
+        'petMedicalRecords',
+        pathParameters: <String, String>{'petId': petId},
+      );
+      return;
+    }
+
     final label = switch (type) {
       PetHealthSectionType.vetVisits => 'Визиты',
       PetHealthSectionType.vaccinations => 'Вакцинации',
