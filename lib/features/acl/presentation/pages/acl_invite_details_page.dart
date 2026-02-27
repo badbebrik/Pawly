@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/network/models/acl_models.dart';
@@ -27,7 +28,21 @@ class AclInviteDetailsPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Приглашение')),
+      appBar: AppBar(
+        title: const Text('Приглашение'),
+        actions: <Widget>[
+          IconButton(
+            onPressed: () => _editInvite(context),
+            icon: const Icon(Icons.edit_rounded),
+            tooltip: 'Редактировать',
+          ),
+          IconButton(
+            onPressed: () => _deleteInvite(context, ref),
+            icon: const Icon(Icons.delete_outline_rounded),
+            tooltip: 'Удалить',
+          ),
+        ],
+      ),
       body: state.when(
         data: (value) => _AclInviteDetailsContent(state: value),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -42,6 +57,80 @@ class AclInviteDetailsPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _editInvite(BuildContext context) async {
+    final nextInviteId = await context.pushNamed<String>(
+      'aclInviteEdit',
+      pathParameters: <String, String>{
+        'petId': petId,
+        'inviteId': inviteId,
+      },
+    );
+    if (nextInviteId == null || !context.mounted) {
+      return;
+    }
+
+    context.pushReplacementNamed(
+      'aclInviteDetails',
+      pathParameters: <String, String>{
+        'petId': petId,
+        'inviteId': nextInviteId,
+      },
+    );
+  }
+
+  Future<void> _deleteInvite(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Удалить приглашение?'),
+            content: const Text(
+              'Ссылка и код перестанут работать для новых участников.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Удалить'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(
+            aclInviteDetailsControllerProvider(
+              AclInviteRef(petId: petId, inviteId: inviteId),
+            ).notifier,
+          )
+          .revokeInvite();
+      if (!context.mounted) {
+        return;
+      }
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось удалить приглашение.',
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -153,9 +242,8 @@ class _AclInviteDetailsContent extends StatelessWidget {
     final box = context.findRenderObject() as RenderBox?;
     await Share.share(
       url,
-      sharePositionOrigin: box == null
-          ? null
-          : box.localToGlobal(Offset.zero) & box.size,
+      sharePositionOrigin:
+          box == null ? null : box.localToGlobal(Offset.zero) & box.size,
     );
     if (!context.mounted) {
       return;
@@ -219,7 +307,8 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
               vertical: PawlySpacing.sm,
             ),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+              color:
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(PawlyRadius.lg),
               ),
@@ -283,7 +372,9 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Icon(
-                        item.canRead ? Icons.check_rounded : Icons.close_rounded,
+                        item.canRead
+                            ? Icons.check_rounded
+                            : Icons.close_rounded,
                         color: item.canRead
                             ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,
@@ -293,7 +384,9 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Icon(
-                        item.canWrite ? Icons.check_rounded : Icons.close_rounded,
+                        item.canWrite
+                            ? Icons.check_rounded
+                            : Icons.close_rounded,
                         color: item.canWrite
                             ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,

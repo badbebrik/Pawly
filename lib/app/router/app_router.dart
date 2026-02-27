@@ -4,7 +4,9 @@ import '../../core/network/session/auth_session_store.dart';
 import '../../features/acl/presentation/pages/acl_access_page.dart';
 import '../../features/acl/presentation/pages/acl_create_invite_page.dart';
 import '../../features/acl/presentation/pages/acl_invite_details_page.dart';
+import '../../features/acl/presentation/pages/acl_member_details_page.dart';
 import '../../features/acl/presentation/pages/acl_invite_preview_page.dart';
+import '../../features/acl/presentation/pages/acl_edit_invite_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
@@ -281,6 +283,14 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                         ),
                         routes: <RouteBase>[
                           GoRoute(
+                            path: 'members/:memberId',
+                            name: 'aclMemberDetails',
+                            builder: (_, state) => AclMemberDetailsPage(
+                              petId: state.pathParameters['petId']!,
+                              memberId: state.pathParameters['memberId']!,
+                            ),
+                          ),
+                          GoRoute(
                             path: 'invite',
                             name: 'aclCreateInvite',
                             builder: (_, state) => AclCreateInvitePage(
@@ -294,6 +304,16 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                               petId: state.pathParameters['petId']!,
                               inviteId: state.pathParameters['inviteId']!,
                             ),
+                            routes: <RouteBase>[
+                              GoRoute(
+                                path: 'edit',
+                                name: 'aclInviteEdit',
+                                builder: (_, state) => AclEditInvitePage(
+                                  petId: state.pathParameters['petId']!,
+                                  inviteId: state.pathParameters['inviteId']!,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

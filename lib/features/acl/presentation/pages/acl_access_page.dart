@@ -26,6 +26,13 @@ class AclAccessPage extends ConsumerWidget {
       body: accessState.when(
         data: (state) => _AclAccessContent(
           state: state,
+          onMemberTap: (memberId) => context.pushNamed(
+            'aclMemberDetails',
+            pathParameters: <String, String>{
+              'petId': petId,
+              'memberId': memberId,
+            },
+          ),
           onCreateInvite: state.capabilities.membersWrite
               ? () => context.pushNamed(
                     'aclCreateInvite',
@@ -53,12 +60,14 @@ class AclAccessPage extends ConsumerWidget {
 class _AclAccessContent extends StatelessWidget {
   const _AclAccessContent({
     required this.state,
+    required this.onMemberTap,
     required this.onInviteTap,
     this.onCreateInvite,
   });
 
   final AclAccessScreenState state;
   final VoidCallback? onCreateInvite;
+  final ValueChanged<String> onMemberTap;
   final ValueChanged<String> onInviteTap;
 
   @override
@@ -95,6 +104,7 @@ class _AclAccessContent extends StatelessWidget {
                 child: _AclMemberTile(
                   member: member,
                   meUserId: state.me.userId,
+                  onTap: () => onMemberTap(member.id),
                 ),
               )),
         const SizedBox(height: PawlySpacing.lg),
@@ -142,10 +152,12 @@ class _AclMemberTile extends StatelessWidget {
   const _AclMemberTile({
     required this.member,
     required this.meUserId,
+    required this.onTap,
   });
 
   final AclMember member;
   final String meUserId;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +168,7 @@ class _AclMemberTile extends StatelessWidget {
     final fullName = _memberName(profile);
 
     return PawlyCard(
+      onTap: onTap,
       padding: const EdgeInsets.all(PawlySpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -206,6 +219,11 @@ class _AclMemberTile extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(width: PawlySpacing.sm),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: colorScheme.onSurfaceVariant,
           ),
         ],
       ),

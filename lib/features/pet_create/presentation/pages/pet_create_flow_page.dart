@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../catalog/data/catalog_cache_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../pets/presentation/providers/active_pet_controller.dart';
 import '../../../pets/presentation/providers/pets_controller.dart';
@@ -89,6 +90,30 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
                   .toList(growable: false);
           final patterns = catalog.patterns;
           final colors = catalog.colors;
+          final speciesName = state.speciesMode == CatalogPickMode.catalog
+              ? _catalogOptionName(
+                  species,
+                  state.speciesId,
+                  fallback: 'Не выбран',
+                )
+              : _fallbackText(state.customSpeciesName);
+          final breedName = state.breedMode == CatalogPickMode.catalog
+              ? _catalogBreedName(
+                  catalog.breeds,
+                  state.breedId,
+                  fallback: 'Не выбрана',
+                )
+              : _fallbackText(state.customBreedName);
+          final patternName = state.patternMode == CatalogPickMode.catalog
+              ? _catalogPatternName(
+                  patterns,
+                  state.patternId,
+                  fallback: 'Не выбран',
+                )
+              : _fallbackText(state.customPatternName);
+          final selectedCatalogColors = colors
+              .where((e) => state.colorIds.contains(e.id))
+              .toList(growable: false);
 
           return SafeArea(
             child: SingleChildScrollView(
@@ -299,21 +324,114 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
                     ),
                   ],
                   if (state.step == PetCreateStep.review) ...[
-                    PawlyCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text('Имя: ${state.name}'),
-                          Text('Пол: ${state.sex}'),
-                          Text(
-                              'Вид: ${state.speciesMode == CatalogPickMode.catalog ? "Из каталога" : "Свой"}'),
-                          Text(
-                              'Порода: ${state.breedMode == CatalogPickMode.catalog ? "Из каталога" : "Своя"}'),
-                          Text(
-                              'Паттерн: ${state.patternMode == CatalogPickMode.catalog ? "Из каталога" : "Свой"}'),
-                          Text(
-                              'Цветов: ${state.colorIds.length + state.customColorsHex.length}'),
-                        ],
+                    Text(
+                      'Проверьте данные перед созданием',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: PawlySpacing.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: PawlyCard(
+                        title: Text(
+                          'Основное',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        child: Column(
+                          children: <Widget>[
+                            _ReviewRow(label: 'Имя', value: state.name.trim()),
+                            _ReviewRow(
+                              label: 'Пол',
+                              value: _sexLabel(state.sex),
+                            ),
+                            _ReviewRow(label: 'Вид', value: speciesName),
+                            _ReviewRow(label: 'Порода', value: breedName),
+                            _ReviewRow(
+                              label: 'Паттерн',
+                              value: patternName,
+                              isLast: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: PawlyCard(
+                        title: Text(
+                          'Внешность',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Цвета',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: PawlySpacing.sm),
+                            if (selectedCatalogColors.isNotEmpty ||
+                                state.customColorsHex.isNotEmpty)
+                              Wrap(
+                                spacing: PawlySpacing.xs,
+                                runSpacing: PawlySpacing.xs,
+                                children: <Widget>[
+                                  ...selectedCatalogColors.map(
+                                    (color) => Chip(label: Text(color.name)),
+                                  ),
+                                  ...state.customColorsHex.map(
+                                    (hex) => Chip(
+                                      avatar: CircleAvatar(
+                                        backgroundColor:
+                                            _colorFromHex(hex) ?? Colors.grey,
+                                      ),
+                                      label: Text(hex),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              Text(
+                                'Не выбраны',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: PawlyCard(
+                        title: Text(
+                          'Дополнительно',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        child: Column(
+                          children: <Widget>[
+                            _ReviewRow(
+                              label: 'Дата рождения',
+                              value: _dateLabel(state.birthDate),
+                            ),
+                            _ReviewRow(
+                              label: 'Стерилизация',
+                              value: _yesNoUnknownLabel(state.isNeutered),
+                            ),
+                            _ReviewRow(
+                              label: 'Свободный выгул',
+                              value: state.isOutdoor ? 'Да' : 'Нет',
+                            ),
+                            _ReviewRow(
+                              label: 'Микрочип',
+                              value: _fallbackText(state.microchipId),
+                            ),
+                            _ReviewRow(
+                              label: 'Дата установки чипа',
+                              value: _dateLabel(state.microchipInstalledAt),
+                              isLast: true,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: PawlySpacing.lg),
@@ -412,21 +530,71 @@ class _ModeChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('$title: '),
-        ChoiceChip(
-          label: const Text('Из каталога'),
-          selected: mode == CatalogPickMode.catalog,
-          onSelected: (_) => onChanged(CatalogPickMode.catalog),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(width: PawlySpacing.xs),
-        ChoiceChip(
-          label: const Text('Свой вариант'),
-          selected: mode == CatalogPickMode.custom,
-          onSelected: (_) => onChanged(CatalogPickMode.custom),
+        const SizedBox(height: PawlySpacing.xs),
+        Wrap(
+          spacing: PawlySpacing.xs,
+          runSpacing: PawlySpacing.xs,
+          children: <Widget>[
+            ChoiceChip(
+              label: const Text('Из каталога'),
+              selected: mode == CatalogPickMode.catalog,
+              onSelected: (_) => onChanged(CatalogPickMode.catalog),
+            ),
+            ChoiceChip(
+              label: const Text('Свой вариант'),
+              selected: mode == CatalogPickMode.custom,
+              onSelected: (_) => onChanged(CatalogPickMode.custom),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _ReviewRow extends StatelessWidget {
+  const _ReviewRow({
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : PawlySpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+          const SizedBox(width: PawlySpacing.md),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -475,4 +643,86 @@ class _StepPills extends StatelessWidget {
       }),
     );
   }
+}
+
+String _catalogOptionName(
+  List<CatalogOption> options,
+  String? id, {
+  required String fallback,
+}) {
+  if (id == null || id.isEmpty) return fallback;
+  for (final option in options) {
+    if (option.id != id) continue;
+    final name = option.name.trim();
+    if (name.isNotEmpty) return name;
+  }
+  return fallback;
+}
+
+String _catalogBreedName(
+  List<CatalogBreedOption> options,
+  String? id, {
+  required String fallback,
+}) {
+  if (id == null || id.isEmpty) return fallback;
+  for (final option in options) {
+    if (option.id != id) continue;
+    final name = option.name.trim();
+    if (name.isNotEmpty) return name;
+  }
+  return fallback;
+}
+
+String _catalogPatternName(
+  List<CatalogPatternOption> options,
+  String? id, {
+  required String fallback,
+}) {
+  if (id == null || id.isEmpty) return fallback;
+  for (final option in options) {
+    if (option.id != id) continue;
+    final name = option.name.trim();
+    if (name.isNotEmpty) return name;
+  }
+  return fallback;
+}
+
+String _fallbackText(String value) {
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? 'Не заполнено' : trimmed;
+}
+
+String _sexLabel(String value) {
+  switch (value) {
+    case 'MALE':
+      return 'Самец';
+    case 'FEMALE':
+      return 'Самка';
+    default:
+      return 'Не указан';
+  }
+}
+
+String _yesNoUnknownLabel(String value) {
+  switch (value) {
+    case 'YES':
+      return 'Да';
+    case 'NO':
+      return 'Нет';
+    default:
+      return 'Не указано';
+  }
+}
+
+String _dateLabel(DateTime? value) {
+  if (value == null) return 'Не заполнено';
+  return value.toLocal().toString().split(' ').first;
+}
+
+Color? _colorFromHex(String hex) {
+  final normalized = hex.trim().replaceFirst('#', '');
+  if (normalized.length != 6) return null;
+  final value = int.tryParse(normalized, radix: 16);
+  if (value == null) return null;
+  return Color(0xFF000000 | value);
 }

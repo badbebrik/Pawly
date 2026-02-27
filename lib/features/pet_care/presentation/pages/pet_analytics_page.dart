@@ -33,7 +33,8 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
         data: (response) => _buildContent(context, response.items),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _AnalyticsErrorView(
-          onRetry: () => ref.invalidate(petAnalyticsMetricsProvider(widget.petId)),
+          onRetry: () =>
+              ref.invalidate(petAnalyticsMetricsProvider(widget.petId)),
         ),
       ),
     );
@@ -138,30 +139,10 @@ class _AnalyticsMetricView extends StatelessWidget {
   Widget build(BuildContext context) {
     final summary = series.summary;
     final unit = series.metric.unitCode;
-    final sumValue = series.points.fold<double>(
-      0,
-      (total, point) => total + point.valueNum,
-    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: PawlySpacing.md,
-          crossAxisSpacing: PawlySpacing.md,
-          childAspectRatio: 1.5,
-          children: <Widget>[
-            _SummaryCard(title: 'Последнее', value: _formatValue(summary?.lastValueNum, unit)),
-            _SummaryCard(title: 'Минимум', value: _formatValue(summary?.minValueNum, unit)),
-            _SummaryCard(title: 'Максимум', value: _formatValue(summary?.maxValueNum, unit)),
-            _SummaryCard(title: 'Среднее', value: _formatValue(summary?.avgValueNum, unit)),
-            _SummaryCard(title: 'Сумма', value: _formatValue(sumValue, unit)),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.lg),
         PawlyCard(
           title: Text(
             summaryMetric.metricName,
@@ -204,6 +185,29 @@ class _AnalyticsMetricView extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: PawlySpacing.lg),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: PawlySpacing.md,
+          crossAxisSpacing: PawlySpacing.md,
+          childAspectRatio: 1.5,
+          children: <Widget>[
+            _SummaryCard(
+                title: 'Последнее',
+                value: _formatValue(summary?.lastValueNum, unit)),
+            _SummaryCard(
+                title: 'Минимум',
+                value: _formatValue(summary?.minValueNum, unit)),
+            _SummaryCard(
+                title: 'Максимум',
+                value: _formatValue(summary?.maxValueNum, unit)),
+            _SummaryCard(
+                title: 'Среднее',
+                value: _formatValue(summary?.avgValueNum, unit)),
+          ],
         ),
       ],
     );
@@ -280,7 +284,8 @@ class _InteractiveMetricLineChart extends StatefulWidget {
       _InteractiveMetricLineChartState();
 }
 
-class _InteractiveMetricLineChartState extends State<_InteractiveMetricLineChart> {
+class _InteractiveMetricLineChartState
+    extends State<_InteractiveMetricLineChart> {
   int? _selectedIndex;
 
   @override
@@ -299,9 +304,11 @@ class _InteractiveMetricLineChartState extends State<_InteractiveMetricLineChart
 
   @override
   Widget build(BuildContext context) {
-    final values = widget.points.map((item) => item.valueNum).toList(growable: false);
+    final values =
+        widget.points.map((item) => item.valueNum).toList(growable: false);
     final geometry = _ChartGeometry.fromValues(values);
-    final selectedPoint = _selectedIndex == null ? null : widget.points[_selectedIndex!];
+    final selectedPoint =
+        _selectedIndex == null ? null : widget.points[_selectedIndex!];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,10 +404,10 @@ class _InteractiveMetricLineChartState extends State<_InteractiveMetricLineChart
                         if (_selectedIndex != null)
                           Positioned(
                             left: _selectedPointX(
-                              constraints.maxWidth,
-                              widget.points.length,
-                              _selectedIndex!,
-                            ) -
+                                  constraints.maxWidth,
+                                  widget.points.length,
+                                  _selectedIndex!,
+                                ) -
                                 1,
                             top: 0,
                             bottom: 16,
@@ -408,7 +415,8 @@ class _InteractiveMetricLineChartState extends State<_InteractiveMetricLineChart
                               width: 2,
                               decoration: BoxDecoration(
                                 color: widget.color.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(PawlyRadius.pill),
+                                borderRadius:
+                                    BorderRadius.circular(PawlyRadius.pill),
                               ),
                             ),
                           ),
@@ -432,16 +440,19 @@ class _InteractiveMetricLineChartState extends State<_InteractiveMetricLineChart
                         ),
                         Text(
                           _formatAxisDate(widget.points.last.occurredAt),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(height: math.max(0, chartHeight - (constraints.maxHeight - 32))),
+                  SizedBox(
+                      height: math.max(
+                          0, chartHeight - (constraints.maxHeight - 32))),
                 ],
               );
             },
@@ -524,7 +535,8 @@ class _MetricLineChartPainter extends CustomPainter {
     final maxValue = points.reduce(math.max);
     final range = maxValue - minValue;
     final safeRange = range == 0 ? 1.0 : range;
-    final stepX = points.length == 1 ? 0.0 : chartRect.width / (points.length - 1);
+    final stepX =
+        points.length == 1 ? 0.0 : chartRect.width / (points.length - 1);
     final path = Path();
     final areaPath = Path();
     final offsets = <Offset>[];
@@ -543,7 +555,8 @@ class _MetricLineChartPainter extends CustomPainter {
       } else {
         final previous = offsets[index - 1];
         final controlX = (previous.dx + point.dx) / 2;
-        path.cubicTo(controlX, previous.dy, controlX, point.dy, point.dx, point.dy);
+        path.cubicTo(
+            controlX, previous.dy, controlX, point.dy, point.dx, point.dy);
         areaPath.cubicTo(
           controlX,
           previous.dy,
@@ -685,9 +698,8 @@ String _formatValue(double? value, String? unit) {
   if (value == null) {
     return '—';
   }
-  final number = value % 1 == 0
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
+  final number =
+      value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   if (unit == null || unit.isEmpty) {
     return number;
   }
