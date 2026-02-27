@@ -103,6 +103,14 @@ class _PetHealthHomeView extends StatelessWidget {
       return;
     }
 
+    if (type == PetHealthSectionType.procedures) {
+      context.pushNamed(
+        'petProcedures',
+        pathParameters: <String, String>{'petId': petId},
+      );
+      return;
+    }
+
     if (type == PetHealthSectionType.medicalRecords) {
       context.pushNamed(
         'petMedicalRecords',
@@ -223,8 +231,7 @@ class _HealthEntityCard extends StatelessWidget {
       PetHealthSectionType.vetVisits =>
         'Плановые и завершенные визиты к ветеринару',
       PetHealthSectionType.vaccinations => 'План вакцинации и история прививок',
-      PetHealthSectionType.procedures =>
-        'Профилактика, уход и лечебные процедуры',
+      PetHealthSectionType.procedures => 'Профилактика',
       PetHealthSectionType.medicalRecords =>
         'Диагнозы, аллергии и клинические записи',
     };
