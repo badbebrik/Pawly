@@ -76,6 +76,14 @@ class AuthRepository {
     );
   }
 
+  Future<RegisterEmailResponse> resendEmailVerificationCode({
+    required String email,
+  }) {
+    return _authApiClient.resendEmailVerificationCode(
+      ResendEmailVerificationRequest(email: email),
+    );
+  }
+
   Future<void> verifyEmailCode({
     required String email,
     required String code,
@@ -87,9 +95,69 @@ class AuthRepository {
     await _persistTokens(tokens);
   }
 
+  Future<StatusResponse> requestPasswordReset({
+    required String email,
+  }) {
+    return _authApiClient.requestPasswordReset(
+      PasswordResetRequestPayload(email: email),
+    );
+  }
+
+  Future<PasswordResetVerifyResponse> verifyPasswordResetCode({
+    required String email,
+    required String code,
+  }) {
+    return _authApiClient.verifyPasswordResetCode(
+      PasswordResetVerifyPayload(email: email, code: code),
+    );
+  }
+
+  Future<StatusResponse> confirmPasswordReset({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    final response = await _authApiClient.confirmPasswordReset(
+      PasswordResetConfirmPayload(
+        resetToken: resetToken,
+        newPassword: newPassword,
+      ),
+    );
+
+    await _googleSignInService.signOut();
+    await _authSessionStore.clear();
+
+    return response;
+  }
+
+  Future<StatusResponse> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    final response = await _authApiClient.changePassword(
+      PasswordChangePayload(
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+      ),
+    );
+
+    await _googleSignInService.signOut();
+    await _authSessionStore.clear();
+
+    return response;
+  }
+
   Future<void> logout() async {
     try {
       await _authApiClient.logout();
+    } catch (_) {}
+
+    await _googleSignInService.signOut();
+    await _authSessionStore.clear();
+  }
+
+  Future<void> logoutAll() async {
+    try {
+      await _authApiClient.logoutAll();
     } catch (_) {}
 
     await _googleSignInService.signOut();
