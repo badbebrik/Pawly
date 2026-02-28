@@ -79,6 +79,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   autofillHints: const <String>[AutofillHints.password],
                   onFieldSubmitted: (_) => _submitEmailLogin(),
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => context.push(
+                              Uri(
+                                path: AppRoutes.passwordResetRequest,
+                                queryParameters: <String, String>{
+                                  if (_emailController.text.trim().isNotEmpty)
+                                    'email': _emailController.text.trim(),
+                                },
+                              ).toString(),
+                            ),
+                    child: const Text('Забыли пароль?'),
+                  ),
+                ),
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: _isSubmitting ? 'Выполняем вход...' : 'Войти',

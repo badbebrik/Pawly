@@ -8,6 +8,9 @@ import '../../features/acl/presentation/pages/acl_member_details_page.dart';
 import '../../features/acl/presentation/pages/acl_invite_preview_page.dart';
 import '../../features/acl/presentation/pages/acl_edit_invite_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/password_reset_confirm_page.dart';
+import '../../features/auth/presentation/pages/password_reset_request_page.dart';
+import '../../features/auth/presentation/pages/password_reset_verify_page.dart';
 import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
 import '../../features/calendar/presentation/pages/calendar_page.dart';
@@ -75,6 +78,28 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
         path: AppRoutes.register,
         name: 'register',
         builder: (_, __) => const RegisterFlowPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.passwordResetRequest,
+        name: 'passwordResetRequest',
+        builder: (_, state) => PasswordResetRequestPage(
+          initialEmail: state.uri.queryParameters['email'],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.passwordResetVerify,
+        name: 'passwordResetVerify',
+        builder: (_, state) => PasswordResetVerifyPage(
+          email: state.uri.queryParameters['email'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.passwordResetConfirm,
+        name: 'passwordResetConfirm',
+        builder: (_, state) => PasswordResetConfirmPage(
+          resetToken: state.uri.queryParameters['reset_token'] ?? '',
+          email: state.uri.queryParameters['email'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.postRegisterChoice,
@@ -355,7 +380,11 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
 bool _isSplashRoute(String location) => location == AppRoutes.splash;
 
 bool _isPublicAuthRoute(String location) {
-  return location == AppRoutes.login || location == AppRoutes.register;
+  return location == AppRoutes.login ||
+      location == AppRoutes.register ||
+      location == AppRoutes.passwordResetRequest ||
+      location == AppRoutes.passwordResetVerify ||
+      location == AppRoutes.passwordResetConfirm;
 }
 
 bool _isProtectedRoute(String location) {

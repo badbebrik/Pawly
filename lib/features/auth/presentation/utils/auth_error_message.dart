@@ -65,6 +65,24 @@ String? _messageByCode(String code, Map<String, dynamic>? details) {
       return 'Не удалось подтвердить Google-аккаунт. Попробуйте еще раз.';
     case 'oauth_provider_unavailable':
       return 'Вход через Google недоступен.';
+    case 'email_taken':
+      return 'Пользователь с таким email уже существует.';
+    case 'email_already_verified':
+      return 'Этот email уже подтвержден.';
+    case 'weak_password':
+      return 'Пароль слишком простой. Используйте минимум 8 символов, буквы и цифры.';
+    case 'verification_code_invalid':
+      return 'Неверный код. Проверьте письмо и попробуйте снова.';
+    case 'verification_code_expired':
+      return 'Срок действия кода истек. Запросите новый код.';
+    case 'verification_too_many_attempts':
+      return 'Слишком много попыток. Запросите новый код позже.';
+    case 'verification_failed':
+      return 'Не удалось отправить код. Попробуйте позже.';
+    case 'profile_creation_failed':
+      return 'Не удалось завершить регистрацию. Попробуйте позже.';
+    case 'user_not_found':
+      return 'Пользователь не найден.';
     case 'unauthorized':
     case 'refresh_token_mismatch':
     case 'session_not_found':
@@ -89,8 +107,7 @@ int? _resendDelaySeconds(Map<String, dynamic>? details) {
     return null;
   }
 
-  final value =
-      details['can_resend_in'] ?? details['can_resend_in_seconds'];
+  final value = details['can_resend_in'] ?? details['can_resend_in_seconds'];
 
   if (value is int) {
     return value;
@@ -98,4 +115,3 @@ int? _resendDelaySeconds(Map<String, dynamic>? details) {
 
   return int.tryParse(value?.toString() ?? '');
 }
-

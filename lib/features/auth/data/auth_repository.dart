@@ -1,6 +1,7 @@
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/clients/auth_api_client.dart';
 import '../../../core/network/models/auth_models.dart';
+import '../../../core/network/models/common_models.dart';
 import '../../../core/network/session/auth_session.dart';
 import '../../../core/network/session/auth_session_store.dart';
 import '../../../core/services/google_sign_in_service.dart';
