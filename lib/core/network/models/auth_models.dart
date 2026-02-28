@@ -71,6 +71,14 @@ class RegisterEmailResponse {
   }
 }
 
+class ResendEmailVerificationRequest {
+  const ResendEmailVerificationRequest({required this.email});
+
+  final String email;
+
+  JsonMap toJson() => <String, dynamic>{'email': email};
+}
+
 class VerifyEmailRequest {
   const VerifyEmailRequest({required this.email, required this.code});
 
@@ -141,6 +149,21 @@ class PasswordResetConfirmPayload {
 
   JsonMap toJson() => <String, dynamic>{
         'reset_token': resetToken,
+        'new_password': newPassword,
+      };
+}
+
+class PasswordChangePayload {
+  const PasswordChangePayload({
+    required this.oldPassword,
+    required this.newPassword,
+  });
+
+  final String oldPassword;
+  final String newPassword;
+
+  JsonMap toJson() => <String, dynamic>{
+        'old_password': oldPassword,
         'new_password': newPassword,
       };
 }

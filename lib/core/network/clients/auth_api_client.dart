@@ -18,6 +18,17 @@ class AuthApiClient {
     );
   }
 
+  Future<RegisterEmailResponse> resendEmailVerificationCode(
+    ResendEmailVerificationRequest payload,
+  ) {
+    return _apiClient.post<RegisterEmailResponse>(
+      ApiEndpoints.authVerificationEmailResend,
+      data: payload.toJson(),
+      requestOptions: const ApiRequestOptions(includeLocale: true),
+      decoder: RegisterEmailResponse.fromJson,
+    );
+  }
+
   Future<AuthTokensResponse> verifyEmail(VerifyEmailRequest payload) {
     return _apiClient.post<AuthTokensResponse>(
       ApiEndpoints.authVerifyEmail,
@@ -98,6 +109,15 @@ class AuthApiClient {
     return _apiClient.post<StatusResponse>(
       ApiEndpoints.authPasswordResetConfirm,
       data: payload.toJson(),
+      decoder: StatusResponse.fromJson,
+    );
+  }
+
+  Future<StatusResponse> changePassword(PasswordChangePayload payload) {
+    return _apiClient.post<StatusResponse>(
+      ApiEndpoints.authPasswordChange,
+      data: payload.toJson(),
+      requestOptions: const ApiRequestOptions(requiresAccessToken: true),
       decoder: StatusResponse.fromJson,
     );
   }

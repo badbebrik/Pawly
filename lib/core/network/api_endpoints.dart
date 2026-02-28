@@ -2,6 +2,8 @@ class ApiEndpoints {
   const ApiEndpoints._();
 
   static const String authRegisterEmail = '/auth/register/email';
+  static const String authVerificationEmailResend =
+      '/auth/verification/email/resend';
   static const String authVerifyEmail = '/auth/verify/email';
   static const String authLoginEmail = '/auth/login/email';
   static const String authLoginOAuth = '/auth/login/oauth';
@@ -11,6 +13,7 @@ class ApiEndpoints {
   static const String authPasswordResetRequest = '/auth/password/reset/request';
   static const String authPasswordResetVerify = '/auth/password/reset/verify';
   static const String authPasswordResetConfirm = '/auth/password/reset/confirm';
+  static const String authPasswordChange = '/auth/password/change';
 
   static const String profileMe = '/v1/profile/me';
   static const String profileAvatarInitUpload =
