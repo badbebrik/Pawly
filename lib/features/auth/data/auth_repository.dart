@@ -4,20 +4,28 @@ import '../../../core/network/models/auth_models.dart';
 import '../../../core/network/models/common_models.dart';
 import '../../../core/network/session/auth_session.dart';
 import '../../../core/network/session/auth_session_store.dart';
+import '../../../core/services/device_preferences_service.dart';
 import '../../../core/services/google_sign_in_service.dart';
+import '../../../core/storage/shared_preferences_service.dart';
 
 class AuthRepository {
   AuthRepository({
     required AuthApiClient authApiClient,
     required AuthSessionStore authSessionStore,
+    required DevicePreferencesService devicePreferencesService,
     required GoogleSignInService googleSignInService,
+    required SharedPreferencesService sharedPreferencesService,
   })  : _authApiClient = authApiClient,
         _authSessionStore = authSessionStore,
-        _googleSignInService = googleSignInService;
+        _devicePreferencesService = devicePreferencesService,
+        _googleSignInService = googleSignInService,
+        _sharedPreferencesService = sharedPreferencesService;
 
   final AuthApiClient _authApiClient;
   final AuthSessionStore _authSessionStore;
+  final DevicePreferencesService _devicePreferencesService;
   final GoogleSignInService _googleSignInService;
+  final SharedPreferencesService _sharedPreferencesService;
 
   Future<bool> tryRestoreSession() async {
     final existingSession = await _authSessionStore.read();
@@ -46,19 +54,21 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
+    final devicePreferences = await _devicePreferencesService.read();
     final tokens = await _authApiClient.loginByEmail(
       LoginEmailRequest(email: email, password: password),
     );
 
-    await _persistTokens(tokens);
+    await _persistTokens(tokens, locale: devicePreferences.locale);
   }
 
   Future<void> loginWithGoogle({required String idToken}) async {
+    final devicePreferences = await _devicePreferencesService.read();
     final tokens = await _authApiClient.loginByOAuth(
       LoginOAuthRequest(provider: 'google', idToken: idToken),
     );
 
-    await _persistTokens(tokens);
+    await _persistTokens(tokens, locale: devicePreferences.locale);
   }
 
   Future<RegisterEmailResponse> registerWithEmail({
@@ -66,11 +76,14 @@ class AuthRepository {
     required String password,
     String? firstName,
     String? lastName,
-  }) {
+  }) async {
+    final devicePreferences = await _devicePreferencesService.read();
     return _authApiClient.registerByEmail(
       RegisterEmailRequest(
         email: email,
         password: password,
+        locale: devicePreferences.locale,
+        timeZone: devicePreferences.timeZone,
         firstName: firstName,
         lastName: lastName,
       ),
@@ -89,11 +102,12 @@ class AuthRepository {
     required String email,
     required String code,
   }) async {
+    final devicePreferences = await _devicePreferencesService.read();
     final tokens = await _authApiClient.verifyEmail(
       VerifyEmailRequest(email: email, code: code),
     );
 
-    await _persistTokens(tokens);
+    await _persistTokens(tokens, locale: devicePreferences.locale);
   }
 
   Future<StatusResponse> requestPasswordReset({
@@ -126,6 +140,7 @@ class AuthRepository {
 
     await _googleSignInService.signOut();
     await _authSessionStore.clear();
+    await _sharedPreferencesService.clearProfilePreferences();
 
     return response;
   }
@@ -143,6 +158,7 @@ class AuthRepository {
 
     await _googleSignInService.signOut();
     await _authSessionStore.clear();
+    await _sharedPreferencesService.clearProfilePreferences();
 
     return response;
   }
@@ -154,6 +170,7 @@ class AuthRepository {
 
     await _googleSignInService.signOut();
     await _authSessionStore.clear();
+    await _sharedPreferencesService.clearProfilePreferences();
   }
 
   Future<void> logoutAll() async {
@@ -163,6 +180,7 @@ class AuthRepository {
 
     await _googleSignInService.signOut();
     await _authSessionStore.clear();
+    await _sharedPreferencesService.clearProfilePreferences();
   }
 
   Future<void> _persistTokens(

@@ -26,12 +26,16 @@ class RegisterEmailRequest {
   const RegisterEmailRequest({
     required this.email,
     required this.password,
+    required this.locale,
+    required this.timeZone,
     this.firstName,
     this.lastName,
   });
 
   final String email;
   final String password;
+  final String locale;
+  final String timeZone;
   final String? firstName;
   final String? lastName;
 
@@ -39,6 +43,8 @@ class RegisterEmailRequest {
     return <String, dynamic>{
       'email': email,
       'password': password,
+      'locale': locale,
+      'time_zone': timeZone,
       'first_name': firstName,
       'last_name': lastName,
     }..removeWhere((_, dynamic value) => value == null);

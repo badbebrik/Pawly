@@ -1,5 +1,3 @@
-import 'package:dio/dio.dart';
-
 import '../api_client.dart';
 import '../api_context.dart';
 import '../api_endpoints.dart';
@@ -24,8 +22,19 @@ class ProfileApiClient {
   }
 
   Future<ProfileResponse> updateMe(UpdateProfilePayload payload) {
-    return _apiClient.put<ProfileResponse>(
+    return _apiClient.patch<ProfileResponse>(
       ApiEndpoints.profileMe,
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: ProfileResponse.fromJson,
+    );
+  }
+
+  Future<ProfileResponse> updatePreferences(
+    UpdateProfilePreferencesPayload payload,
+  ) {
+    return _apiClient.patch<ProfileResponse>(
+      ApiEndpoints.profilePreferences,
       data: payload.toJson(),
       requestOptions: _withUserAndToken,
       decoder: ProfileResponse.fromJson,
@@ -47,19 +56,6 @@ class ProfileApiClient {
     return _apiClient.post<ConfirmAvatarUploadResponse>(
       ApiEndpoints.profileAvatarConfirmUpload,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
-      decoder: ConfirmAvatarUploadResponse.fromJson,
-    );
-  }
-
-  Future<ConfirmAvatarUploadResponse> testAvatarUpload({
-    required MultipartFile file,
-  }) {
-    final formData = FormData.fromMap(<String, dynamic>{'file': file});
-
-    return _apiClient.post<ConfirmAvatarUploadResponse>(
-      ApiEndpoints.profileAvatarTestUpload,
-      data: formData,
       requestOptions: _withUserAndToken,
       decoder: ConfirmAvatarUploadResponse.fromJson,
     );

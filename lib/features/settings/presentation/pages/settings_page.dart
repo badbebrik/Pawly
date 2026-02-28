@@ -11,14 +11,19 @@ import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/profile_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../auth/presentation/utils/auth_error_message.dart';
+import '../../../auth/presentation/utils/auth_validators.dart';
 import '../providers/settings_profile_controller.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
+  static const _supportedLocales = <String>['ru', 'en'];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileState = ref.watch(settingsProfileControllerProvider);
+    final profile = profileState.whenOrNull(data: (state) => state.profile);
     final themeMode = ref.watch(themeModeControllerProvider).asData?.value ??
         ThemeMode.system;
 
@@ -47,8 +52,27 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsTile(
                   icon: Icons.person_outline_rounded,
                   title: 'Настройки профиля',
-                  subtitle: 'Фото, имя и фамилия',
-                  onTap: () {},
+                  subtitle: profile == null
+                      ? 'Имя и фамилия'
+                      : _profileSettingsSubtitle(profile),
+                  onTap: profile == null
+                      ? () {}
+                      : () => _showProfileSettingsSheet(
+                            context,
+                            profile,
+                          ),
+                ),
+                const Divider(height: 1),
+                _SettingsTile(
+                  icon: Icons.language_rounded,
+                  title: 'Язык приложения',
+                  subtitle: _localeLabel(profile?.locale),
+                  onTap: profile == null
+                      ? () {}
+                      : () => _showLanguageSheet(
+                            context,
+                            profile.locale,
+                          ),
                 ),
                 const Divider(height: 1),
                 _SettingsTile(
@@ -68,6 +92,13 @@ class SettingsPage extends ConsumerWidget {
                         .read(themeModeControllerProvider.notifier)
                         .setThemeMode(selectedMode);
                   },
+                ),
+                const Divider(height: 1),
+                _SettingsTile(
+                  icon: Icons.lock_outline_rounded,
+                  title: 'Безопасность',
+                  subtitle: 'Смена пароля',
+                  onTap: () => _showSecuritySheet(context),
                 ),
               ],
             ),
@@ -153,6 +184,46 @@ class SettingsPage extends ConsumerWidget {
     };
   }
 
+  static String _profileSettingsSubtitle(ProfileResponse profile) {
+    return _ProfileHeader._fullName(
+      profile.firstName,
+      profile.lastName,
+    );
+  }
+
+  static String _localeLabel(String? locale) {
+    return switch (locale) {
+      'en' => 'English',
+      _ => 'Русский',
+    };
+  }
+
+  static Future<void> _showProfileSettingsSheet(
+    BuildContext context,
+    ProfileResponse profile,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _ProfileSettingsSheet(profile: profile),
+    );
+  }
+
+  static Future<void> _showLanguageSheet(
+    BuildContext context,
+    String currentLocale,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => _LanguageSettingsSheet(
+        currentLocale: currentLocale,
+        supportedLocales: _supportedLocales,
+      ),
+    );
+  }
+
   static Future<void> _showPhotoActionsSheet(
     BuildContext context,
     WidgetRef ref,
@@ -222,6 +293,15 @@ class SettingsPage extends ConsumerWidget {
         );
       }
     }
+  }
+
+  static Future<void> _showSecuritySheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => const _SecuritySettingsSheet(),
+    );
   }
 }
 
@@ -297,7 +377,7 @@ class _ProfileHeader extends StatelessWidget {
     final resolvedTitle = resolvedProfile == null
         ? title ?? 'Профиль Pawly'
         : _fullName(resolvedProfile.firstName, resolvedProfile.lastName);
-    final resolvedSubtitle = resolvedProfile?.phone ?? subtitle;
+    final resolvedSubtitle = subtitle;
     final initials = resolvedProfile == null
         ? 'P'
         : _initials(resolvedProfile.firstName, resolvedProfile.lastName);
@@ -507,5 +587,438 @@ class _ThemeModeOption extends StatelessWidget {
           : null,
       onTap: () => Navigator.of(context).pop(mode),
     );
+  }
+}
+
+class _ProfileSettingsSheet extends ConsumerStatefulWidget {
+  const _ProfileSettingsSheet({
+    required this.profile,
+  });
+
+  final ProfileResponse profile;
+
+  @override
+  ConsumerState<_ProfileSettingsSheet> createState() =>
+      _ProfileSettingsSheetState();
+}
+
+class _ProfileSettingsSheetState extends ConsumerState<_ProfileSettingsSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _firstNameController;
+  late final TextEditingController _lastNameController;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _firstNameController = TextEditingController(
+      text: widget.profile.firstName ?? '',
+    );
+    _lastNameController = TextEditingController(
+      text: widget.profile.lastName ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          PawlySpacing.lg,
+          PawlySpacing.sm,
+          PawlySpacing.lg,
+          PawlySpacing.lg + viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Профиль',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyTextField(
+                  controller: _firstNameController,
+                  label: 'Имя',
+                  textCapitalization: TextCapitalization.words,
+                  enabled: !_isSaving,
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyTextField(
+                  controller: _lastNameController,
+                  label: 'Фамилия',
+                  textCapitalization: TextCapitalization.words,
+                  enabled: !_isSaving,
+                ),
+                const SizedBox(height: PawlySpacing.lg),
+                PawlyButton(
+                  label: _isSaving ? 'Сохраняем...' : 'Сохранить',
+                  onPressed: _isSaving ? null : _submit,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid) {
+      return;
+    }
+
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+
+    final isNameChanged =
+        firstName != (widget.profile.firstName ?? '').trim() ||
+            lastName != (widget.profile.lastName ?? '').trim();
+
+    if (!isNameChanged) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final controller = ref.read(settingsProfileControllerProvider.notifier);
+      await controller.updateName(
+        firstName: firstName,
+        lastName: lastName,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось сохранить настройки профиля.'),
+        ),
+      );
+    }
+  }
+}
+
+class _LanguageSettingsSheet extends ConsumerStatefulWidget {
+  const _LanguageSettingsSheet({
+    required this.currentLocale,
+    required this.supportedLocales,
+  });
+
+  final String currentLocale;
+  final List<String> supportedLocales;
+
+  @override
+  ConsumerState<_LanguageSettingsSheet> createState() =>
+      _LanguageSettingsSheetState();
+}
+
+class _LanguageSettingsSheetState extends ConsumerState<_LanguageSettingsSheet> {
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: PawlySpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                PawlySpacing.lg,
+                PawlySpacing.xs,
+                PawlySpacing.lg,
+                PawlySpacing.sm,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Язык приложения',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ),
+            for (final locale in widget.supportedLocales)
+              _LanguageOption(
+                locale: locale,
+                title: SettingsPage._localeLabel(locale),
+                currentLocale: widget.currentLocale,
+                enabled: !_isSaving,
+                onTap: () => _selectLocale(locale),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectLocale(String locale) async {
+    if (_isSaving || locale == widget.currentLocale) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await ref
+          .read(settingsProfileControllerProvider.notifier)
+          .updatePreferences(locale: locale);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось сменить язык приложения.')),
+      );
+    }
+  }
+}
+
+class _LanguageOption extends StatelessWidget {
+  const _LanguageOption({
+    required this.locale,
+    required this.title,
+    required this.currentLocale,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String locale;
+  final String title;
+  final String currentLocale;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      enabled: enabled,
+      leading: const Icon(Icons.language_rounded),
+      title: Text(title),
+      trailing: currentLocale == locale
+          ? Icon(
+              Icons.check_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+class _SecuritySettingsSheet extends ConsumerStatefulWidget {
+  const _SecuritySettingsSheet();
+
+  @override
+  ConsumerState<_SecuritySettingsSheet> createState() =>
+      _SecuritySettingsSheetState();
+}
+
+class _SecuritySettingsSheetState
+    extends ConsumerState<_SecuritySettingsSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _oldPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isSubmitting = false;
+  bool _oldPasswordVisible = false;
+  bool _newPasswordVisible = false;
+  bool _confirmPasswordVisible = false;
+
+  @override
+  void dispose() {
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          PawlySpacing.lg,
+          PawlySpacing.sm,
+          PawlySpacing.lg,
+          PawlySpacing.lg + viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Безопасность',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: PawlySpacing.xxxs),
+                Text(
+                  'После смены пароля потребуется войти заново.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyTextField(
+                  controller: _oldPasswordController,
+                  label: 'Текущий пароль',
+                  obscureText: !_oldPasswordVisible,
+                  enabled: !_isSubmitting,
+                  validator: AuthValidators.password,
+                  suffixIcon: IconButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => setState(() {
+                              _oldPasswordVisible = !_oldPasswordVisible;
+                            }),
+                    icon: Icon(
+                      _oldPasswordVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyTextField(
+                  controller: _newPasswordController,
+                  label: 'Новый пароль',
+                  obscureText: !_newPasswordVisible,
+                  enabled: !_isSubmitting,
+                  validator: (value) {
+                    final base = AuthValidators.password(value);
+                    if (base != null) {
+                      return base;
+                    }
+                    if ((value ?? '') == _oldPasswordController.text) {
+                      return 'Новый пароль должен отличаться от текущего.';
+                    }
+                    return null;
+                  },
+                  suffixIcon: IconButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => setState(() {
+                              _newPasswordVisible = !_newPasswordVisible;
+                            }),
+                    icon: Icon(
+                      _newPasswordVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyTextField(
+                  controller: _confirmPasswordController,
+                  label: 'Повторите новый пароль',
+                  obscureText: !_confirmPasswordVisible,
+                  enabled: !_isSubmitting,
+                  validator: (value) => AuthValidators.confirmPassword(
+                    value,
+                    _newPasswordController.text,
+                  ),
+                  suffixIcon: IconButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => setState(() {
+                              _confirmPasswordVisible =
+                                  !_confirmPasswordVisible;
+                            }),
+                    icon: Icon(
+                      _confirmPasswordVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.lg),
+                PawlyButton(
+                  label: _isSubmitting ? 'Сохраняем...' : 'Сменить пароль',
+                  onPressed: _isSubmitting ? null : _submit,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await ref.read(authRepositoryProvider).changePassword(
+            oldPassword: _oldPasswordController.text,
+            newPassword: _newPasswordController.text,
+          );
+      if (!mounted) {
+        return;
+      }
+      resetSessionState(ref);
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Пароль изменен. Войдите в аккаунт снова.'),
+        ),
+      );
+      context.go(AppRoutes.login);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+      });
+      final message = authErrorMessage(error) ?? 'Не удалось сменить пароль.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 }

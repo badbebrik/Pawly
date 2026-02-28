@@ -18,7 +18,9 @@ import '../network/dio_factory.dart';
 import '../network/session/auth_session_store.dart';
 import '../services/google_sign_in_service.dart';
 import '../services/media_picker_service.dart';
+import '../services/device_preferences_service.dart';
 import '../storage/secure_storage_service.dart';
+import '../storage/shared_preferences_service.dart';
 
 final connectivityProvider = Provider<Connectivity>((ref) {
   return Connectivity();
@@ -35,6 +37,12 @@ final flutterSecureStorageProvider = Provider<FlutterSecureStorage>((ref) {
 final secureStorageServiceProvider = Provider<SecureStorageService>((ref) {
   final storage = ref.watch(flutterSecureStorageProvider);
   return SecureStorageService(storage);
+});
+
+final sharedPreferencesServiceProvider = Provider<SharedPreferencesService>((
+  ref,
+) {
+  return SharedPreferencesService();
 });
 
 final authSessionStoreProvider = Provider<AuthSessionStore>((ref) {
@@ -98,6 +106,12 @@ final mediaPickerServiceProvider = Provider<MediaPickerService>((ref) {
 
 final googleSignInServiceProvider = Provider<GoogleSignInService>((ref) {
   return AppGoogleSignInService();
+});
+
+final devicePreferencesServiceProvider = Provider<DevicePreferencesService>((
+  ref,
+) {
+  return DevicePreferencesService();
 });
 
 final appRouterProvider = Provider<GoRouter>((ref) {

@@ -47,4 +47,13 @@ class AuthSessionStore {
       ),
     );
   }
+
+  Future<void> updateLocale(String locale) async {
+    final current = await read();
+    if (current == null) {
+      return;
+    }
+
+    await write(current.copyWith(locale: locale));
+  }
 }

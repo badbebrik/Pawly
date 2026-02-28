@@ -28,10 +28,14 @@ class SettingsProfileState {
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final profileApiClient = ref.watch(profileApiClientProvider);
   final uploadDio = ref.watch(dioProvider);
+  final authSessionStore = ref.watch(authSessionStoreProvider);
+  final sharedPreferencesService = ref.watch(sharedPreferencesServiceProvider);
 
   return SettingsRepository(
     profileApiClient: profileApiClient,
     uploadDio: uploadDio,
+    authSessionStore: authSessionStore,
+    sharedPreferencesService: sharedPreferencesService,
   );
 });
 
@@ -69,24 +73,68 @@ class SettingsProfileController extends AsyncNotifier<SettingsProfileState> {
     try {
       final updatedProfile =
           await ref.read(settingsRepositoryProvider).uploadAvatar(file: file);
-
-      state = AsyncData(
-        current.copyWith(
-          profile: updatedProfile,
-          isUploadingPhoto: false,
-        ),
-      );
+      await _setProfile(updatedProfile, isUploadingPhoto: false);
     } catch (_) {
       state = AsyncData(current.copyWith(isUploadingPhoto: false));
       rethrow;
     }
   }
 
+  Future<ProfileResponse> updateName({
+    required String firstName,
+    required String lastName,
+  }) async {
+    final current = state.requireValue;
+    final updatedProfile = await ref.read(settingsRepositoryProvider).updateProfile(
+          firstName: firstName,
+          lastName: lastName,
+        );
+    await _setProfile(
+      updatedProfile,
+      isUploadingPhoto: current.isUploadingPhoto,
+    );
+    return updatedProfile;
+  }
+
+  Future<ProfileResponse> updatePreferences({
+    String? locale,
+    String? timeZone,
+  }) async {
+    final current = state.requireValue;
+    final updatedProfile =
+        await ref.read(settingsRepositoryProvider).updatePreferences(
+              locale: locale,
+              timeZone: timeZone,
+            );
+    await _setProfile(
+      updatedProfile,
+      isUploadingPhoto: current.isUploadingPhoto,
+    );
+    return updatedProfile;
+  }
+
   Future<SettingsProfileState> _load() async {
     final profile = await ref.read(settingsRepositoryProvider).getProfile();
-    return SettingsProfileState(
-      profile: profile,
-      isUploadingPhoto: false,
+    await ref.read(settingsRepositoryProvider).syncStoredPreferences(
+          locale: profile.locale,
+          timeZone: profile.timeZone,
+        );
+    return SettingsProfileState(profile: profile, isUploadingPhoto: false);
+  }
+
+  Future<void> _setProfile(
+    ProfileResponse profile, {
+    required bool isUploadingPhoto,
+  }) async {
+    await ref.read(settingsRepositoryProvider).syncStoredPreferences(
+          locale: profile.locale,
+          timeZone: profile.timeZone,
+        );
+    state = AsyncData(
+      SettingsProfileState(
+        profile: profile,
+        isUploadingPhoto: isUploadingPhoto,
+      ),
     );
   }
 }

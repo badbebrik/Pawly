@@ -16,12 +16,11 @@ class ApiEndpoints {
   static const String authPasswordChange = '/auth/password/change';
 
   static const String profileMe = '/v1/profile/me';
+  static const String profilePreferences = '/v1/profile/me/preferences';
   static const String profileAvatarInitUpload =
       '/v1/profile/me/avatar:init-upload';
   static const String profileAvatarConfirmUpload =
       '/v1/profile/me/avatar:confirm-upload';
-  static const String profileAvatarTestUpload =
-      '/v1/profile/me/avatar:test-upload';
 
   static const String pets = '/v1/pets';
 
