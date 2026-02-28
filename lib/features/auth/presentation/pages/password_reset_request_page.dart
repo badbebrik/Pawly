@@ -112,7 +112,7 @@ class _PasswordResetRequestPageState
         return;
       }
 
-      context.go(
+      context.push(
         Uri(
           path: AppRoutes.passwordResetVerify,
           queryParameters: <String, String>{'email': email},

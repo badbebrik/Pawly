@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../app/providers/session_state_reset.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/auth_providers.dart';
 import '../utils/auth_error_message.dart';
@@ -34,9 +37,11 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
   _RegisterStep _step = _RegisterStep.name;
   bool _isSubmitting = false;
   int _canResendInSeconds = 0;
+  Timer? _resendTimer;
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -250,6 +255,16 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
           ),
           const SizedBox(height: PawlySpacing.sm),
           PawlyButton(
+            label: _canResendInSeconds > 0
+                ? 'Отправить код повторно через $_canResendInSeconds сек.'
+                : 'Отправить код повторно',
+            variant: PawlyButtonVariant.secondary,
+            onPressed: _isSubmitting || _canResendInSeconds > 0
+                ? null
+                : _resendVerificationCode,
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          PawlyButton(
             label: 'Изменить email',
             variant: PawlyButtonVariant.ghost,
             onPressed: _isSubmitting ? null : () => _goTo(_RegisterStep.email),
@@ -303,10 +318,11 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
       }
 
       setState(() {
-        _canResendInSeconds = response.canResendInSeconds;
         _step = _RegisterStep.verification;
       });
+      _startResendCountdown(response.canResendInSeconds);
     } catch (error) {
+      _syncCooldownFromError(error);
       if (mounted) {
         final message = authErrorMessage(error);
         if (message != null) {
@@ -349,6 +365,7 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
 
       context.go(AppRoutes.postRegisterChoice);
     } catch (error) {
+      _syncCooldownFromError(error);
       if (mounted) {
         final message = authErrorMessage(error);
         if (message != null) {
@@ -387,6 +404,104 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
     setState(() {
       _step = nextStep;
     });
+  }
+
+  Future<void> _resendVerificationCode() async {
+    if (_isSubmitting || _canResendInSeconds > 0) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final response =
+          await ref.read(authRepositoryProvider).resendEmailVerificationCode(
+                email: _emailController.text.trim(),
+              );
+
+      _codeController.clear();
+      _startResendCountdown(response.canResendInSeconds);
+
+      if (mounted) {
+        _showError('Код отправлен повторно.');
+      }
+    } catch (error) {
+      _syncCooldownFromError(error);
+      if (mounted) {
+        final message = authErrorMessage(error);
+        if (message != null) {
+          _showError(message);
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  void _startResendCountdown(int seconds) {
+    _resendTimer?.cancel();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _canResendInSeconds = seconds > 0 ? seconds : 0;
+    });
+
+    if (_canResendInSeconds == 0) {
+      return;
+    }
+
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_canResendInSeconds <= 1) {
+        timer.cancel();
+        setState(() {
+          _canResendInSeconds = 0;
+        });
+        return;
+      }
+
+      setState(() {
+        _canResendInSeconds -= 1;
+      });
+    });
+  }
+
+  void _syncCooldownFromError(Object error) {
+    final seconds = _extractCanResendInSeconds(error);
+    if (seconds != null && seconds > 0) {
+      _startResendCountdown(seconds);
+    }
+  }
+
+  int? _extractCanResendInSeconds(Object error) {
+    if (error is! ApiException || error.error.code != 'cannot_resend_yet') {
+      return null;
+    }
+
+    final details = error.error.details;
+    if (details == null) {
+      return null;
+    }
+
+    final value = details['can_resend_in'] ?? details['can_resend_in_seconds'];
+    if (value is int) {
+      return value;
+    }
+
+    return int.tryParse(value?.toString() ?? '');
   }
 
   void _showError(String message) {

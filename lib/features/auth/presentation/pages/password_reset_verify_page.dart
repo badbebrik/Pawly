@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/auth_providers.dart';
 import '../utils/auth_error_message.dart';
@@ -29,9 +32,18 @@ class _PasswordResetVerifyPageState
 
   bool _isSubmitting = false;
   bool _isResending = false;
+  int _canResendInSeconds = 60;
+  Timer? _resendTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startResendCountdown(_canResendInSeconds);
+  }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -94,9 +106,14 @@ class _PasswordResetVerifyPageState
                 PawlyButton(
                   label: _isResending
                       ? 'Отправляем заново...'
-                      : 'Отправить код заново',
+                      : _canResendInSeconds > 0
+                          ? 'Отправить код заново через $_canResendInSeconds сек.'
+                          : 'Отправить код заново',
                   variant: PawlyButtonVariant.secondary,
-                  onPressed: _isSubmitting || _isResending ? null : _resendCode,
+                  onPressed:
+                      _isSubmitting || _isResending || _canResendInSeconds > 0
+                          ? null
+                          : _resendCode,
                 ),
                 const SizedBox(height: PawlySpacing.xs),
                 PawlyButton(
@@ -146,7 +163,7 @@ class _PasswordResetVerifyPageState
         return;
       }
 
-      context.go(
+      context.push(
         Uri(
           path: AppRoutes.passwordResetConfirm,
           queryParameters: <String, String>{
@@ -156,6 +173,7 @@ class _PasswordResetVerifyPageState
         ).toString(),
       );
     } catch (error) {
+      _syncCooldownFromError(error);
       if (!mounted) {
         return;
       }
@@ -187,6 +205,9 @@ class _PasswordResetVerifyPageState
           .read(authRepositoryProvider)
           .requestPasswordReset(email: widget.email);
 
+      _codeController.clear();
+      _startResendCountdown(60);
+
       if (!mounted) {
         return;
       }
@@ -195,6 +216,7 @@ class _PasswordResetVerifyPageState
         const SnackBar(content: Text('Новый код отправлен на email.')),
       );
     } catch (error) {
+      _syncCooldownFromError(error);
       if (!mounted) {
         return;
       }
@@ -216,6 +238,66 @@ class _PasswordResetVerifyPageState
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _startResendCountdown(int seconds) {
+    _resendTimer?.cancel();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _canResendInSeconds = seconds > 0 ? seconds : 0;
+    });
+
+    if (_canResendInSeconds == 0) {
+      return;
+    }
+
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_canResendInSeconds <= 1) {
+        timer.cancel();
+        setState(() {
+          _canResendInSeconds = 0;
+        });
+        return;
+      }
+
+      setState(() {
+        _canResendInSeconds -= 1;
+      });
+    });
+  }
+
+  void _syncCooldownFromError(Object error) {
+    final seconds = _extractCanResendInSeconds(error);
+    if (seconds != null && seconds > 0) {
+      _startResendCountdown(seconds);
+    }
+  }
+
+  int? _extractCanResendInSeconds(Object error) {
+    if (error is! ApiException || error.error.code != 'cannot_resend_yet') {
+      return null;
+    }
+
+    final details = error.error.details;
+    if (details == null) {
+      return null;
+    }
+
+    final value = details['can_resend_in'] ?? details['can_resend_in_seconds'];
+    if (value is int) {
+      return value;
+    }
+
+    return int.tryParse(value?.toString() ?? '');
   }
 }
 
