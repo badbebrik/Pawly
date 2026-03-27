@@ -11,6 +11,7 @@ import '../network/api_client.dart';
 import '../network/clients/acl_api_client.dart';
 import '../network/clients/auth_api_client.dart';
 import '../network/clients/catalog_api_client.dart';
+import '../network/clients/chat_api_client.dart';
 import '../network/clients/health_api_client.dart';
 import '../network/clients/pets_api_client.dart';
 import '../network/clients/profile_api_client.dart';
@@ -88,6 +89,11 @@ final aclApiClientProvider = Provider<AclApiClient>((ref) {
 final catalogApiClientProvider = Provider<CatalogApiClient>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return CatalogApiClient(apiClient);
+});
+
+final chatApiClientProvider = Provider<ChatApiClient>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return ChatApiClient(apiClient);
 });
 
 final healthApiClientProvider = Provider<HealthApiClient>((ref) {

@@ -22,6 +22,20 @@ class ApiEndpoints {
   static const String profileAvatarConfirmUpload =
       '/v1/profile/me/avatar:confirm-upload';
 
+  static const String chatConversationsOpen = '/v1/chat/conversations:open';
+  static const String chatConversations = '/v1/chat/conversations';
+  static const String chatUnreadSummary = '/v1/chat/unread-summary';
+  static const String chatWs = '/v1/chat/ws';
+
+  static String chatConversationById(String conversationId) =>
+      '/v1/chat/conversations/$conversationId';
+
+  static String chatConversationMessages(String conversationId) =>
+      '/v1/chat/conversations/$conversationId/messages';
+
+  static String chatConversationRead(String conversationId) =>
+      '/v1/chat/conversations/$conversationId/read';
+
   static const String pets = '/v1/pets';
 
   static String petById(String petId) => '/v1/pets/$petId';
