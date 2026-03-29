@@ -1,10 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../chat/data/chat_repository_models.dart';
+import '../../../chat/presentation/providers/chat_providers.dart';
 import '../models/acl_screen_models.dart';
 import '../providers/acl_controllers.dart';
 
@@ -60,6 +63,14 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
             onSave: () => _saveChanges(member),
             onRevoke: () => _revokeAccess(member),
             onOwnerTransferPressed: () => _showOwnerTransferDialog(member),
+            onMessageTap: member.userId == state.me.userId
+                ? null
+                : () => _openDirectChat(
+                      context: context,
+                      ref: ProviderScope.containerOf(context),
+                      petId: state.me.petId,
+                      otherUserId: member.userId,
+                    ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -267,6 +278,7 @@ class _AclMemberDetailsContent extends StatelessWidget {
     required this.onSave,
     required this.onRevoke,
     required this.onOwnerTransferPressed,
+    this.onMessageTap,
   });
 
   final AclAccessScreenState state;
@@ -280,6 +292,7 @@ class _AclMemberDetailsContent extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onRevoke;
   final VoidCallback onOwnerTransferPressed;
+  final VoidCallback? onMessageTap;
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +313,10 @@ class _AclMemberDetailsContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(PawlySpacing.lg),
       children: <Widget>[
-        _MemberSummaryCard(member: member),
+        _MemberSummaryCard(
+          member: member,
+          onMessageTap: onMessageTap,
+        ),
         const SizedBox(height: PawlySpacing.md),
         PawlyCard(
           title: Text(
@@ -472,9 +488,13 @@ class _AclMemberDetailsContent extends StatelessWidget {
 }
 
 class _MemberSummaryCard extends StatelessWidget {
-  const _MemberSummaryCard({required this.member});
+  const _MemberSummaryCard({
+    required this.member,
+    this.onMessageTap,
+  });
 
   final AclMember member;
+  final VoidCallback? onMessageTap;
 
   @override
   Widget build(BuildContext context) {
@@ -483,6 +503,13 @@ class _MemberSummaryCard extends StatelessWidget {
     final name = _memberName(profile);
 
     return PawlyCard(
+      trailing: onMessageTap == null
+          ? null
+          : IconButton(
+              onPressed: onMessageTap,
+              tooltip: 'Открыть чат',
+              icon: const Icon(Icons.chat_bubble_rounded),
+            ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -796,4 +823,37 @@ String _normalizeStorageUrl(String url) {
   }
 
   return uri.replace(host: apiUri.host).toString();
+}
+
+Future<void> _openDirectChat({
+  required BuildContext context,
+  required ProviderContainer ref,
+  required String petId,
+  required String otherUserId,
+}) async {
+  try {
+    final conversation =
+        await ref.read(chatRepositoryProvider).openConversation(
+              OpenDirectChatInput(
+                petId: petId,
+                otherUserId: otherUserId,
+              ),
+            );
+    if (!context.mounted) {
+      return;
+    }
+    context.pushNamed(
+      'chatConversation',
+      pathParameters: <String, String>{
+        'conversationId': conversation.conversationId,
+      },
+    );
+  } catch (_) {
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Не удалось открыть чат.')),
+    );
+  }
 }

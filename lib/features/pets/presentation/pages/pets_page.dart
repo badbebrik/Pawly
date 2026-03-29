@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../../data/pets_repository.dart';
 import '../providers/active_pet_controller.dart';
 import '../providers/active_pet_details_controller.dart';
@@ -22,7 +23,12 @@ class PetsPage extends ConsumerWidget {
     final activePetId = activePetAsync.asData?.value;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Питомцы')),
+      appBar: AppBar(
+        title: const Text('Питомцы'),
+        actions: const <Widget>[
+          ChatAppBarAction(),
+        ],
+      ),
       floatingActionButton: activePetId == null || activePetId.isEmpty
           ? _PetsActionsButton(
               onCreatePet: () => context.push(AppRoutes.petCreate),

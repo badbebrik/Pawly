@@ -12,6 +12,8 @@ class AppRoutes {
   static const String calendar = '/home/calendar';
   static const String pets = '/home/pets';
   static const String settings = '/home/settings';
+  static const String chatInbox = '/chat';
+  static const String chatConversation = '/chat/conversations';
   static const String petCreate = '/pets/create';
   static const String aclInvitePreview = '/invite-preview';
 }

@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../chat/data/chat_repository_models.dart';
+import '../../../chat/presentation/providers/chat_providers.dart';
 import '../models/acl_screen_models.dart';
 import '../providers/acl_controllers.dart';
 
@@ -105,6 +107,14 @@ class _AclAccessContent extends StatelessWidget {
                   member: member,
                   meUserId: state.me.userId,
                   onTap: () => onMemberTap(member.id),
+                  onMessageTap: member.userId == state.me.userId
+                      ? null
+                      : () => _openDirectChat(
+                            context: context,
+                            ref: ProviderScope.containerOf(context),
+                            petId: state.me.petId,
+                            otherUserId: member.userId,
+                          ),
                 ),
               )),
         const SizedBox(height: PawlySpacing.lg),
@@ -153,11 +163,13 @@ class _AclMemberTile extends StatelessWidget {
     required this.member,
     required this.meUserId,
     required this.onTap,
+    this.onMessageTap,
   });
 
   final AclMember member;
   final String meUserId;
   final VoidCallback onTap;
+  final VoidCallback? onMessageTap;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +233,13 @@ class _AclMemberTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: PawlySpacing.sm),
+          if (onMessageTap != null)
+            IconButton(
+              onPressed: onMessageTap,
+              tooltip: 'Открыть чат',
+              icon: const Icon(Icons.chat_bubble_rounded),
+              color: colorScheme.primary,
+            ),
           Icon(
             Icons.chevron_right_rounded,
             color: colorScheme.onSurfaceVariant,
@@ -244,6 +263,39 @@ class _AclMemberTile extends StatelessWidget {
     }
 
     return 'Участник';
+  }
+}
+
+Future<void> _openDirectChat({
+  required BuildContext context,
+  required ProviderContainer ref,
+  required String petId,
+  required String otherUserId,
+}) async {
+  try {
+    final conversation =
+        await ref.read(chatRepositoryProvider).openConversation(
+              OpenDirectChatInput(
+                petId: petId,
+                otherUserId: otherUserId,
+              ),
+            );
+    if (!context.mounted) {
+      return;
+    }
+    context.pushNamed(
+      'chatConversation',
+      pathParameters: <String, String>{
+        'conversationId': conversation.conversationId,
+      },
+    );
+  } catch (_) {
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Не удалось открыть чат.')),
+    );
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../../../pets/presentation/providers/active_pet_controller.dart';
 import '../providers/calendar_controllers.dart';
 
@@ -23,7 +24,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final selectedDate = ref.watch(calendarSelectedDateProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Календарь')),
+      appBar: AppBar(
+        title: const Text('Календарь'),
+        actions: const <Widget>[
+          ChatAppBarAction(),
+        ],
+      ),
       body: activePetAsync.when(
         data: (petId) {
           if (petId == null || petId.isEmpty) {

@@ -5,8 +5,11 @@ class ChatInboxPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Сообщения'),
+      ),
+      body: const Center(
         child: Text('Chat inbox is not implemented yet.'),
       ),
     );

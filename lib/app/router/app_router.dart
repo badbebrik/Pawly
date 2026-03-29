@@ -14,6 +14,8 @@ import '../../features/auth/presentation/pages/password_reset_verify_page.dart';
 import '../../features/auth/presentation/pages/post_register_choice_page.dart';
 import '../../features/auth/presentation/pages/register_flow_page.dart';
 import '../../features/calendar/presentation/pages/calendar_page.dart';
+import '../../features/chat/presentation/pages/chat_conversation_page.dart';
+import '../../features/chat/presentation/pages/chat_inbox_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/pets/presentation/pages/pet_details_page.dart';
 import '../../features/pets/presentation/pages/pet_edit_page.dart';
@@ -110,6 +112,20 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
         path: AppRoutes.home,
         name: 'home',
         redirect: (_, __) => AppRoutes.pets,
+      ),
+      GoRoute(
+        path: AppRoutes.chatInbox,
+        name: 'chatInbox',
+        builder: (_, __) => const ChatInboxPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'conversations/:conversationId',
+            name: 'chatConversation',
+            builder: (_, state) => ChatConversationPage(
+              conversationId: state.pathParameters['conversationId']!,
+            ),
+          ),
+        ],
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -397,6 +413,10 @@ bool _isProtectedRoute(String location) {
       location.startsWith('${AppRoutes.pets}/') ||
       location == AppRoutes.settings ||
       location.startsWith('${AppRoutes.settings}/') ||
+      location == AppRoutes.chatInbox ||
+      location.startsWith('${AppRoutes.chatInbox}/') ||
+      location == AppRoutes.chatConversation ||
+      location.startsWith('${AppRoutes.chatConversation}/') ||
       location == AppRoutes.petCreate ||
       location.startsWith('${AppRoutes.petCreate}/');
 }

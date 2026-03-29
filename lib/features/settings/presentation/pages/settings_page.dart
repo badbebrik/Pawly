@@ -13,6 +13,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/utils/auth_error_message.dart';
 import '../../../auth/presentation/utils/auth_validators.dart';
+import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../providers/settings_profile_controller.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -28,7 +29,12 @@ class SettingsPage extends ConsumerWidget {
         ThemeMode.system;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Настройки')),
+      appBar: AppBar(
+        title: const Text('Настройки'),
+        actions: const <Widget>[
+          ChatAppBarAction(),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(PawlySpacing.lg),
         children: <Widget>[
