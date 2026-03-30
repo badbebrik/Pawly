@@ -4,12 +4,26 @@ import '../../../../core/providers/core_providers.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/chat_repository.dart';
 import '../../data/chat_repository_models.dart';
+import '../../data/chat_socket_models.dart';
+import '../../data/chat_socket_service.dart';
 import '../models/chat_screen_models.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   final chatApiClient = ref.watch(chatApiClientProvider);
   return ChatRepository(chatApiClient: chatApiClient);
 });
+
+final chatSocketServiceProvider = Provider<ChatSocketService>((ref) {
+  final authSessionStore = ref.watch(authSessionStoreProvider);
+  final service = ChatSocketService(authSessionStore: authSessionStore);
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final chatSocketConnectionControllerProvider = AsyncNotifierProvider<
+    ChatSocketConnectionController, ChatSocketConnectionState>(
+  ChatSocketConnectionController.new,
+);
 
 final chatUnreadSummaryControllerProvider = AsyncNotifierProvider.autoDispose<
     ChatUnreadSummaryController, ChatUnreadState>(
@@ -25,6 +39,99 @@ final chatConversationControllerProvider = AsyncNotifierProvider.autoDispose
     .family<ChatConversationController, ChatConversationState, String>(
   ChatConversationController.new,
 );
+
+class ChatSocketConnectionState {
+  const ChatSocketConnectionState({
+    required this.status,
+    required this.reconnectAttempt,
+    this.lastEventType,
+    this.errorMessage,
+  });
+
+  const ChatSocketConnectionState.disconnected()
+      : status = ChatSocketLifecycleStatus.disconnected,
+        reconnectAttempt = 0,
+        lastEventType = null,
+        errorMessage = null;
+
+  final ChatSocketLifecycleStatus status;
+  final int reconnectAttempt;
+  final String? lastEventType;
+  final String? errorMessage;
+
+  bool get isConnected => status == ChatSocketLifecycleStatus.connected;
+
+  ChatSocketConnectionState copyWith({
+    ChatSocketLifecycleStatus? status,
+    int? reconnectAttempt,
+    String? lastEventType,
+    String? errorMessage,
+    bool clearErrorMessage = false,
+  }) {
+    return ChatSocketConnectionState(
+      status: status ?? this.status,
+      reconnectAttempt: reconnectAttempt ?? this.reconnectAttempt,
+      lastEventType: lastEventType ?? this.lastEventType,
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+class ChatSocketConnectionController
+    extends AsyncNotifier<ChatSocketConnectionState> {
+  @override
+  Future<ChatSocketConnectionState> build() async {
+    final service = ref.read(chatSocketServiceProvider);
+
+    final lifecycleSubscription = service.lifecycleEvents.listen((event) {
+      final current =
+          state.asData?.value ?? const ChatSocketConnectionState.disconnected();
+      state = AsyncData(
+        current.copyWith(
+          status: event.status,
+          reconnectAttempt: event.reconnectAttempt,
+          errorMessage: event.errorMessage,
+          clearErrorMessage: event.errorMessage == null,
+        ),
+      );
+    });
+
+    final eventSubscription = service.events.listen((event) {
+      final current =
+          state.asData?.value ?? const ChatSocketConnectionState.disconnected();
+      state = AsyncData(current.copyWith(lastEventType: event.type));
+    });
+
+    ref.onDispose(() async {
+      await lifecycleSubscription.cancel();
+      await eventSubscription.cancel();
+    });
+
+    await service.ensureConnected();
+    await service.subscribeInbox();
+
+    return const ChatSocketConnectionState(
+      status: ChatSocketLifecycleStatus.connected,
+      reconnectAttempt: 0,
+    );
+  }
+
+  Future<void> reconnect() async {
+    state = AsyncData(
+      (state.asData?.value ?? const ChatSocketConnectionState.disconnected())
+          .copyWith(
+        status: ChatSocketLifecycleStatus.connecting,
+        clearErrorMessage: true,
+      ),
+    );
+
+    final service = ref.read(chatSocketServiceProvider);
+    await service.disconnect();
+    await service.ensureConnected();
+    await service.subscribeInbox();
+  }
+}
 
 class ChatUnreadSummaryController extends AsyncNotifier<ChatUnreadState> {
   @override
