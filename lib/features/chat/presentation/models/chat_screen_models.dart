@@ -47,6 +47,7 @@ class ChatConversationState {
     required this.hasMoreMessages,
     required this.isLoadingMoreMessages,
     required this.isMarkingRead,
+    required this.isSendingMessage,
   });
 
   final String currentUserId;
@@ -55,6 +56,7 @@ class ChatConversationState {
   final bool hasMoreMessages;
   final bool isLoadingMoreMessages;
   final bool isMarkingRead;
+  final bool isSendingMessage;
 
   String? get lastMessageId =>
       messages.isEmpty ? conversation.lastMessageId : messages.last.messageId;
@@ -68,6 +70,7 @@ class ChatConversationState {
     bool? hasMoreMessages,
     bool? isLoadingMoreMessages,
     bool? isMarkingRead,
+    bool? isSendingMessage,
   }) {
     return ChatConversationState(
       currentUserId: currentUserId ?? this.currentUserId,
@@ -77,6 +80,7 @@ class ChatConversationState {
       isLoadingMoreMessages:
           isLoadingMoreMessages ?? this.isLoadingMoreMessages,
       isMarkingRead: isMarkingRead ?? this.isMarkingRead,
+      isSendingMessage: isSendingMessage ?? this.isSendingMessage,
     );
   }
 }

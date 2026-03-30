@@ -99,6 +99,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
               _ConversationComposer(
                 controller: _messageController,
                 canSend: state.conversation.canSend,
+                isSending: state.isSendingMessage,
                 onSend: _handleSend,
               ),
             ],
@@ -134,6 +135,11 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
     if (text.isEmpty) {
       return;
     }
+
+    ref
+        .read(chatConversationControllerProvider(widget.conversationId).notifier)
+        .sendMessage(text);
+    _messageController.clear();
   }
 
   void _scheduleMarkRead(ChatConversationState state) {
@@ -194,6 +200,8 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
             text: message.text,
             timeLabel: createdAt == null ? '' : _timeFormat.format(createdAt),
             isMine: message.senderUserId == state.currentUserId,
+            isSending: message.isSending,
+            hasFailed: message.hasFailed,
           ),
         ),
       );
@@ -328,11 +336,13 @@ class _ConversationComposer extends StatelessWidget {
   const _ConversationComposer({
     required this.controller,
     required this.canSend,
+    required this.isSending,
     required this.onSend,
   });
 
   final TextEditingController controller;
   final bool canSend;
+  final bool isSending;
   final VoidCallback onSend;
 
   @override
@@ -369,12 +379,12 @@ class _ConversationComposer extends StatelessWidget {
                       ? 'Напишите сообщение'
                       : 'Отправка недоступна',
                 ),
-                onSubmitted: canSend ? (_) => onSend() : null,
+                onSubmitted: canSend && !isSending ? (_) => onSend() : null,
               ),
             ),
             const SizedBox(width: PawlySpacing.sm),
             FilledButton(
-              onPressed: canSend ? onSend : null,
+              onPressed: canSend && !isSending ? onSend : null,
               style: FilledButton.styleFrom(
                 minimumSize: const Size(52, 52),
                 padding: EdgeInsets.zero,
@@ -382,7 +392,13 @@ class _ConversationComposer extends StatelessWidget {
                   borderRadius: BorderRadius.circular(PawlyRadius.lg),
                 ),
               ),
-              child: const Icon(Icons.arrow_upward_rounded),
+              child: isSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_upward_rounded),
             ),
           ],
         ),
@@ -396,11 +412,15 @@ class _MessageBubble extends StatelessWidget {
     required this.text,
     required this.timeLabel,
     required this.isMine,
+    required this.isSending,
+    required this.hasFailed,
   });
 
   final String text;
   final String timeLabel;
   final bool isMine;
+  final bool isSending;
+  final bool hasFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -435,11 +455,55 @@ class _MessageBubble extends StatelessWidget {
                     const SizedBox(height: PawlySpacing.xs),
                     Align(
                       alignment: Alignment.bottomRight,
-                      child: Text(
-                        timeLabel,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (hasFailed)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(right: PawlySpacing.xs),
+                              child: Icon(
+                                Icons.error_outline_rounded,
+                                size: 14,
+                                color: colorScheme.error,
+                              ),
+                            ),
+                          if (isSending)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(right: PawlySpacing.xs),
+                              child: SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          Text(
+                            timeLabel,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: hasFailed
+                                  ? colorScheme.error
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (isSending || hasFailed) ...<Widget>[
+                    const SizedBox(height: PawlySpacing.xs),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Icon(
+                        hasFailed
+                            ? Icons.error_outline_rounded
+                            : Icons.schedule_rounded,
+                        size: 14,
+                        color: hasFailed
+                            ? colorScheme.error
+                            : colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],

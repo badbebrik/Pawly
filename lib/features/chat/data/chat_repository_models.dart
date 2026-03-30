@@ -1,3 +1,9 @@
+enum ChatMessageDeliveryStatus {
+  sent,
+  sending,
+  failed,
+}
+
 class ChatPeer {
   const ChatPeer({
     required this.userId,
@@ -82,6 +88,7 @@ class ChatMessageItem {
     required this.clientMessageId,
     required this.text,
     required this.createdAt,
+    this.deliveryStatus = ChatMessageDeliveryStatus.sent,
   });
 
   final String messageId;
@@ -90,6 +97,30 @@ class ChatMessageItem {
   final String? clientMessageId;
   final String text;
   final DateTime? createdAt;
+  final ChatMessageDeliveryStatus deliveryStatus;
+
+  bool get isSending => deliveryStatus == ChatMessageDeliveryStatus.sending;
+  bool get hasFailed => deliveryStatus == ChatMessageDeliveryStatus.failed;
+
+  ChatMessageItem copyWith({
+    String? messageId,
+    String? conversationId,
+    String? senderUserId,
+    String? clientMessageId,
+    String? text,
+    DateTime? createdAt,
+    ChatMessageDeliveryStatus? deliveryStatus,
+  }) {
+    return ChatMessageItem(
+      messageId: messageId ?? this.messageId,
+      conversationId: conversationId ?? this.conversationId,
+      senderUserId: senderUserId ?? this.senderUserId,
+      clientMessageId: clientMessageId ?? this.clientMessageId,
+      text: text ?? this.text,
+      createdAt: createdAt ?? this.createdAt,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
+    );
+  }
 }
 
 class ChatMessagePageData {

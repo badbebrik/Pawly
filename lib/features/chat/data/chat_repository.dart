@@ -79,6 +79,14 @@ class ChatRepository {
     return response.lastReadMessageId;
   }
 
+  ChatListItem mapConversation(ChatConversation source) {
+    return _mapConversation(source);
+  }
+
+  ChatMessageItem mapMessage(ChatMessage source) {
+    return _mapMessage(source);
+  }
+
   ChatListItem _mapConversation(ChatConversation source) {
     return ChatListItem(
       conversationId: source.conversationId,
@@ -110,6 +118,7 @@ class ChatRepository {
       clientMessageId: source.clientMsgId,
       text: source.text,
       createdAt: source.createdAt,
+      deliveryStatus: ChatMessageDeliveryStatus.sent,
     );
   }
 }
