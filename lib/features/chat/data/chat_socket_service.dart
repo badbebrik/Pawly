@@ -162,10 +162,13 @@ class ChatSocketService {
         throw StateError('Chat socket requires an authenticated session.');
       }
 
+      final wsUrl = _buildWsUrl();
+      final token = session.accessToken;
+
       final socket = await WebSocket.connect(
-        _buildWsUrl(),
+        wsUrl,
         headers: <String, dynamic>{
-          'Authorization': 'Bearer ${session.accessToken}',
+          'Authorization': 'Bearer $token',
         },
       );
       socket.pingInterval = const Duration(seconds: 20);
@@ -186,6 +189,7 @@ class ChatSocketService {
       );
       await _restoreSubscriptions();
     } catch (error) {
+      final isUnauthorized = error.toString().contains('401');
       _emitLifecycle(
         ChatSocketLifecycleEvent(
           status: ChatSocketLifecycleStatus.error,
@@ -193,8 +197,9 @@ class ChatSocketService {
           reconnectAttempt: _reconnectAttempt,
         ),
       );
-      _scheduleReconnect();
-      rethrow;
+      if (!isUnauthorized) {
+        _scheduleReconnect();
+      }
     } finally {
       _connectFuture = null;
     }
@@ -261,7 +266,13 @@ class ChatSocketService {
     final delaySeconds = _reconnectAttempt.clamp(1, 5);
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       _reconnectTimer = null;
-      ensureConnected();
+      Future<void>(() async {
+        try {
+          await ensureConnected();
+        } catch (_) {
+          // lifecycleEvents already contain error details
+        }
+      });
     });
   }
 

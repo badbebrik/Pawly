@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math';
+import 'dart:async';
 
 import '../../../../core/providers/core_providers.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -16,7 +17,9 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 
 final chatSocketServiceProvider = Provider<ChatSocketService>((ref) {
   final authSessionStore = ref.watch(authSessionStoreProvider);
-  final service = ChatSocketService(authSessionStore: authSessionStore);
+  final service = ChatSocketService(
+    authSessionStore: authSessionStore,
+  );
   ref.onDispose(service.dispose);
   return service;
 });
@@ -109,12 +112,20 @@ class ChatSocketConnectionController
       await eventSubscription.cancel();
     });
 
-    await service.ensureConnected();
-    await service.subscribeInbox();
+    try {
+      await service.ensureConnected();
+      if (service.isConnected) {
+        await service.subscribeInbox();
+      }
+    } catch (_) {
+    }
 
-    return const ChatSocketConnectionState(
-      status: ChatSocketLifecycleStatus.connected,
+    return ChatSocketConnectionState(
+      status: service.isConnected
+          ? ChatSocketLifecycleStatus.connected
+          : ChatSocketLifecycleStatus.error,
       reconnectAttempt: 0,
+      errorMessage: service.isConnected ? null : 'WebSocket connection failed',
     );
   }
 
@@ -129,15 +140,21 @@ class ChatSocketConnectionController
 
     final service = ref.read(chatSocketServiceProvider);
     await service.disconnect();
-    await service.ensureConnected();
-    await service.subscribeInbox();
+    try {
+      await service.ensureConnected();
+      if (service.isConnected) {
+        await service.subscribeInbox();
+      }
+    } catch (_) {
+      // lifecycle state already updated by the socket service
+    }
   }
 }
 
 class ChatUnreadSummaryController extends AsyncNotifier<ChatUnreadState> {
   @override
   Future<ChatUnreadState> build() async {
-    ref.watch(chatSocketConnectionControllerProvider);
+    ref.read(chatSocketConnectionControllerProvider);
     final service = ref.read(chatSocketServiceProvider);
 
     final subscription = service.events.listen((event) {
@@ -166,6 +183,26 @@ class ChatUnreadSummaryController extends AsyncNotifier<ChatUnreadState> {
   void patch(ChatUnreadState value) {
     state = AsyncData(value);
   }
+
+  void decrement({
+    required int unreadConversationsDelta,
+    required int unreadMessagesDelta,
+  }) {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    patch(
+      ChatUnreadState(
+        unreadConversations:
+            (current.unreadConversations - unreadConversationsDelta)
+                .clamp(0, 1 << 31),
+        unreadMessages:
+            (current.unreadMessages - unreadMessagesDelta).clamp(0, 1 << 31),
+      ),
+    );
+  }
 }
 
 class ChatInboxController extends AsyncNotifier<ChatInboxState> {
@@ -175,7 +212,7 @@ class ChatInboxController extends AsyncNotifier<ChatInboxState> {
 
   @override
   Future<ChatInboxState> build() async {
-    ref.watch(chatSocketConnectionControllerProvider);
+    ref.read(chatSocketConnectionControllerProvider);
     final service = ref.read(chatSocketServiceProvider);
     final repository = ref.read(chatRepositoryProvider);
 
@@ -276,6 +313,37 @@ class ChatInboxController extends AsyncNotifier<ChatInboxState> {
     state = AsyncData(current.copyWith(items: nextItems));
   }
 
+  void markConversationRead({
+    required String conversationId,
+    required String lastReadMessageId,
+  }) {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final nextItems = current.items.map((item) {
+      if (item.conversationId != conversationId) {
+        return item;
+      }
+
+      return ChatListItem(
+        conversationId: item.conversationId,
+        pet: item.pet,
+        peer: item.peer,
+        lastMessageId: item.lastMessageId,
+        lastMessageAt: item.lastMessageAt,
+        lastMessagePreview: item.lastMessagePreview,
+        lastMessageSenderId: item.lastMessageSenderId,
+        lastReadMessageId: lastReadMessageId,
+        unreadCount: 0,
+        canSend: item.canSend,
+      );
+    }).toList(growable: false);
+
+    state = AsyncData(current.copyWith(items: nextItems));
+  }
+
   Future<ChatInboxState> _loadInitial(ChatInboxState base) async {
     final page = await ref.read(chatRepositoryProvider).listConversations(
           petId: _petIdFilter,
@@ -293,10 +361,11 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
   ChatConversationController(this._conversationId);
 
   final String _conversationId;
+  final Map<String, Timer> _pendingAckTimers = <String, Timer>{};
 
   @override
   Future<ChatConversationState> build() async {
-    ref.watch(chatSocketConnectionControllerProvider);
+    ref.read(chatSocketConnectionControllerProvider);
     final service = ref.read(chatSocketServiceProvider);
     final repository = ref.read(chatRepositoryProvider);
 
@@ -318,36 +387,27 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     });
 
     ref.onDispose(() async {
+      for (final timer in _pendingAckTimers.values) {
+        timer.cancel();
+      }
+      _pendingAckTimers.clear();
       await subscription.cancel();
       await service.unsubscribeConversation(_conversationId);
     });
 
-    await service.subscribeConversation(_conversationId);
+    Future<void>(() async {
+      try {
+        await service.subscribeConversation(_conversationId);
+      } catch (_) {
+      }
+    });
 
-    final results = await Future.wait<dynamic>(<Future<dynamic>>[
-      ref.read(currentUserIdProvider.future),
-      repository.getConversation(_conversationId),
-      repository.getMessages(_conversationId),
-    ]);
-
-    final currentUserId = results[0] as String?;
-    final conversation = results[1] as ChatListItem;
-    final messagesPage = results[2] as ChatMessagePageData;
-
-    return ChatConversationState(
-      currentUserId: currentUserId ?? '',
-      conversation: conversation,
-      messages: messagesPage.messages.reversed.toList(growable: false),
-      hasMoreMessages: messagesPage.hasMore,
-      isLoadingMoreMessages: false,
-      isMarkingRead: false,
-      isSendingMessage: false,
-    );
+    return _loadInitialState(repository);
   }
 
   Future<void> reload() async {
     state = const AsyncLoading();
-    state = AsyncData(await build());
+    state = AsyncData(await _loadInitialState(ref.read(chatRepositoryProvider)));
   }
 
   Future<void> loadOlderMessages() async {
@@ -394,34 +454,39 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     }
 
     state = AsyncData(current.copyWith(isMarkingRead: true));
+    final hadUnread = current.conversation.unreadCount > 0;
+    final unreadMessages = current.conversation.unreadCount;
+    _applyLocalReadState(
+      current: current,
+      lastReadMessageId: lastReadMessageId,
+    );
 
     try {
-      await ref.read(chatRepositoryProvider).markRead(
-            MarkChatReadInput(
+      try {
+        await ref.read(chatSocketServiceProvider).markRead(
               conversationId: _conversationId,
               lastReadMessageId: lastReadMessageId,
-            ),
-          );
-
-      state = AsyncData(
-        current.copyWith(
-          conversation: ChatListItem(
-            conversationId: current.conversation.conversationId,
-            pet: current.conversation.pet,
-            peer: current.conversation.peer,
-            lastMessageId: current.conversation.lastMessageId,
-            lastMessageAt: current.conversation.lastMessageAt,
-            lastMessagePreview: current.conversation.lastMessagePreview,
-            lastMessageSenderId: current.conversation.lastMessageSenderId,
-            lastReadMessageId: lastReadMessageId,
-            unreadCount: 0,
-            canSend: current.conversation.canSend,
-          ),
-          isMarkingRead: false,
-        ),
-      );
+            );
+      } catch (_) {
+        await ref.read(chatRepositoryProvider).markRead(
+              MarkChatReadInput(
+                conversationId: _conversationId,
+                lastReadMessageId: lastReadMessageId,
+              ),
+            );
+      }
     } catch (error, stackTrace) {
+      _rollbackLocalReadState(
+        current: current,
+        hadUnread: hadUnread,
+        unreadMessages: unreadMessages,
+      );
       state = AsyncError(error, stackTrace);
+    } finally {
+      final latest = state.asData?.value;
+      if (latest != null) {
+        state = AsyncData(latest.copyWith(isMarkingRead: false));
+      }
     }
   }
 
@@ -467,11 +532,13 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
             clientMessageId: clientMessageId,
             text: normalizedText,
           );
+      _scheduleAckTimeout(clientMessageId);
       final latest = state.asData?.value;
       if (latest != null) {
         state = AsyncData(latest.copyWith(isSendingMessage: false));
       }
     } catch (error, stackTrace) {
+      _clearAckTimeout(clientMessageId);
       final latest = state.asData?.value ?? current;
       state = AsyncError(error, stackTrace);
       state = AsyncData(
@@ -488,6 +555,15 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
         ),
       );
     }
+  }
+
+  bool hasFailedMessages() {
+    final current = state.asData?.value;
+    if (current == null) {
+      return false;
+    }
+
+    return current.messages.any((message) => message.hasFailed);
   }
 
   void patchConversation(ChatListItem value) {
@@ -513,6 +589,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     }
 
     final ackMessage = repository.mapMessage(event.message);
+    _clearAckTimeout(ackMessage.clientMessageId);
     final nextMessages = current.messages.map((message) {
       if (message.clientMessageId != ackMessage.clientMessageId) {
         return message;
@@ -547,6 +624,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     }
 
     final newMessage = repository.mapMessage(event.message);
+    _clearAckTimeout(newMessage.clientMessageId);
     final hasByMessageId = current.messages.any(
       (message) => message.messageId == newMessage.messageId,
     );
@@ -604,6 +682,22 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
         ),
       ),
     );
+
+    if (event.userId == current.currentUserId) {
+      ref
+          .read(chatInboxControllerProvider(null).notifier)
+          .markConversationRead(
+            conversationId: _conversationId,
+            lastReadMessageId: event.lastReadMessageId,
+          );
+      ref
+          .read(chatInboxControllerProvider(current.conversation.pet.petId)
+              .notifier)
+          .markConversationRead(
+            conversationId: _conversationId,
+            lastReadMessageId: event.lastReadMessageId,
+          );
+    }
   }
 
   ChatListItem _mergeConversationWithMessage(
@@ -661,8 +755,166 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
   }
 
   String _generateClientMessageId() {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    final suffix = Random().nextInt(1 << 32).toRadixString(16);
-    return 'msg-$timestamp-$suffix';
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    final hex = bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+
+    return '${hex.substring(0, 8)}-'
+        '${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-'
+        '${hex.substring(20, 32)}';
+  }
+
+  void _scheduleAckTimeout(String clientMessageId) {
+    _clearAckTimeout(clientMessageId);
+    _pendingAckTimers[clientMessageId] = Timer(
+      const Duration(seconds: 12),
+      () {
+        _pendingAckTimers.remove(clientMessageId);
+        final current = state.asData?.value;
+        if (current == null) {
+          return;
+        }
+
+        var changed = false;
+        final nextMessages = current.messages.map((message) {
+          if (message.clientMessageId != clientMessageId || !message.isSending) {
+            return message;
+          }
+          changed = true;
+          return message.copyWith(
+            deliveryStatus: ChatMessageDeliveryStatus.failed,
+          );
+        }).toList(growable: false);
+
+        if (!changed) {
+          return;
+        }
+
+        state = AsyncData(
+          current.copyWith(
+            messages: nextMessages,
+            isSendingMessage: false,
+          ),
+        );
+      },
+    );
+  }
+
+  void _clearAckTimeout(String? clientMessageId) {
+    if (clientMessageId == null || clientMessageId.isEmpty) {
+      return;
+    }
+    _pendingAckTimers.remove(clientMessageId)?.cancel();
+  }
+
+  Future<ChatConversationState> _loadInitialState(
+    ChatRepository repository,
+  ) async {
+    final results = await Future.wait<dynamic>(<Future<dynamic>>[
+      ref.read(currentUserIdProvider.future),
+      repository.getConversation(_conversationId),
+      repository.getMessages(_conversationId),
+    ]);
+
+    final currentUserId = results[0] as String?;
+    final conversation = results[1] as ChatListItem;
+    final messagesPage = results[2] as ChatMessagePageData;
+
+    return ChatConversationState(
+      currentUserId: currentUserId ?? '',
+      conversation: conversation,
+      messages: messagesPage.messages.reversed.toList(growable: false),
+      hasMoreMessages: messagesPage.hasMore,
+      isLoadingMoreMessages: false,
+      isMarkingRead: false,
+      isSendingMessage: false,
+    );
+  }
+
+  void _applyLocalReadState({
+    required ChatConversationState current,
+    required String lastReadMessageId,
+  }) {
+    final hadUnread = current.conversation.unreadCount > 0;
+    final unreadMessages = current.conversation.unreadCount;
+
+    state = AsyncData(
+      current.copyWith(
+        conversation: ChatListItem(
+          conversationId: current.conversation.conversationId,
+          pet: current.conversation.pet,
+          peer: current.conversation.peer,
+          lastMessageId: current.conversation.lastMessageId,
+          lastMessageAt: current.conversation.lastMessageAt,
+          lastMessagePreview: current.conversation.lastMessagePreview,
+          lastMessageSenderId: current.conversation.lastMessageSenderId,
+          lastReadMessageId: lastReadMessageId,
+          unreadCount: 0,
+          canSend: current.conversation.canSend,
+        ),
+        isMarkingRead: true,
+      ),
+    );
+
+    ref.read(chatInboxControllerProvider(null).notifier).markConversationRead(
+          conversationId: _conversationId,
+          lastReadMessageId: lastReadMessageId,
+        );
+    ref
+        .read(chatInboxControllerProvider(current.conversation.pet.petId)
+            .notifier)
+        .markConversationRead(
+          conversationId: _conversationId,
+          lastReadMessageId: lastReadMessageId,
+        );
+
+    if (hadUnread) {
+      ref.read(chatUnreadSummaryControllerProvider.notifier).decrement(
+            unreadConversationsDelta: 1,
+            unreadMessagesDelta: unreadMessages,
+          );
+    }
+  }
+
+  void _rollbackLocalReadState({
+    required ChatConversationState current,
+    required bool hadUnread,
+    required int unreadMessages,
+  }) {
+    state = AsyncData(current.copyWith(isMarkingRead: false));
+    ref.read(chatInboxControllerProvider(null).notifier).upsertConversation(
+          current.conversation,
+        );
+    ref
+        .read(chatInboxControllerProvider(current.conversation.pet.petId)
+            .notifier)
+        .upsertConversation(
+          current.conversation,
+        );
+
+    if (hadUnread) {
+      final unreadController = ref.read(
+        chatUnreadSummaryControllerProvider.notifier,
+      );
+      final unreadState =
+          unreadController.state.asData?.value ?? const ChatUnreadState(
+                unreadConversations: 0,
+                unreadMessages: 0,
+              );
+      unreadController.patch(
+        ChatUnreadState(
+          unreadConversations: unreadState.unreadConversations + 1,
+          unreadMessages: unreadState.unreadMessages + unreadMessages,
+        ),
+      );
+    }
   }
 }

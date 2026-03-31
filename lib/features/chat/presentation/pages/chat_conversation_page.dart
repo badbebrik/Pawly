@@ -25,6 +25,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
   static final DateFormat _timeFormat = DateFormat('HH:mm');
   static final DateFormat _dateFormat = DateFormat('d MMMM', 'ru');
   final TextEditingController _messageController = TextEditingController();
+  bool _sendErrorShown = false;
 
   @override
   void dispose() {
@@ -47,6 +48,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
       ),
       body: conversationState.when(
         data: (state) {
+          _scheduleSendErrorToast(state);
           _scheduleMarkRead(state);
           return Column(
             children: <Widget>[
@@ -147,7 +149,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
       return;
     }
 
-    final lastMessageId = state.lastMessageId;
+    final lastMessageId = state.lastReadableMessageId;
     if (lastMessageId == null || lastMessageId.isEmpty) {
       return;
     }
@@ -160,6 +162,29 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
           .read(chatConversationControllerProvider(widget.conversationId)
               .notifier)
           .markReadUpTo(lastMessageId);
+    });
+  }
+
+  void _scheduleSendErrorToast(ChatConversationState state) {
+    final hasFailed = state.messages.any((message) => message.hasFailed);
+    if (!hasFailed) {
+      _sendErrorShown = false;
+      return;
+    }
+    if (_sendErrorShown) {
+      return;
+    }
+
+    _sendErrorShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось отправить сообщение. Проверьте соединение.'),
+        ),
+      );
     });
   }
 

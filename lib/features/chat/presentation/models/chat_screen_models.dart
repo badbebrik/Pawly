@@ -58,10 +58,27 @@ class ChatConversationState {
   final bool isMarkingRead;
   final bool isSendingMessage;
 
-  String? get lastMessageId =>
-      messages.isEmpty ? conversation.lastMessageId : messages.last.messageId;
+  String? get lastReadableMessageId {
+    for (final message in messages.reversed) {
+      if (message.deliveryStatus != ChatMessageDeliveryStatus.sent) {
+        continue;
+      }
+      if (message.messageId.startsWith('local-')) {
+        continue;
+      }
+      return message.messageId;
+    }
 
-  bool get canMarkRead => lastMessageId != null && lastMessageId!.isNotEmpty;
+    final fallback = conversation.lastMessageId;
+    if (fallback == null || fallback.isEmpty || fallback.startsWith('local-')) {
+      return null;
+    }
+
+    return fallback;
+  }
+
+  bool get canMarkRead =>
+      lastReadableMessageId != null && lastReadableMessageId!.isNotEmpty;
 
   ChatConversationState copyWith({
     String? currentUserId,
