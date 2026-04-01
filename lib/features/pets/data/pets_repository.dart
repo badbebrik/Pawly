@@ -77,6 +77,21 @@ class PetsRepository {
     );
   }
 
+  Future<Pet> transferOwnership({
+    required String petId,
+    required int rowVersion,
+    required String targetMemberId,
+  }) async {
+    final response = await _petsApiClient.transferOwnership(
+      petId,
+      TransferPetOwnershipPayload(
+        rowVersion: rowVersion,
+        targetMemberId: targetMemberId,
+      ),
+    );
+    return response.pet;
+  }
+
   Future<Pet> uploadPetPhoto({
     required Pet pet,
     required XFile file,

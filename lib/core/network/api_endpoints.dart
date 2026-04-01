@@ -42,6 +42,9 @@ class ApiEndpoints {
 
   static String petStatus(String petId) => '/v1/pets/$petId/status';
 
+  static String petTransferOwnership(String petId) =>
+      '/v1/pets/$petId/transfer-ownership';
+
   static String petPhotoInitUpload(String petId) =>
       '/v1/pets/$petId/photo:init-upload';
 

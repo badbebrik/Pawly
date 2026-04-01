@@ -69,6 +69,18 @@ class PetsApiClient {
     );
   }
 
+  Future<PetEnvelopeResponse> transferOwnership(
+    String petId,
+    TransferPetOwnershipPayload payload,
+  ) {
+    return _apiClient.post<PetEnvelopeResponse>(
+      ApiEndpoints.petTransferOwnership(petId),
+      data: payload.toJson(),
+      requestOptions: _withUserAndToken,
+      decoder: PetEnvelopeResponse.fromJson,
+    );
+  }
+
   Future<InitUploadResponse> initPhotoUpload(
     String petId,
     InitPetPhotoUploadPayload payload,

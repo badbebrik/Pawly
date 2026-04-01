@@ -79,6 +79,13 @@ class AclRepository {
     return response.member;
   }
 
+  Future<AclMember> leaveMyAccess({
+    required String petId,
+  }) async {
+    final response = await _aclApiClient.leaveMyAccess(petId);
+    return response.member;
+  }
+
   Future<void> revokeInvite({
     required String petId,
     required String inviteId,

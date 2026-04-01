@@ -254,6 +254,23 @@ class ChangePetStatusPayload {
   }
 }
 
+class TransferPetOwnershipPayload {
+  const TransferPetOwnershipPayload({
+    required this.rowVersion,
+    required this.targetMemberId,
+  });
+
+  final int rowVersion;
+  final String targetMemberId;
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'row_version': rowVersion,
+      'target_member_id': targetMemberId,
+    };
+  }
+}
+
 class InitPetPhotoUploadPayload {
   const InitPetPhotoUploadPayload({
     required this.mimeType,

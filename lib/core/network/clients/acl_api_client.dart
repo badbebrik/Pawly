@@ -40,6 +40,14 @@ class AclApiClient {
     );
   }
 
+  Future<AclMemberEnvelope> leaveMyAccess(String petId) {
+    return _apiClient.delete<AclMemberEnvelope>(
+      ApiEndpoints.aclMe(petId),
+      requestOptions: _withUserAndToken,
+      decoder: AclMemberEnvelope.fromJson,
+    );
+  }
+
   Future<AclMemberListResponse> listMembers(String petId) {
     return _apiClient.get<AclMemberListResponse>(
       ApiEndpoints.aclMembers(petId),
