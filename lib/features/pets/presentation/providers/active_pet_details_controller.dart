@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/network/api_error.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../catalog/data/catalog_cache_models.dart';
@@ -91,7 +93,17 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
       return null;
     }
 
-    final pet = await ref.read(petsRepositoryProvider).getPetById(activePetId);
+    final Pet pet;
+    try {
+      pet = await ref.read(petsRepositoryProvider).getPetById(activePetId);
+    } on ApiException catch (error) {
+      if (_isInactiveAccessError(error)) {
+        await ref.read(activePetControllerProvider.notifier).clear();
+        await ref.read(petsControllerProvider.notifier).reload();
+        return null;
+      }
+      rethrow;
+    }
     final catalog = await ref.read(catalogSyncProvider.future);
 
     return ActivePetDetailsState(
@@ -109,5 +121,10 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
     }
 
     return 'Неизвестный вид';
+  }
+
+  bool _isInactiveAccessError(ApiException error) {
+    return error.error.type == ApiErrorType.forbidden ||
+        error.error.type == ApiErrorType.notFound;
   }
 }

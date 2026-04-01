@@ -104,7 +104,6 @@ class PetsController extends AsyncNotifier<PetsState> {
     final result = await ref.read(petsRepositoryProvider).acceptInviteByCode(
           code.trim().toUpperCase(),
         );
-    await reload();
     return result.petId;
   }
 

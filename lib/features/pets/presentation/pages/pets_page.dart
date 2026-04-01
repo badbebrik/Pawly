@@ -711,84 +711,121 @@ class _PetsErrorView extends StatelessWidget {
 }
 
 Future<void> _showJoinByCodeDialog(BuildContext context, WidgetRef ref) async {
-  final controller = TextEditingController();
-  var isSubmitting = false;
-
-  await showDialog<void>(
+  final acceptedPetId = await showDialog<String>(
     context: context,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Присоединиться по коду'),
-            content: TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.characters,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                hintText: 'Введите код',
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: isSubmitting
-                    ? null
-                    : () => Navigator.of(dialogContext).pop(),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: isSubmitting
-                    ? null
-                    : () async {
-                        final code = controller.text.trim().toUpperCase();
-                        if (code.length != 6) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Код должен содержать 6 символов.'),
-                            ),
-                          );
-                          return;
-                        }
-
-                        setState(() {
-                          isSubmitting = true;
-                        });
-
-                        try {
-                          final petId = await ref
-                              .read(petsControllerProvider.notifier)
-                              .acceptInviteByCode(code);
-                          await ref
-                              .read(activePetControllerProvider.notifier)
-                              .selectPet(petId);
-                          if (dialogContext.mounted) {
-                            Navigator.of(dialogContext).pop();
-                          }
-                        } catch (error) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  _acceptInviteByCodeErrorMessage(error),
-                                ),
-                              ),
-                            );
-                          }
-                          setState(() {
-                            isSubmitting = false;
-                          });
-                        }
-                      },
-                child: Text(isSubmitting ? 'Подключаем...' : 'Подключиться'),
-              ),
-            ],
-          );
-        },
-      );
-    },
+    builder: (_) => const _JoinByCodeDialog(),
   );
 
-  controller.dispose();
+  if (acceptedPetId == null || !context.mounted) {
+    return;
+  }
+
+  try {
+    await ref.read(activePetControllerProvider.notifier).selectPet(
+          acceptedPetId,
+        );
+    ref.invalidate(activePetDetailsControllerProvider);
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _acceptInviteByCodeErrorMessage(error),
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class _JoinByCodeDialog extends ConsumerStatefulWidget {
+  const _JoinByCodeDialog();
+
+  @override
+  ConsumerState<_JoinByCodeDialog> createState() => _JoinByCodeDialogState();
+}
+
+class _JoinByCodeDialogState extends ConsumerState<_JoinByCodeDialog> {
+  late final TextEditingController _controller;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Присоединиться по коду'),
+      content: TextField(
+        controller: _controller,
+        textCapitalization: TextCapitalization.characters,
+        maxLength: 6,
+        decoration: const InputDecoration(
+          hintText: 'Введите код',
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: Text(_isSubmitting ? 'Подключаем...' : 'Подключиться'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    final code = _controller.text.trim().toUpperCase();
+    if (code.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Код должен содержать 6 символов.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final petId = await ref
+          .read(petsControllerProvider.notifier)
+          .acceptInviteByCode(code);
+      await ref.read(petsControllerProvider.notifier).reload();
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(petId);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _acceptInviteByCodeErrorMessage(error),
+          ),
+        ),
+      );
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
+  }
 }
 
 String _acceptInviteByCodeErrorMessage(Object error) {
