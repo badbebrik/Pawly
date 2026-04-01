@@ -8,6 +8,9 @@ import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/data/chat_repository_models.dart';
 import '../../../chat/presentation/providers/chat_providers.dart';
+import '../../../pets/presentation/providers/active_pet_controller.dart';
+import '../../../pets/presentation/providers/active_pet_details_controller.dart';
+import '../../../pets/presentation/providers/pets_controller.dart';
 import '../models/acl_screen_models.dart';
 import '../providers/acl_controllers.dart';
 
@@ -62,6 +65,7 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
             onWriteChanged: _setWritePermission,
             onSave: () => _saveChanges(member),
             onRevoke: () => _revokeAccess(member),
+            onLeave: () => _leaveAccess(member),
             onOwnerTransferPressed: () => _showOwnerTransferDialog(member),
             onMessageTap: member.userId == state.me.userId
                 ? null
@@ -259,9 +263,102 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Передача роли владельца запущена.')),
-    );
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(aclAccessControllerProvider(widget.petId).notifier)
+          .transferOwnership(targetMemberId: member.id);
+      ref.invalidate(activePetDetailsControllerProvider);
+      await ref.read(petsControllerProvider.notifier).refreshAfterPetMutation();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_memberName(member.profile)} теперь основной владелец питомца.',
+          ),
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _aclErrorMessage(error, 'Не удалось передать роль владельца.'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _leaveAccess(AclMember member) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Выйти из ухода за питомцем?'),
+            content: const Text(
+              'Вы потеряете доступ к питомцу и сможете вернуться только по новому приглашению.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Выйти'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(aclAccessControllerProvider(widget.petId).notifier)
+          .leaveMyAccess();
+      await ref.read(activePetControllerProvider.notifier).clear();
+      ref.invalidate(activePetDetailsControllerProvider);
+      await ref.read(petsControllerProvider.notifier).reload();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_memberName(member.profile)} больше не участвует в уходе за питомцем.',
+          ),
+        ),
+      );
+      context.goNamed('pets');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _aclErrorMessage(error, 'Не удалось выйти из ухода за питомцем.'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 }
 
@@ -277,6 +374,7 @@ class _AclMemberDetailsContent extends StatelessWidget {
     required this.onWriteChanged,
     required this.onSave,
     required this.onRevoke,
+    required this.onLeave,
     required this.onOwnerTransferPressed,
     this.onMessageTap,
   });
@@ -291,6 +389,7 @@ class _AclMemberDetailsContent extends StatelessWidget {
   final void Function(AclPermissionDomain domain, bool value) onWriteChanged;
   final VoidCallback onSave;
   final VoidCallback onRevoke;
+  final VoidCallback onLeave;
   final VoidCallback onOwnerTransferPressed;
   final VoidCallback? onMessageTap;
 
@@ -464,11 +563,11 @@ class _AclMemberDetailsContent extends StatelessWidget {
               ],
               if (isMe && !member.isPrimaryOwner) ...<Widget>[
                 const SizedBox(height: PawlySpacing.sm),
-                Text(
-                  'Свой доступ отозвать нельзя.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                PawlyButton(
+                  label: 'Выйти из ухода',
+                  onPressed: isSubmitting ? null : onLeave,
+                  variant: PawlyButtonVariant.secondary,
+                  icon: Icons.logout_rounded,
                 ),
               ],
               if (!canManage) ...<Widget>[

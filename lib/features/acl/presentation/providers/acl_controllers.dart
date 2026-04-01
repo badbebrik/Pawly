@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/models/acl_models.dart';
+import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
+import '../../../pets/presentation/providers/pets_controller.dart';
 import '../../data/acl_repository.dart';
 import '../../data/acl_repository_models.dart';
 import '../models/acl_screen_models.dart';
@@ -31,8 +33,7 @@ final aclInvitePreviewControllerProvider = AsyncNotifierProvider.autoDispose
   AclInvitePreviewController.new,
 );
 
-class AclAccessController
-    extends AsyncNotifier<AclAccessScreenState> {
+class AclAccessController extends AsyncNotifier<AclAccessScreenState> {
   AclAccessController(this._petId);
 
   final String _petId;
@@ -73,6 +74,12 @@ class AclAccessController
     return member;
   }
 
+  Future<AclMember> leaveMyAccess() async {
+    return ref.read(aclRepositoryProvider).leaveMyAccess(
+          petId: _petId,
+        );
+  }
+
   Future<void> revokeInvite(String inviteId) async {
     await ref.read(aclRepositoryProvider).revokeInvite(
           petId: _petId,
@@ -81,21 +88,35 @@ class AclAccessController
     await reload();
   }
 
+  Future<Pet> transferOwnership({
+    required String targetMemberId,
+  }) async {
+    final pet = await ref.read(petsRepositoryProvider).getPetById(_petId);
+    final updatedPet = await ref.read(petsRepositoryProvider).transferOwnership(
+          petId: _petId,
+          rowVersion: pet.rowVersion,
+          targetMemberId: targetMemberId,
+        );
+    await reload();
+    return updatedPet;
+  }
+
   Future<AclAccessScreenState> _load() async {
-    final bootstrap = await ref.read(aclRepositoryProvider).getBootstrap(_petId);
+    final bootstrap =
+        await ref.read(aclRepositoryProvider).getBootstrap(_petId);
     return AclAccessScreenState.fromBootstrap(bootstrap);
   }
 }
 
-class AclCreateInviteController
-    extends AsyncNotifier<AclCreateInviteState> {
+class AclCreateInviteController extends AsyncNotifier<AclCreateInviteState> {
   AclCreateInviteController(this._petId);
 
   final String _petId;
 
   @override
   Future<AclCreateInviteState> build() async {
-    final bootstrap = await ref.read(aclRepositoryProvider).getBootstrap(_petId);
+    final bootstrap =
+        await ref.read(aclRepositoryProvider).getBootstrap(_petId);
     return AclCreateInviteState.initial(
       petId: _petId,
       roles: bootstrap.roles,
@@ -203,7 +224,8 @@ class AclCreateInviteController
       throw StateError('Экран приглашения еще не готов.');
     }
     if (!current.isRoleSelectionValid) {
-      throw StateError('Нужно выбрать существующую роль или ввести название новой.');
+      throw StateError(
+          'Нужно выбрать существующую роль или ввести название новой.');
     }
 
     state = AsyncData(current.copyWith(isSubmitting: true));
@@ -243,7 +265,8 @@ class AclCreateInviteController
   }
 
   Future<AclCreateInviteState> _load() async {
-    final bootstrap = await ref.read(aclRepositoryProvider).getBootstrap(_petId);
+    final bootstrap =
+        await ref.read(aclRepositoryProvider).getBootstrap(_petId);
     return AclCreateInviteState.initial(
       petId: _petId,
       roles: bootstrap.roles,
@@ -253,8 +276,7 @@ class AclCreateInviteController
   }
 }
 
-class AclInviteDetailsController
-    extends AsyncNotifier<AclInviteDetailsState> {
+class AclInviteDetailsController extends AsyncNotifier<AclInviteDetailsState> {
   AclInviteDetailsController(this._inviteRef);
 
   final AclInviteRef _inviteRef;
@@ -299,8 +321,7 @@ class AclInviteDetailsController
   }
 }
 
-class AclInvitePreviewController
-    extends AsyncNotifier<AclInvitePreviewState> {
+class AclInvitePreviewController extends AsyncNotifier<AclInvitePreviewState> {
   AclInvitePreviewController(this._token);
 
   final String _token;
@@ -327,9 +348,10 @@ class AclInvitePreviewController
     state = AsyncData(current.copyWith(isSubmitting: true));
 
     try {
-      final response = await ref.read(aclRepositoryProvider).acceptInviteByToken(
-            _token,
-          );
+      final response =
+          await ref.read(aclRepositoryProvider).acceptInviteByToken(
+                _token,
+              );
       state = AsyncData(current.copyWith(isSubmitting: false));
       return response;
     } catch (_) {

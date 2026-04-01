@@ -217,15 +217,11 @@ class AclCreateInviteState {
   final bool isSubmitting;
 
   List<AclRole> get systemRoles {
-    return roles
-        .where((role) => role.kind == 'SYSTEM')
-        .toList(growable: false);
+    return roles.where((role) => role.kind == 'SYSTEM').toList(growable: false);
   }
 
   List<AclRole> get customRoles {
-    return roles
-        .where((role) => role.kind == 'CUSTOM')
-        .toList(growable: false);
+    return roles.where((role) => role.kind == 'CUSTOM').toList(growable: false);
   }
 
   AclRole? roleById(String? roleId) {

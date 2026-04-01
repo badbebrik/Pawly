@@ -247,7 +247,8 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
               vertical: PawlySpacing.sm,
             ),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+              color:
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(PawlyRadius.lg),
               ),
@@ -311,7 +312,9 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Icon(
-                        item.canRead ? Icons.check_rounded : Icons.close_rounded,
+                        item.canRead
+                            ? Icons.check_rounded
+                            : Icons.close_rounded,
                         color: item.canRead
                             ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,
@@ -321,7 +324,9 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Icon(
-                        item.canWrite ? Icons.check_rounded : Icons.close_rounded,
+                        item.canWrite
+                            ? Icons.check_rounded
+                            : Icons.close_rounded,
                         color: item.canWrite
                             ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,

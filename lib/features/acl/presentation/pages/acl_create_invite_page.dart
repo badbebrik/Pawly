@@ -16,7 +16,8 @@ class AclCreateInvitePage extends ConsumerStatefulWidget {
   final String petId;
 
   @override
-  ConsumerState<AclCreateInvitePage> createState() => _AclCreateInvitePageState();
+  ConsumerState<AclCreateInvitePage> createState() =>
+      _AclCreateInvitePageState();
 }
 
 class _AclCreateInvitePageState extends ConsumerState<AclCreateInvitePage> {
@@ -269,7 +270,8 @@ class _AclPermissionsTable extends StatelessWidget {
               vertical: PawlySpacing.sm,
             ),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+              color:
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(PawlyRadius.lg),
               ),
