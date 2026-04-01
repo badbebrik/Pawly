@@ -87,6 +87,28 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
     }
   }
 
+  Future<void> archivePet() async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final updatedPet = await ref.read(petsRepositoryProvider).changeStatus(
+          petId: current.pet.id,
+          rowVersion: current.pet.rowVersion,
+          status: 'ARCHIVED',
+        );
+
+    await ref.read(activePetControllerProvider.notifier).clear();
+    await ref.read(petsControllerProvider.notifier).refreshAfterPetMutation();
+
+    state = AsyncData(
+      current.copyWith(
+        pet: updatedPet,
+      ),
+    );
+  }
+
   Future<ActivePetDetailsState?> _load() async {
     final activePetId = await ref.watch(activePetControllerProvider.future);
     if (activePetId == null || activePetId.isEmpty) {
@@ -103,6 +125,11 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
         return null;
       }
       rethrow;
+    }
+    if (pet.status == 'ARCHIVED') {
+      await ref.read(activePetControllerProvider.notifier).clear();
+      await ref.read(petsControllerProvider.notifier).reload();
+      return null;
     }
     final catalog = await ref.read(catalogSyncProvider.future);
 

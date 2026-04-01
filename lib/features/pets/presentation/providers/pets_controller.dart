@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
@@ -7,34 +8,43 @@ import '../../data/pets_repository.dart';
 
 enum PetsOwnershipFilter { all, owned, shared }
 
+enum PetsStatusBucket { active, archive }
+
 class PetsState {
   const PetsState({
     required this.items,
     required this.searchQuery,
     required this.ownershipFilter,
+    required this.statusBucket,
   });
 
   factory PetsState.initial() => const PetsState(
         items: <PetListEntry>[],
         searchQuery: '',
         ownershipFilter: PetsOwnershipFilter.all,
+        statusBucket: PetsStatusBucket.active,
       );
 
   final List<PetListEntry> items;
   final String searchQuery;
   final PetsOwnershipFilter ownershipFilter;
+  final PetsStatusBucket statusBucket;
 
   List<PetListEntry> get filteredItems {
     final normalizedQuery = searchQuery.trim().toLowerCase();
 
     return items.where((item) {
+      final matchesBucket = switch (statusBucket) {
+        PetsStatusBucket.active => item.pet.status != 'ARCHIVED',
+        PetsStatusBucket.archive => item.pet.status == 'ARCHIVED',
+      };
       final matchesFilter = switch (ownershipFilter) {
         PetsOwnershipFilter.all => true,
         PetsOwnershipFilter.owned => item.isOwnedByMe,
         PetsOwnershipFilter.shared => !item.isOwnedByMe,
       };
 
-      if (!matchesFilter) {
+      if (!matchesBucket || !matchesFilter) {
         return false;
       }
 
@@ -50,11 +60,13 @@ class PetsState {
     List<PetListEntry>? items,
     String? searchQuery,
     PetsOwnershipFilter? ownershipFilter,
+    PetsStatusBucket? statusBucket,
   }) {
     return PetsState(
       items: items ?? this.items,
       searchQuery: searchQuery ?? this.searchQuery,
       ownershipFilter: ownershipFilter ?? this.ownershipFilter,
+      statusBucket: statusBucket ?? this.statusBucket,
     );
   }
 }
@@ -96,8 +108,26 @@ class PetsController extends AsyncNotifier<PetsState> {
     state = AsyncData(current.copyWith(ownershipFilter: value));
   }
 
+  Future<void> setStatusBucket(PetsStatusBucket value) async {
+    final current = state.asData?.value ?? PetsState.initial();
+    state = AsyncData(current.copyWith(statusBucket: value));
+  }
+
   Future<void> refreshAfterPetMutation() async {
     await reload();
+  }
+
+  Future<Pet> changePetStatus({
+    required Pet pet,
+    required String status,
+  }) async {
+    final updatedPet = await ref.read(petsRepositoryProvider).changeStatus(
+          petId: pet.id,
+          rowVersion: pet.rowVersion,
+          status: status,
+        );
+    await reload();
+    return updatedPet;
   }
 
   Future<String> acceptInviteByCode(String code) async {
@@ -117,6 +147,7 @@ class PetsController extends AsyncNotifier<PetsState> {
     final items = await ref.read(petsRepositoryProvider).listAvailablePets(
           currentUserId: currentUserId,
           catalog: catalog,
+          includeArchived: true,
         );
 
     return base.copyWith(items: items);

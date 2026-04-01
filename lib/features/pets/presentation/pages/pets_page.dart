@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/network/models/pet_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../../data/pets_repository.dart';
@@ -87,8 +88,35 @@ class _PetsListView extends ConsumerWidget {
         ),
         const SizedBox(height: PawlySpacing.md),
         Text(
-          'Доступные питомцы',
+          state.statusBucket == PetsStatusBucket.archive
+              ? 'Архив питомцев'
+              : 'Доступные питомцы',
           style: theme.textTheme.titleLarge,
+        ),
+        const SizedBox(height: PawlySpacing.sm),
+        Wrap(
+          spacing: PawlySpacing.xs,
+          runSpacing: PawlySpacing.xs,
+          children: <Widget>[
+            ChoiceChip(
+              label: const Text('Активные'),
+              selected: state.statusBucket == PetsStatusBucket.active,
+              onSelected: (_) {
+                ref
+                    .read(petsControllerProvider.notifier)
+                    .setStatusBucket(PetsStatusBucket.active);
+              },
+            ),
+            ChoiceChip(
+              label: const Text('Архив'),
+              selected: state.statusBucket == PetsStatusBucket.archive,
+              onSelected: (_) {
+                ref
+                    .read(petsControllerProvider.notifier)
+                    .setStatusBucket(PetsStatusBucket.archive);
+              },
+            ),
+          ],
         ),
         const SizedBox(height: PawlySpacing.sm),
         Wrap(
@@ -127,9 +155,16 @@ class _PetsListView extends ConsumerWidget {
         const SizedBox(height: PawlySpacing.lg),
         if (items.isEmpty)
           PawlyCard(
-            title: Text('Питомцев пока нет', style: theme.textTheme.titleLarge),
+            title: Text(
+              state.statusBucket == PetsStatusBucket.archive
+                  ? 'Архив пуст'
+                  : 'Питомцев пока нет',
+              style: theme.textTheme.titleLarge,
+            ),
             child: Text(
-              'Когда появятся питомцы, здесь будет список карточек. Добавить питомца можно через кнопку внизу.',
+              state.statusBucket == PetsStatusBucket.archive
+                  ? 'Заархивированные питомцы будут показаны здесь. Их можно вернуть в активные.'
+                  : 'Когда появятся питомцы, здесь будет список карточек. Добавить питомца можно через кнопку внизу.',
               style: theme.textTheme.bodyMedium,
             ),
           )
@@ -139,10 +174,16 @@ class _PetsListView extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: PawlySpacing.md),
               child: _PetListCard(
                 entry: item,
-                onTap: () =>
-                    ref.read(activePetControllerProvider.notifier).selectPet(
+                onTap: state.statusBucket == PetsStatusBucket.archive
+                    ? null
+                    : () => ref
+                        .read(activePetControllerProvider.notifier)
+                        .selectPet(
                           item.id,
                         ),
+                onRestore: state.statusBucket == PetsStatusBucket.archive
+                    ? () => _restorePetFromArchive(context, ref, item.pet)
+                    : null,
               ),
             );
           }),
@@ -155,11 +196,13 @@ class _PetsListView extends ConsumerWidget {
 class _PetListCard extends StatelessWidget {
   const _PetListCard({
     required this.entry,
-    required this.onTap,
+    this.onTap,
+    this.onRestore,
   });
 
   final PetListEntry entry;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final VoidCallback? onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -215,15 +258,42 @@ class _PetListCard extends StatelessWidget {
                           color: colorScheme.onSurface,
                         ),
                       ),
+                      if (entry.pet.status == 'ARCHIVED') ...<Widget>[
+                        const SizedBox(height: PawlySpacing.xs),
+                        Wrap(
+                          spacing: PawlySpacing.xs,
+                          runSpacing: PawlySpacing.xs,
+                          children: <Widget>[
+                            const PawlyBadge(
+                              label: 'В архиве',
+                              tone: PawlyBadgeTone.warning,
+                            ),
+                            if (entry.pet.archivedAt != null)
+                              Text(
+                                'с ${_formatShortDate(entry.pet.archivedAt!)}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: PawlySpacing.sm),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                  size: 28,
-                ),
+                if (onRestore != null)
+                  IconButton.outlined(
+                    onPressed: onRestore,
+                    tooltip: 'Вернуть в активные',
+                    icon: const Icon(Icons.unarchive_rounded),
+                  )
+                else
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 28,
+                  ),
               ],
             ),
           ),
@@ -486,6 +556,13 @@ class _ActivePetView extends ConsumerWidget {
             ),
             const SizedBox(height: PawlySpacing.lg),
             PawlyButton(
+              label: 'Архивировать питомца',
+              onPressed: () => _archiveActivePet(context, ref, pet.name),
+              variant: PawlyButtonVariant.secondary,
+              icon: Icons.archive_outlined,
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            PawlyButton(
               label: 'Сменить питомца',
               onPressed: () =>
                   ref.read(activePetControllerProvider.notifier).clear(),
@@ -501,6 +578,91 @@ class _ActivePetView extends ConsumerWidget {
             ref.read(activePetDetailsControllerProvider.notifier).reload(),
       ),
     );
+  }
+}
+
+Future<void> _archiveActivePet(
+  BuildContext context,
+  WidgetRef ref,
+  String petName,
+) async {
+  final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Архивировать питомца?'),
+          content: Text(
+            '$petName исчезнет из списка активных питомцев и будет доступен в архиве.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Архивировать'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+
+  try {
+    await ref.read(activePetDetailsControllerProvider.notifier).archivePet();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$petName перемещен в архив.'),
+        ),
+      );
+    }
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось архивировать питомца.',
+          ),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> _restorePetFromArchive(
+  BuildContext context,
+  WidgetRef ref,
+  Pet pet,
+) async {
+  try {
+    await ref.read(petsControllerProvider.notifier).changePetStatus(
+          pet: pet,
+          status: 'ACTIVE',
+        );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${pet.name} возвращен в активные.'),
+        ),
+      );
+    }
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось вернуть питомца из архива.',
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -553,6 +715,13 @@ String _monthsWord(int value) {
     return 'месяца';
   }
   return 'месяцев';
+}
+
+String _formatShortDate(DateTime value) {
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final year = value.year.toString();
+  return '$day.$month.$year';
 }
 
 Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {

@@ -65,6 +65,23 @@ class PetsRepository {
     return response.pet;
   }
 
+  Future<Pet> changeStatus({
+    required String petId,
+    required int rowVersion,
+    required String status,
+    DateTime? missingSince,
+  }) async {
+    final response = await _petsApiClient.changeStatus(
+      petId,
+      ChangePetStatusPayload(
+        rowVersion: rowVersion,
+        status: status,
+        missingSince: missingSince,
+      ),
+    );
+    return response.pet;
+  }
+
   Future<PetInviteAcceptResult> acceptInviteByCode(String code) async {
     final response = await _aclApiClient.acceptInviteByCode(
       AcceptInviteByCodePayload(code: code),
