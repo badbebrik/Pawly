@@ -48,16 +48,18 @@ class PetColor {
 
     return PetColor(
       presetId: asNullableString(json['preset_id']),
-      hexOverride: asNullableString(json['hex_override']),
-      note: asNullableString(json['note']),
+      hexOverride: asNullableString(json['custom_hex']) ??
+          asNullableString(json['hex_override']),
+      note: asNullableString(json['custom_name']) ??
+          asNullableString(json['note']),
       sortOrder: asInt(json['sort_order']),
     );
   }
 
   JsonMap toJson() => <String, dynamic>{
         'preset_id': presetId,
-        'hex_override': hexOverride,
-        'note': note,
+        'custom_name': note,
+        'custom_hex': hexOverride,
         'sort_order': sortOrder,
       }..removeWhere((_, dynamic value) => value == null);
 }
@@ -142,6 +144,27 @@ class Pet {
     final colors = rawColors is List
         ? rawColors.map(PetColor.fromJson).toList(growable: false)
         : const <PetColor>[];
+    final rawBreed = json['breed'];
+    final breed = rawBreed == null
+        ? PetBreed(
+            source: asNullableString(json['custom_breed_name']) != null
+                ? 'CUSTOM'
+                : 'SYSTEM',
+            systemBreedId: asNullableString(json['breed_id']),
+            customBreedName: asNullableString(json['custom_breed_name']),
+          )
+        : PetBreed.fromJson(rawBreed);
+    final rawCoatPattern = json['coat_pattern'];
+    final coatPattern = rawCoatPattern == null
+        ? PetCoatPattern(
+            source: asNullableString(json['custom_pattern_name']) != null
+                ? 'CUSTOM'
+                : 'SYSTEM',
+            systemCoatPatternId: asNullableString(json['pattern_id']),
+            customCoatPatternName:
+                asNullableString(json['custom_pattern_name']),
+          )
+        : PetCoatPattern.fromJson(rawCoatPattern);
 
     return Pet(
       id: asString(json['id']),
@@ -151,9 +174,9 @@ class Pet {
       speciesId: asString(json['species_id']),
       sex: asString(json['sex']),
       birthDate: asDateTime(json['birth_date']),
-      breed: PetBreed.fromJson(json['breed']),
+      breed: breed,
       colors: colors,
-      coatPattern: PetCoatPattern.fromJson(json['coat_pattern']),
+      coatPattern: coatPattern,
       isNeutered: asString(json['is_neutered']),
       isOutdoor: asBool(json['is_outdoor']),
       profilePhotoFileId: asNullableString(json['profile_photo_file_id']),
@@ -177,9 +200,11 @@ class CreatePetPayload {
     required this.speciesId,
     required this.sex,
     this.birthDate,
-    required this.breed,
+    this.breedId,
+    this.customBreedName,
     required this.colors,
-    required this.coatPattern,
+    this.patternId,
+    this.customPatternName,
     required this.isNeutered,
     required this.isOutdoor,
     this.profilePhotoFileId,
@@ -191,9 +216,11 @@ class CreatePetPayload {
   final String speciesId;
   final String sex;
   final DateTime? birthDate;
-  final PetBreed breed;
+  final String? breedId;
+  final String? customBreedName;
   final List<PetColor> colors;
-  final PetCoatPattern coatPattern;
+  final String? patternId;
+  final String? customPatternName;
   final String isNeutered;
   final bool isOutdoor;
   final String? profilePhotoFileId;
@@ -206,9 +233,11 @@ class CreatePetPayload {
       'species_id': speciesId,
       'sex': sex,
       'birth_date': birthDate == null ? null : formatDate(birthDate!),
-      'breed': breed.toJson(),
+      'breed_id': breedId,
+      'custom_breed_name': customBreedName,
       'colors': colors.map((item) => item.toJson()).toList(growable: false),
-      'coat_pattern': coatPattern.toJson(),
+      'pattern_id': patternId,
+      'custom_pattern_name': customPatternName,
       'is_neutered': isNeutered,
       'is_outdoor': isOutdoor,
       'profile_photo_file_id': profilePhotoFileId,

@@ -358,25 +358,17 @@ class PetCreateController extends Notifier<PetCreateState> {
       speciesId: state.speciesId!,
       sex: state.sex,
       birthDate: state.birthDate,
-      breed: state.breedMode == CatalogPickMode.catalog
-          ? PetBreed(
-              source: 'SYSTEM',
-              systemBreedId: state.breedId,
-            )
-          : PetBreed(
-              source: 'CUSTOM',
-              customBreedName: state.customBreedName.trim(),
-            ),
+      breedId:
+          state.breedMode == CatalogPickMode.catalog ? state.breedId : null,
+      customBreedName: state.breedMode == CatalogPickMode.custom
+          ? state.customBreedName.trim()
+          : null,
       colors: colors,
-      coatPattern: state.patternMode == CatalogPickMode.catalog
-          ? PetCoatPattern(
-              source: 'SYSTEM',
-              systemCoatPatternId: state.patternId,
-            )
-          : PetCoatPattern(
-              source: 'CUSTOM',
-              customCoatPatternName: state.customPatternName.trim(),
-            ),
+      patternId:
+          state.patternMode == CatalogPickMode.catalog ? state.patternId : null,
+      customPatternName: state.patternMode == CatalogPickMode.custom
+          ? state.customPatternName.trim()
+          : null,
       isNeutered: state.isNeutered,
       isOutdoor: state.isOutdoor,
       microchipId:

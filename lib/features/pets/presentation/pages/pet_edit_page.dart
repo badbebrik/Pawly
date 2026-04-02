@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/models/pet_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../catalog/data/catalog_cache_models.dart';
-import '../../../catalog/presentation/providers/catalog_providers.dart';
+import '../../../catalog/presentation/providers/pet_dictionaries_providers.dart';
 import '../providers/active_pet_details_controller.dart';
 import '../providers/pets_controller.dart';
 
@@ -14,7 +14,7 @@ enum _CatalogPickMode { catalog, custom }
 final _petEditInitialDataProvider = FutureProvider.autoDispose
     .family<_PetEditInitialData, String>((ref, petId) async {
   final pet = await ref.read(petsRepositoryProvider).getPetById(petId);
-  final catalog = await ref.read(catalogSyncProvider.future);
+  final catalog = await ref.read(petDictionariesSyncProvider.future);
   return _PetEditInitialData(pet: pet, catalog: catalog);
 });
 
@@ -450,21 +450,18 @@ class _PetEditPageState extends ConsumerState<PetEditPage> {
         speciesId: _speciesId,
         sex: _sex,
         birthDate: _birthDate,
-        breed: _breedMode == _CatalogPickMode.catalog
-            ? PetBreed(source: 'SYSTEM', systemBreedId: _breedId)
-            : PetBreed(
-                source: 'CUSTOM',
-                customBreedName: _customBreedCtrl.text.trim(),
-              ),
+        breedId: _breedMode == _CatalogPickMode.catalog ? _breedId : null,
+        customBreedName: _breedMode == _CatalogPickMode.custom
+            ? _customBreedCtrl.text.trim()
+            : null,
         colors: _buildColorsPayload(),
-        coatPattern: _patternMode == _CatalogPickMode.catalog
-            ? PetCoatPattern(source: 'SYSTEM', systemCoatPatternId: _patternId)
-            : PetCoatPattern(
-                source: 'CUSTOM',
-                customCoatPatternName: _customPatternCtrl.text.trim(),
-              ),
+        patternId: _patternMode == _CatalogPickMode.catalog ? _patternId : null,
+        customPatternName: _patternMode == _CatalogPickMode.custom
+            ? _customPatternCtrl.text.trim()
+            : null,
         isNeutered: _isNeutered,
         isOutdoor: _isOutdoor,
+        profilePhotoFileId: pet.profilePhotoFileId,
         microchipId: _microchipCtrl.text.trim().isEmpty
             ? null
             : _microchipCtrl.text.trim(),

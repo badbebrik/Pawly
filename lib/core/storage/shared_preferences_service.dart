@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SharedPreferencesService {
@@ -37,5 +39,25 @@ class SharedPreferencesService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(localeKey);
     await preferences.remove(timeZoneKey);
+  }
+
+  Future<void> writeJson(String key, Map<String, dynamic> payload) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(key, jsonEncode(payload));
+  }
+
+  Future<Map<String, dynamic>?> readJson(String key) async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(key);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    final decoded = jsonDecode(raw);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+
+    return null;
   }
 }

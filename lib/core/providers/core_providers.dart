@@ -10,9 +10,9 @@ import '../../app/router/app_router.dart';
 import '../network/api_client.dart';
 import '../network/clients/acl_api_client.dart';
 import '../network/clients/auth_api_client.dart';
-import '../network/clients/catalog_api_client.dart';
 import '../network/clients/chat_api_client.dart';
 import '../network/clients/health_api_client.dart';
+import '../network/clients/pet_dictionaries_api_client.dart';
 import '../network/clients/pets_api_client.dart';
 import '../network/clients/profile_api_client.dart';
 import '../network/dio_factory.dart';
@@ -86,9 +86,11 @@ final aclApiClientProvider = Provider<AclApiClient>((ref) {
   return AclApiClient(apiClient);
 });
 
-final catalogApiClientProvider = Provider<CatalogApiClient>((ref) {
+final petDictionariesApiClientProvider = Provider<PetDictionariesApiClient>((
+  ref,
+) {
   final apiClient = ref.watch(apiClientProvider);
-  return CatalogApiClient(apiClient);
+  return PetDictionariesApiClient(apiClient);
 });
 
 final chatApiClientProvider = Provider<ChatApiClient>((ref) {

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
-import '../../../catalog/presentation/providers/catalog_providers.dart';
+import '../../../catalog/presentation/providers/pet_dictionaries_providers.dart';
 import '../../data/pets_repository.dart';
 
 enum PetsOwnershipFilter { all, owned, shared }
@@ -143,7 +143,7 @@ class PetsController extends AsyncNotifier<PetsState> {
       return base.copyWith(items: const <PetListEntry>[]);
     }
 
-    final catalog = await ref.read(catalogSyncProvider.future);
+    final catalog = await ref.read(petDictionariesSyncProvider.future);
     final items = await ref.read(petsRepositoryProvider).listAvailablePets(
           currentUserId: currentUserId,
           catalog: catalog,

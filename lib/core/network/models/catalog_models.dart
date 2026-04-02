@@ -1,116 +1,245 @@
 import 'json_parsers.dart';
 
-class CatalogVersionResponse {
-  const CatalogVersionResponse({required this.version});
-  final int version;
+class PetDictionariesResponse {
+  const PetDictionariesResponse({
+    required this.species,
+    required this.breeds,
+    required this.patterns,
+    required this.colorPresets,
+  });
 
-  factory CatalogVersionResponse.fromJson(Object? data) {
+  final List<SpeciesDictionaryItem> species;
+  final List<BreedDictionaryItem> breeds;
+  final List<PatternDictionaryItem> patterns;
+  final List<ColorPresetDictionaryItem> colorPresets;
+
+  factory PetDictionariesResponse.fromJson(Object? data) {
     final json = asJsonMap(data);
-    return CatalogVersionResponse(version: asInt(json['version']));
+
+    return PetDictionariesResponse(
+      species: asJsonMapList(json['species'])
+          .map(SpeciesDictionaryItem.fromJson)
+          .toList(growable: false),
+      breeds: asJsonMapList(json['breeds'])
+          .map(BreedDictionaryItem.fromJson)
+          .toList(growable: false),
+      patterns: asJsonMapList(json['patterns'])
+          .map(PatternDictionaryItem.fromJson)
+          .toList(growable: false),
+      colorPresets: asJsonMapList(json['color_presets'])
+          .map(ColorPresetDictionaryItem.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  int get version {
+    var hash = 0x811C9DC5;
+
+    void add(String value) {
+      for (final codeUnit in value.codeUnits) {
+        hash ^= codeUnit;
+        hash = (hash * 0x01000193) & 0x7fffffff;
+      }
+    }
+
+    for (final item in species) {
+      add(item.id);
+      add(item.code);
+      add(item.nameRu);
+      add(item.nameEn);
+      add(item.iconKey);
+      add(item.sortOrder.toString());
+      add(item.isActive.toString());
+    }
+
+    for (final item in breeds) {
+      add(item.id);
+      add(item.speciesId);
+      add(item.nameRu);
+      add(item.nameEn);
+      add(item.sortOrder.toString());
+      add(item.isActive.toString());
+    }
+
+    for (final item in patterns) {
+      add(item.id);
+      add(item.speciesId ?? '');
+      add(item.nameRu);
+      add(item.nameEn);
+      add(item.iconKey ?? '');
+      add(item.sortOrder.toString());
+      add(item.isActive.toString());
+    }
+
+    for (final item in colorPresets) {
+      add(item.id);
+      add(item.nameRu);
+      add(item.nameEn);
+      add(item.hex);
+      add(item.sortOrder.toString());
+      add(item.isActive.toString());
+    }
+
+    return hash == 0 ? 1 : hash;
   }
 }
 
-class SpeciesItem {
-  const SpeciesItem({
+class SpeciesDictionaryItem {
+  const SpeciesDictionaryItem({
     required this.id,
-    required this.name,
+    required this.code,
+    required this.nameRu,
+    required this.nameEn,
+    required this.iconKey,
+    required this.sortOrder,
     required this.isActive,
-    required this.version,
   });
 
   final String id;
-  final String name;
+  final String code;
+  final String nameRu;
+  final String nameEn;
+  final String iconKey;
+  final int sortOrder;
   final bool isActive;
-  final int version;
 
-  factory SpeciesItem.fromJson(Object? data) {
+  factory SpeciesDictionaryItem.fromJson(Object? data) {
     final json = asJsonMap(data);
-    return SpeciesItem(
+
+    return SpeciesDictionaryItem(
       id: asString(json['id']),
-      name: asString(json['name']),
+      code: asString(json['code']),
+      nameRu: asString(json['name_ru']),
+      nameEn: asString(json['name_en']),
+      iconKey: asString(json['icon_key']),
+      sortOrder: asInt(json['sort_order']),
       isActive: asBool(json['is_active']),
-      version: asInt(json['version']),
     );
+  }
+
+  String localizedName({String? locale}) {
+    return _pickLocalizedName(nameRu: nameRu, nameEn: nameEn, locale: locale);
   }
 }
 
-class BreedItem {
-  const BreedItem({
+class BreedDictionaryItem {
+  const BreedDictionaryItem({
     required this.id,
     required this.speciesId,
-    required this.name,
+    required this.nameRu,
+    required this.nameEn,
+    required this.sortOrder,
     required this.isActive,
-    required this.version,
   });
 
   final String id;
   final String speciesId;
-  final String name;
+  final String nameRu;
+  final String nameEn;
+  final int sortOrder;
   final bool isActive;
-  final int version;
 
-  factory BreedItem.fromJson(Object? data) {
+  factory BreedDictionaryItem.fromJson(Object? data) {
     final json = asJsonMap(data);
-    return BreedItem(
+
+    return BreedDictionaryItem(
       id: asString(json['id']),
       speciesId: asString(json['species_id']),
-      name: asString(json['name']),
+      nameRu: asString(json['name_ru']),
+      nameEn: asString(json['name_en']),
+      sortOrder: asInt(json['sort_order']),
       isActive: asBool(json['is_active']),
-      version: asInt(json['version']),
     );
+  }
+
+  String localizedName({String? locale}) {
+    return _pickLocalizedName(nameRu: nameRu, nameEn: nameEn, locale: locale);
   }
 }
 
-class ColorItem {
-  const ColorItem({
+class PatternDictionaryItem {
+  const PatternDictionaryItem({
     required this.id,
-    required this.name,
-    required this.hex,
-    required this.isActive,
-    required this.version,
-  });
-
-  final String id;
-  final String name;
-  final String hex;
-  final bool isActive;
-  final int version;
-
-  factory ColorItem.fromJson(Object? data) {
-    final json = asJsonMap(data);
-    return ColorItem(
-      id: asString(json['id']),
-      name: asString(json['name']),
-      hex: asString(json['hex']),
-      isActive: asBool(json['is_active']),
-      version: asInt(json['version']),
-    );
-  }
-}
-
-class PatternItem {
-  const PatternItem({
-    required this.id,
-    required this.name,
+    required this.speciesId,
+    required this.nameRu,
+    required this.nameEn,
     required this.iconKey,
+    required this.sortOrder,
     required this.isActive,
-    required this.version,
   });
 
   final String id;
-  final String name;
-  final String iconKey;
+  final String? speciesId;
+  final String nameRu;
+  final String nameEn;
+  final String? iconKey;
+  final int sortOrder;
   final bool isActive;
-  final int version;
 
-  factory PatternItem.fromJson(Object? data) {
+  factory PatternDictionaryItem.fromJson(Object? data) {
     final json = asJsonMap(data);
-    return PatternItem(
+
+    return PatternDictionaryItem(
       id: asString(json['id']),
-      name: asString(json['name']),
-      iconKey: asString(json['icon_key']),
+      speciesId: asNullableString(json['species_id']),
+      nameRu: asString(json['name_ru']),
+      nameEn: asString(json['name_en']),
+      iconKey: asNullableString(json['icon_key']),
+      sortOrder: asInt(json['sort_order']),
       isActive: asBool(json['is_active']),
-      version: asInt(json['version']),
     );
   }
+
+  String localizedName({String? locale}) {
+    return _pickLocalizedName(nameRu: nameRu, nameEn: nameEn, locale: locale);
+  }
+}
+
+class ColorPresetDictionaryItem {
+  const ColorPresetDictionaryItem({
+    required this.id,
+    required this.nameRu,
+    required this.nameEn,
+    required this.hex,
+    required this.sortOrder,
+    required this.isActive,
+  });
+
+  final String id;
+  final String nameRu;
+  final String nameEn;
+  final String hex;
+  final int sortOrder;
+  final bool isActive;
+
+  factory ColorPresetDictionaryItem.fromJson(Object? data) {
+    final json = asJsonMap(data);
+
+    return ColorPresetDictionaryItem(
+      id: asString(json['id']),
+      nameRu: asString(json['name_ru']),
+      nameEn: asString(json['name_en']),
+      hex: asString(json['hex']),
+      sortOrder: asInt(json['sort_order']),
+      isActive: asBool(json['is_active']),
+    );
+  }
+
+  String localizedName({String? locale}) {
+    return _pickLocalizedName(nameRu: nameRu, nameEn: nameEn, locale: locale);
+  }
+}
+
+String _pickLocalizedName({
+  required String nameRu,
+  required String nameEn,
+  String? locale,
+}) {
+  final normalized = (locale ?? 'ru').toLowerCase();
+
+  if (normalized.startsWith('en')) {
+    return nameEn.isNotEmpty ? nameEn : nameRu;
+  }
+
+  return nameRu.isNotEmpty ? nameRu : nameEn;
 }

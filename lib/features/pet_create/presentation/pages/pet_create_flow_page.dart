@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../catalog/data/catalog_cache_models.dart';
-import '../../../catalog/presentation/providers/catalog_providers.dart';
+import '../../../catalog/presentation/providers/pet_dictionaries_providers.dart';
 import '../../../pets/presentation/providers/active_pet_controller.dart';
 import '../../../pets/presentation/providers/pets_controller.dart';
 import '../providers/pet_create_controller.dart';
@@ -37,7 +37,7 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
 
   @override
   Widget build(BuildContext context) {
-    final catalogAsync = ref.watch(catalogSyncProvider);
+    final catalogAsync = ref.watch(petDictionariesSyncProvider);
     final state = ref.watch(petCreateControllerProvider);
     final c = ref.read(petCreateControllerProvider.notifier);
 
@@ -77,7 +77,7 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
         error: (_, __) => Center(
           child: PawlyButton(
             label: 'Повторить загрузку каталога',
-            onPressed: () => ref.invalidate(catalogSyncProvider),
+            onPressed: () => ref.invalidate(petDictionariesSyncProvider),
             fullWidth: false,
           ),
         ),

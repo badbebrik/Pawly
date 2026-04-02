@@ -6,7 +6,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../catalog/data/catalog_cache_models.dart';
-import '../../../catalog/presentation/providers/catalog_providers.dart';
+import '../../../catalog/presentation/providers/pet_dictionaries_providers.dart';
 import 'active_pet_controller.dart';
 import 'pets_controller.dart';
 
@@ -70,7 +70,7 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
             pet: current.pet,
             file: file,
           );
-      final catalog = await ref.read(catalogSyncProvider.future);
+      final catalog = await ref.read(petDictionariesSyncProvider.future);
 
       state = AsyncData(
         current.copyWith(
@@ -131,7 +131,7 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
       await ref.read(petsControllerProvider.notifier).reload();
       return null;
     }
-    final catalog = await ref.read(catalogSyncProvider.future);
+    final catalog = await ref.read(petDictionariesSyncProvider.future);
 
     return ActivePetDetailsState(
       pet: pet,
