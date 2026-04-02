@@ -135,9 +135,5 @@ class ApiEndpoints {
   static const String aclAcceptInviteByToken =
       '/v1/acl/invites/accept-by-token';
 
-  static const String catalogVersion = '/catalog/version';
-  static const String catalogSpecies = '/catalog/species';
-  static const String catalogBreeds = '/catalog/breeds';
-  static const String catalogColors = '/catalog/colors';
-  static const String catalogPatterns = '/catalog/patterns';
+  static const String petDictionaries = '/v1/pet-dictionaries';
 }
