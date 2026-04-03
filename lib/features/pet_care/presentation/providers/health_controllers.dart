@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/models/log_models.dart';
@@ -29,13 +30,17 @@ final petLogComposerBootstrapProvider =
 });
 
 final petAnalyticsMetricsProvider = FutureProvider.autoDispose
-    .family<AnalyticsMetricSummaryListResponse, String>((
+    .family<AnalyticsMetricSummaryListResponse, PetAnalyticsMetricsRef>((
   ref,
-  petId,
+  args,
 ) {
   return ref.read(healthRepositoryProvider).listAnalyticsMetrics(
-        petId,
-        query: const AnalyticsMetricsQuery(),
+        args.petId,
+        query: AnalyticsMetricsQuery(
+          dateFrom: args.dateFrom,
+          dateTo: args.dateTo,
+          typeIds: args.typeIds,
+        ),
       );
 });
 
@@ -44,13 +49,13 @@ final petMetricSeriesProvider = FutureProvider.autoDispose
   ref,
   args,
 ) {
-  final dateRange = _resolveAnalyticsDateRange(args.range);
   return ref.read(healthRepositoryProvider).getMetricSeries(
         args.petId,
         args.metricId,
         query: AnalyticsSeriesQuery(
-          dateFrom: dateRange.dateFrom,
-          dateTo: dateRange.dateTo,
+          dateFrom: args.dateFrom,
+          dateTo: args.dateTo,
+          typeIds: args.typeIds,
         ),
       );
 });
@@ -78,12 +83,16 @@ class PetMetricSeriesRef {
   const PetMetricSeriesRef({
     required this.petId,
     required this.metricId,
-    required this.range,
+    this.dateFrom,
+    this.dateTo,
+    this.typeIds = const <String>[],
   });
 
   final String petId;
   final String metricId;
-  final String range;
+  final String? dateFrom;
+  final String? dateTo;
+  final List<String> typeIds;
 
   @override
   bool operator ==(Object other) {
@@ -91,44 +100,51 @@ class PetMetricSeriesRef {
         other is PetMetricSeriesRef &&
             other.petId == petId &&
             other.metricId == metricId &&
-            other.range == range;
+            other.dateFrom == dateFrom &&
+            other.dateTo == dateTo &&
+            listEquals(other.typeIds, typeIds);
   }
 
   @override
-  int get hashCode => Object.hash(petId, metricId, range);
+  int get hashCode => Object.hash(
+        petId,
+        metricId,
+        dateFrom,
+        dateTo,
+        Object.hashAll(typeIds),
+      );
 }
 
-_AnalyticsDateRange _resolveAnalyticsDateRange(String range) {
-  if (range == 'all') {
-    return const _AnalyticsDateRange();
-  }
-
-  final nowUtc = DateTime.now().toUtc();
-  final duration = switch (range) {
-    '7d' => const Duration(days: 7),
-    '30d' => const Duration(days: 30),
-    '90d' => const Duration(days: 90),
-    _ => null,
-  };
-
-  if (duration == null) {
-    return const _AnalyticsDateRange();
-  }
-
-  return _AnalyticsDateRange(
-    dateFrom: nowUtc.subtract(duration).toIso8601String(),
-    dateTo: nowUtc.toIso8601String(),
-  );
-}
-
-class _AnalyticsDateRange {
-  const _AnalyticsDateRange({
+class PetAnalyticsMetricsRef {
+  const PetAnalyticsMetricsRef({
+    required this.petId,
     this.dateFrom,
     this.dateTo,
+    this.typeIds = const <String>[],
   });
 
+  final String petId;
   final String? dateFrom;
   final String? dateTo;
+  final List<String> typeIds;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PetAnalyticsMetricsRef &&
+            other.petId == petId &&
+            other.dateFrom == dateFrom &&
+            other.dateTo == dateTo &&
+            listEquals(other.typeIds, typeIds);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        petId,
+        dateFrom,
+        dateTo,
+        Object.hashAll(typeIds),
+      );
 }
 
 class PetLogsState {

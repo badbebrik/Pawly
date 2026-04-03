@@ -381,7 +381,7 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
             ),
           );
       ref.invalidate(petLogsControllerProvider(widget.petId));
-      ref.invalidate(petAnalyticsMetricsProvider(widget.petId));
+      ref.invalidate(petAnalyticsMetricsProvider);
       ref.invalidate(
         petLogDetailsControllerProvider(
           PetLogRef(petId: widget.petId, logId: widget.logId),

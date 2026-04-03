@@ -1407,6 +1407,6 @@ Color _statusColor(String status) {
 void _invalidateHealthDerivedData(WidgetRef ref, String petId) {
   ref.invalidate(petHealthHomeProvider(petId));
   ref.invalidate(petLogsControllerProvider(petId));
-  ref.invalidate(petAnalyticsMetricsProvider(petId));
+  ref.invalidate(petAnalyticsMetricsProvider);
   ref.invalidate(petMetricSeriesProvider);
 }

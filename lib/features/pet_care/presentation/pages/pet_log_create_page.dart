@@ -345,7 +345,7 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
           );
 
       ref.invalidate(petLogsControllerProvider(widget.petId));
-      ref.invalidate(petAnalyticsMetricsProvider(widget.petId));
+      ref.invalidate(petAnalyticsMetricsProvider);
 
       if (!mounted) {
         return;

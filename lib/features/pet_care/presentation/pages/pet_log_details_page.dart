@@ -113,7 +113,7 @@ class PetLogDetailsPage extends ConsumerWidget {
             rowVersion: log.rowVersion,
           );
       ref.invalidate(petLogsControllerProvider(petId));
-      ref.invalidate(petAnalyticsMetricsProvider(petId));
+      ref.invalidate(petAnalyticsMetricsProvider);
       ref.invalidate(petLogDetailsControllerProvider(PetLogRef(
         petId: petId,
         logId: logId,

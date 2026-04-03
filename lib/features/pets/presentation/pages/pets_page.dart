@@ -306,21 +306,20 @@ class _PetListCard extends StatelessWidget {
 class _PetAvatar extends StatelessWidget {
   const _PetAvatar({
     required this.photoUrl,
-    this.size = 110,
   });
 
   final String? photoUrl;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
-    final resolvedPhotoUrl = hasPhoto ? _normalizeStorageUrl(photoUrl!) : null;
+    final resolvedPhotoUrl =
+        hasPhoto ? _normalizePetStorageUrl(photoUrl!) : null;
 
     return Container(
-      width: size,
-      height: size,
+      width: 110,
+      height: 110,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: colorScheme.onSurface, width: 2.2),
@@ -337,16 +336,6 @@ class _PetAvatar extends StatelessWidget {
             )
           : _PetAvatarFallback(colorScheme: colorScheme),
     );
-  }
-
-  String _normalizeStorageUrl(String url) {
-    final uri = Uri.tryParse(url);
-    final apiUri = Uri.tryParse(ApiConstants.baseUrl);
-    if (uri == null || apiUri == null || uri.host != 'minio') {
-      return url;
-    }
-
-    return uri.replace(host: apiUri.host).toString();
   }
 }
 
@@ -373,17 +362,20 @@ class _PetFeatureCard extends StatelessWidget {
   const _PetFeatureCard({
     required this.title,
     required this.icon,
+    this.tint,
     this.onTap,
   });
 
   final String title;
   final IconData icon;
+  final Color? tint;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final accent = tint ?? colorScheme.primary;
 
     return Material(
       color: Colors.transparent,
@@ -395,17 +387,38 @@ class _PetFeatureCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: colorScheme.surface,
             borderRadius: BorderRadius.circular(PawlyRadius.xl),
-            border: Border.all(color: colorScheme.outline, width: 1.4),
-            boxShadow: PawlyElevation.soft(colorScheme.shadow),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(icon, size: 28, color: colorScheme.primary),
-              const SizedBox(height: PawlySpacing.sm),
+              Row(
+                children: <Widget>[
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(PawlyRadius.md),
+                    ),
+                    child: Icon(icon, size: 24, color: accent),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_outward_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const Spacer(),
               Text(
                 title,
-                style: theme.textTheme.titleLarge?.copyWith(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -440,76 +453,23 @@ class _ActivePetView extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.all(PawlySpacing.lg),
           children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Stack(
-                  children: <Widget>[
-                    GestureDetector(
-                      onTap: details.isUploadingPhoto
-                          ? null
-                          : () => _showPhotoActionsSheet(context, ref),
-                      child: _PetAvatar(
-                        photoUrl: pet.profilePhotoDownloadUrl,
-                        size: 112,
-                      ),
-                    ),
-                    if (details.isUploadingPhoto)
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.28),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 28,
-                              height: 28,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2.6),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: PawlySpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        pet.name,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      const SizedBox(height: PawlySpacing.xxs),
-                      Text(
-                        '${details.speciesName} · $ageLabel',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: PawlySpacing.sm),
-                IconButton.outlined(
-                  onPressed: () => context.pushNamed(
-                    'petEdit',
-                    pathParameters: {'petId': pet.id},
-                  ),
-                  icon: const Icon(Icons.edit_rounded),
-                  tooltip: 'Редактировать питомца',
-                ),
-              ],
+            _ActivePetHeroCard(
+              pet: pet,
+              speciesName: details.speciesName,
+              ageLabel: ageLabel,
+              isUploadingPhoto: details.isUploadingPhoto,
+              onPhotoTap: details.isUploadingPhoto
+                  ? null
+                  : () => _showPhotoActionsSheet(context, ref),
+              onEdit: () => context.pushNamed(
+                'petEdit',
+                pathParameters: {'petId': pet.id},
+              ),
+              onMore: () => _showActivePetActionsSheet(
+                context,
+                ref,
+                petName: pet.name,
+              ),
             ),
             const SizedBox(height: PawlySpacing.xl),
             GridView.count(
@@ -523,6 +483,7 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Записи',
                   icon: Icons.edit_note_rounded,
+                  tint: Theme.of(context).colorScheme.primary,
                   onTap: () => context.pushNamed(
                     'petLogs',
                     pathParameters: <String, String>{'petId': pet.id},
@@ -531,6 +492,7 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Здоровье',
                   icon: Icons.health_and_safety_rounded,
+                  tint: const Color(0xFF2C9C8C),
                   onTap: () => context.pushNamed(
                     'petHealthHome',
                     pathParameters: <String, String>{'petId': pet.id},
@@ -539,6 +501,7 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Совместный доступ',
                   icon: Icons.group_rounded,
+                  tint: const Color(0xFFB67A2D),
                   onTap: () => context.pushNamed(
                     'aclAccess',
                     pathParameters: <String, String>{'petId': pet.id},
@@ -547,6 +510,7 @@ class _ActivePetView extends ConsumerWidget {
                 _PetFeatureCard(
                   title: 'Аналитика',
                   icon: Icons.bar_chart_rounded,
+                  tint: const Color(0xFF5972D9),
                   onTap: () => context.pushNamed(
                     'petAnalytics',
                     pathParameters: <String, String>{'petId': pet.id},
@@ -554,20 +518,7 @@ class _ActivePetView extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: PawlySpacing.lg),
-            PawlyButton(
-              label: 'Архивировать питомца',
-              onPressed: () => _archiveActivePet(context, ref, pet.name),
-              variant: PawlyButtonVariant.secondary,
-              icon: Icons.archive_outlined,
-            ),
-            const SizedBox(height: PawlySpacing.sm),
-            PawlyButton(
-              label: 'Сменить питомца',
-              onPressed: () =>
-                  ref.read(activePetControllerProvider.notifier).clear(),
-              variant: PawlyButtonVariant.secondary,
-            ),
+            const SizedBox(height: PawlySpacing.xl),
           ],
         );
       },
@@ -579,6 +530,215 @@ class _ActivePetView extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _ActivePetHeroCard extends StatelessWidget {
+  const _ActivePetHeroCard({
+    required this.pet,
+    required this.speciesName,
+    required this.ageLabel,
+    required this.isUploadingPhoto,
+    this.onPhotoTap,
+    required this.onEdit,
+    required this.onMore,
+  });
+
+  final Pet pet;
+  final String speciesName;
+  final String ageLabel;
+  final bool isUploadingPhoto;
+  final VoidCallback? onPhotoTap;
+  final VoidCallback onEdit;
+  final VoidCallback onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.045),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _HeroPetAvatar(
+              photoUrl: pet.profilePhotoDownloadUrl,
+              isUploadingPhoto: isUploadingPhoto,
+              onTap: onPhotoTap,
+            ),
+            const SizedBox(width: PawlySpacing.md),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: PawlySpacing.xs),
+                child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      pet.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      '$speciesName · $ageLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: PawlySpacing.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                _HeroCompactActionButton(
+                  onPressed: onEdit,
+                  icon: Icons.edit_rounded,
+                  tooltip: 'Редактировать питомца',
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                _HeroCompactActionButton(
+                  onPressed: onMore,
+                  icon: Icons.more_horiz_rounded,
+                  tooltip: 'Действия',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroPetAvatar extends StatelessWidget {
+  const _HeroPetAvatar({
+    required this.photoUrl,
+    required this.isUploadingPhoto,
+    this.onTap,
+  });
+
+  final String? photoUrl;
+  final bool isUploadingPhoto;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
+    final resolvedPhotoUrl =
+        hasPhoto ? _normalizePetStorageUrl(photoUrl!) : null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 108,
+        height: 108,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: colorScheme.surface,
+        ),
+        child: ClipOval(
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (hasPhoto)
+                CachedNetworkImage(
+                  imageUrl: resolvedPhotoUrl!,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) =>
+                      _PetAvatarFallback(colorScheme: colorScheme),
+                )
+              else
+                _PetAvatarFallback(colorScheme: colorScheme),
+              if (isUploadingPhoto)
+                Container(
+                  color: Colors.black.withValues(alpha: 0.30),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.6),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroCompactActionButton extends StatelessWidget {
+  const _HeroCompactActionButton({
+    required this.onPressed,
+    required this.icon,
+    required this.tooltip,
+  });
+
+  final VoidCallback onPressed;
+  final IconData icon;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: 38,
+        height: 38,
+        child: IconButton(
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          style: IconButton.styleFrom(
+            backgroundColor: colorScheme.surface,
+            foregroundColor: colorScheme.onSurfaceVariant,
+            side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          iconSize: 18,
+          icon: Icon(icon),
+        ),
+      ),
+    );
+  }
+}
+
+String _normalizePetStorageUrl(String url) {
+  final uri = Uri.tryParse(url);
+  final apiUri = Uri.tryParse(ApiConstants.baseUrl);
+  if (uri == null || apiUri == null || uri.host != 'minio') {
+    return url;
+  }
+
+  return uri.replace(host: apiUri.host).toString();
 }
 
 Future<void> _archiveActivePet(
@@ -632,6 +792,54 @@ Future<void> _archiveActivePet(
       );
     }
   }
+}
+
+Future<void> _showActivePetActionsSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  required String petName,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(PawlyRadius.xl)),
+    ),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PawlySpacing.md,
+            PawlySpacing.md,
+            PawlySpacing.md,
+            PawlySpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.swap_horiz_rounded),
+                title: const Text('Сменить питомца'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await ref.read(activePetControllerProvider.notifier).clear();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                iconColor: Theme.of(context).colorScheme.error,
+                textColor: Theme.of(context).colorScheme.error,
+                title: const Text('Архивировать питомца'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await _archiveActivePet(context, ref, petName);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 Future<void> _restorePetFromArchive(
