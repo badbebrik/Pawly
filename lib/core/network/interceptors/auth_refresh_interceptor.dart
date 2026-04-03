@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:dio/dio.dart';
 
 import '../api_context.dart';
@@ -31,6 +33,12 @@ class AuthRefreshInterceptor extends Interceptor {
     final skipRefresh =
         err.requestOptions.extra[ApiContextKeys.skipTokenRefresh] == true;
 
+    _logBootstrap401(
+      err,
+      requiresToken: requiresToken,
+      skipRefresh: skipRefresh,
+    );
+
     if (responseStatus != 401 || !requiresToken || skipRefresh) {
       return handler.next(err);
     }
@@ -61,6 +69,9 @@ class AuthRefreshInterceptor extends Interceptor {
         extra: Map<String, dynamic>.from(requestOptions.extra)
           ..[ApiContextKeys.skipTokenRefresh] = true,
       );
+
+      _logBootstrapRetry(
+          requestOptions, options.headers ?? const <String, dynamic>{});
 
       final response = await _dio.request<Object?>(
         requestOptions.path,
@@ -106,5 +117,63 @@ class AuthRefreshInterceptor extends Interceptor {
     } on FormatException {
       return false;
     }
+  }
+
+  void _logBootstrap401(
+    DioException err, {
+    required bool requiresToken,
+    required bool skipRefresh,
+  }) {
+    final requestOptions = err.requestOptions;
+    if (!_isLogsBootstrapRequest(requestOptions.path)) {
+      return;
+    }
+
+    final authorization = requestOptions.headers['Authorization']?.toString();
+    final userId = requestOptions.headers['X-User-ID']?.toString();
+    debugPrint(
+      '[HealthBootstrap][onError] status=${err.response?.statusCode} '
+      'path=${requestOptions.path} '
+      'requiresToken=$requiresToken '
+      'skipRefresh=$skipRefresh '
+      'authHeader=${authorization != null} '
+      'authBearer=${authorization?.startsWith('Bearer ') == true} '
+      'authPreview=${_maskAuthorization(authorization)} '
+      'xUserIdHeader=${userId != null && userId.isNotEmpty} '
+      'error=${err.response?.data ?? err.error}',
+    );
+  }
+
+  void _logBootstrapRetry(
+    RequestOptions requestOptions,
+    Map<String, dynamic> headers,
+  ) {
+    if (!_isLogsBootstrapRequest(requestOptions.path)) {
+      return;
+    }
+
+    final authorization = headers['Authorization']?.toString();
+    debugPrint(
+      '[HealthBootstrap][retry] ${requestOptions.method} ${requestOptions.path} '
+      'authHeader=${authorization != null} '
+      'authBearer=${authorization?.startsWith('Bearer ') == true} '
+      'authPreview=${_maskAuthorization(authorization)} '
+      'headerKeys=${headers.keys.toList()}',
+    );
+  }
+
+  bool _isLogsBootstrapRequest(String path) => path.contains('/logs/bootstrap');
+
+  String _maskAuthorization(String? authorization) {
+    if (authorization == null || authorization.isEmpty) {
+      return '<none>';
+    }
+    if (!authorization.startsWith('Bearer ')) {
+      return authorization;
+    }
+
+    final token = authorization.substring('Bearer '.length);
+    final visible = token.length <= 10 ? token : '${token.substring(0, 10)}...';
+    return 'Bearer $visible';
   }
 }

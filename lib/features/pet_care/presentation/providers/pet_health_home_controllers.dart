@@ -42,7 +42,15 @@ final petHealthHomeProvider = FutureProvider.autoDispose
       petId,
       query: const MedicalRecordListQuery(
         limit: 20,
-        bucket: 'all',
+        bucket: 'active',
+        sort: 'updated_at_desc',
+      ),
+    ),
+    healthRepository.listMedicalRecords(
+      petId,
+      query: const MedicalRecordListQuery(
+        limit: 20,
+        bucket: 'archive',
         sort: 'updated_at_desc',
       ),
     ),
@@ -53,7 +61,8 @@ final petHealthHomeProvider = FutureProvider.autoDispose
   final vetVisits = results[2] as VetVisitListResponse;
   final vaccinations = results[3] as VaccinationListResponse;
   final procedures = results[4] as ProcedureListResponse;
-  final medicalRecords = results[5] as MedicalRecordListResponse;
+  final activeMedicalRecords = results[5] as MedicalRecordListResponse;
+  final archiveMedicalRecords = results[6] as MedicalRecordListResponse;
 
   return PetHealthHomeState(
     petName: pet.name,
@@ -80,9 +89,11 @@ final petHealthHomeProvider = FutureProvider.autoDispose
       ),
       PetHealthHomeSectionState(
         type: PetHealthSectionType.medicalRecords,
-        countLabel: _countLabel(
-          medicalRecords.items.length,
-          medicalRecords.nextCursor,
+        countLabel: _combinedCountLabel(
+          activeMedicalRecords.items.length +
+              archiveMedicalRecords.items.length,
+          hasMore: _hasNextPage(activeMedicalRecords.nextCursor) ||
+              _hasNextPage(archiveMedicalRecords.nextCursor),
         ),
       ),
     ],
@@ -121,15 +132,23 @@ class PetHealthHomeSectionState {
 }
 
 String _countLabel(int count, String? nextCursor) {
+  return _combinedCountLabel(count, hasMore: _hasNextPage(nextCursor));
+}
+
+String _combinedCountLabel(int count, {required bool hasMore}) {
   if (count == 0) {
     return 'Пока пусто';
   }
 
-  if (nextCursor != null && nextCursor.isNotEmpty) {
-    return '20+ записей';
+  if (hasMore) {
+    return '$count+ ${_recordsWord(count)}';
   }
 
   return '$count ${_recordsWord(count)}';
+}
+
+bool _hasNextPage(String? nextCursor) {
+  return nextCursor != null && nextCursor.isNotEmpty;
 }
 
 String _recordsWord(int value) {

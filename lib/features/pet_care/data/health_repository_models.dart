@@ -100,6 +100,24 @@ class UpsertMetricInput {
   final double? maxValue;
 }
 
+class AnalyticsMetricsQuery {
+  const AnalyticsMetricsQuery({
+    this.query,
+    this.dateFrom,
+    this.dateTo,
+    this.source,
+    this.typeIds = const <String>[],
+    this.limit,
+  });
+
+  final String? query;
+  final String? dateFrom;
+  final String? dateTo;
+  final String? source;
+  final List<String> typeIds;
+  final int? limit;
+}
+
 class UpdateMetricInput extends UpsertMetricInput {
   const UpdateMetricInput({
     required super.name,
@@ -115,7 +133,6 @@ class UpdateMetricInput extends UpsertMetricInput {
 
 class AnalyticsSeriesQuery {
   const AnalyticsSeriesQuery({
-    this.range,
     this.dateFrom,
     this.dateTo,
     this.source,
@@ -124,7 +141,6 @@ class AnalyticsSeriesQuery {
     this.includeSummary = true,
   });
 
-  final String? range;
   final String? dateFrom;
   final String? dateTo;
   final String? source;

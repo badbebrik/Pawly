@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/health_repository_models.dart';
+import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_procedures_controller.dart';
 
@@ -83,7 +84,7 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
       await ref
           .read(petProceduresControllerProvider(widget.petId).notifier)
           .createProcedure(input: input);
-      ref.invalidate(petHealthHomeProvider(widget.petId));
+      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Процедура сохранена.')),
@@ -483,7 +484,7 @@ class _ProcedureComposerSheetState extends State<_ProcedureComposerSheet> {
                 ),
                 const SizedBox(height: PawlySpacing.md),
                 DropdownButtonFormField<String>(
-                  value: _procedureType,
+                  initialValue: _procedureType,
                   decoration: const InputDecoration(labelText: 'Тип процедуры'),
                   items: widget.allowedTypes
                       .map(
@@ -739,7 +740,7 @@ class PetProcedureDetailsPage extends ConsumerWidget {
           PetProcedureRef(petId: petId, procedureId: procedureId),
         ),
       );
-      ref.invalidate(petHealthHomeProvider(petId));
+      _invalidateHealthDerivedData(ref, petId);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Изменения сохранены.')),
@@ -795,7 +796,7 @@ class PetProcedureDetailsPage extends ConsumerWidget {
           PetProcedureRef(petId: petId, procedureId: procedureId),
         ),
       );
-      ref.invalidate(petHealthHomeProvider(petId));
+      _invalidateHealthDerivedData(ref, petId);
       if (!context.mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -1105,4 +1106,11 @@ String _procedureTypeLabel(String type) {
     'OTHER' => 'Другое',
     _ => type,
   };
+}
+
+void _invalidateHealthDerivedData(WidgetRef ref, String petId) {
+  ref.invalidate(petHealthHomeProvider(petId));
+  ref.invalidate(petLogsControllerProvider(petId));
+  ref.invalidate(petAnalyticsMetricsProvider(petId));
+  ref.invalidate(petMetricSeriesProvider);
 }

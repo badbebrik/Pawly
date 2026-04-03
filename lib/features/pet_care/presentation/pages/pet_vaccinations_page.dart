@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/health_repository_models.dart';
+import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_vaccinations_controller.dart';
 
@@ -86,7 +87,7 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
       await ref
           .read(petVaccinationsControllerProvider(widget.petId).notifier)
           .createVaccination(input: input);
-      ref.invalidate(petHealthHomeProvider(widget.petId));
+      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
@@ -126,7 +127,7 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
             vaccinationId: card.id,
             administeredAt: administeredAt,
           );
-      ref.invalidate(petHealthHomeProvider(widget.petId));
+      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
@@ -154,7 +155,7 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
             vaccination: updated,
             nextDueAt: nextDueAt,
           );
-      ref.invalidate(petHealthHomeProvider(widget.petId));
+      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
@@ -411,10 +412,11 @@ class _VaccinationListCard extends StatelessWidget {
                   tone: _statusTone(item.status),
                 ),
                 const SizedBox(height: PawlySpacing.sm),
-                if (_primaryDateLabel(item) case final dateLabel?) _InfoLine(
-                  icon: Icons.event_rounded,
-                  text: dateLabel,
-                ),
+                if (_primaryDateLabel(item) case final dateLabel?)
+                  _InfoLine(
+                    icon: Icons.event_rounded,
+                    text: dateLabel,
+                  ),
                 if ((item.clinicName ?? '').trim().isNotEmpty) ...<Widget>[
                   const SizedBox(height: PawlySpacing.xs),
                   _InfoLine(
@@ -1021,7 +1023,7 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
           PetVaccinationRef(petId: petId, vaccinationId: vaccinationId),
         ),
       );
-      ref.invalidate(petHealthHomeProvider(petId));
+      _invalidateHealthDerivedData(ref, petId);
       if (!context.mounted) {
         return;
       }
@@ -1083,7 +1085,7 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
           PetVaccinationRef(petId: petId, vaccinationId: vaccinationId),
         ),
       );
-      ref.invalidate(petHealthHomeProvider(petId));
+      _invalidateHealthDerivedData(ref, petId);
       if (!context.mounted) {
         return;
       }
@@ -1163,29 +1165,29 @@ class _VaccinationDetailsView extends StatelessWidget {
               children: <Widget>[
                 if (_dateValue(vaccination.scheduledAt) case final value?)
                   _DetailsRow(
-                  label: 'План',
-                  value: value,
-                ),
+                    label: 'План',
+                    value: value,
+                  ),
                 if (_dateValue(vaccination.administeredAt) case final value?)
                   _DetailsRow(
-                  label: 'Выполнено',
-                  value: value,
-                ),
+                    label: 'Выполнено',
+                    value: value,
+                  ),
                 if (_dateValue(vaccination.nextDueAt) case final value?)
                   _DetailsRow(
-                  label: 'Ревакцинация',
-                  value: value,
-                ),
+                    label: 'Ревакцинация',
+                    value: value,
+                  ),
                 if (_textValue(vaccination.clinicName) case final value?)
                   _DetailsRow(
-                  label: 'Клиника',
-                  value: value,
-                ),
+                    label: 'Клиника',
+                    value: value,
+                  ),
                 if (_textValue(vaccination.vetName) case final value?)
                   _DetailsRow(
-                  label: 'Врач',
-                  value: value,
-                ),
+                    label: 'Врач',
+                    value: value,
+                  ),
               ],
             ),
           ),
@@ -1400,4 +1402,11 @@ Color _statusColor(String status) {
     'CANCELLED' => const Color(0xFFE5A33A),
     _ => const Color(0xFF94A3B8),
   };
+}
+
+void _invalidateHealthDerivedData(WidgetRef ref, String petId) {
+  ref.invalidate(petHealthHomeProvider(petId));
+  ref.invalidate(petLogsControllerProvider(petId));
+  ref.invalidate(petAnalyticsMetricsProvider(petId));
+  ref.invalidate(petMetricSeriesProvider);
 }

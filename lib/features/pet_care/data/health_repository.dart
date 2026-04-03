@@ -211,17 +211,16 @@ class HealthRepository {
 
   Future<AnalyticsMetricSummaryListResponse> listAnalyticsMetrics(
     String petId, {
-    String? query,
-    String? range,
-    String? source,
-    int? limit,
+    AnalyticsMetricsQuery query = const AnalyticsMetricsQuery(),
   }) {
     return _healthApiClient.listAnalyticsMetrics(
       petId,
-      query: query,
-      range: range,
-      source: source,
-      limit: limit,
+      query: query.query,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      source: query.source,
+      typeIds: query.typeIds,
+      limit: query.limit,
     );
   }
 
@@ -233,7 +232,6 @@ class HealthRepository {
     return _healthApiClient.getMetricSeries(
       petId,
       metricId,
-      range: query.range,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
       source: query.source,

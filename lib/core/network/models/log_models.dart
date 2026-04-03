@@ -22,7 +22,7 @@ class LogMetricValue {
       metricId: asString(json['metric_id']),
       metricName: asString(json['metric_name']),
       inputKind: asString(json['input_kind']),
-      unitCode: asNullableString(json['unit_code']),
+      unitCode: _readNullableString(json, 'unit', fallbackKey: 'unit_code'),
       valueNum: (json['value_num'] as num?)?.toDouble() ?? 0,
     );
   }
@@ -118,8 +118,16 @@ class LogCard {
       logTypeScope: asNullableString(json['log_type_scope']),
       descriptionPreview: asString(json['description_preview']),
       source: asString(json['source']),
-      sourceEntityType: asNullableString(json['source_entity_type']),
-      sourceEntityId: asNullableString(json['source_entity_id']),
+      sourceEntityType: _readNullableString(
+        json,
+        'related_entity_type',
+        fallbackKey: 'source_entity_type',
+      ),
+      sourceEntityId: _readNullableString(
+        json,
+        'related_entity_id',
+        fallbackKey: 'source_entity_id',
+      ),
       sourceLabel: asNullableString(json['source_label']),
       metricValuesPreview: rawMetricValues is List
           ? rawMetricValues.map(LogMetricValue.fromJson).toList(growable: false)
@@ -127,7 +135,11 @@ class LogCard {
       attachmentsCount: asInt(json['attachments_count']),
       hasAttachments: asBool(json['has_attachments']),
       createdByUserId: asString(json['created_by_user_id']),
-      createdByDisplayName: asString(json['created_by_display_name']),
+      createdByDisplayName: _displayNameOrUserId(
+        json,
+        displayNameKey: 'created_by_display_name',
+        userIdKey: 'created_by_user_id',
+      ),
     );
   }
 }
@@ -194,8 +206,16 @@ class LogEntry {
       logTypeScope: asNullableString(json['log_type_scope']),
       description: asString(json['description']),
       source: asString(json['source']),
-      sourceEntityType: asNullableString(json['source_entity_type']),
-      sourceEntityId: asNullableString(json['source_entity_id']),
+      sourceEntityType: _readNullableString(
+        json,
+        'related_entity_type',
+        fallbackKey: 'source_entity_type',
+      ),
+      sourceEntityId: _readNullableString(
+        json,
+        'related_entity_id',
+        fallbackKey: 'source_entity_id',
+      ),
       sourceLabel: asNullableString(json['source_label']),
       metricValues: rawMetricValues is List
           ? rawMetricValues.map(LogMetricValue.fromJson).toList(growable: false)
@@ -206,10 +226,18 @@ class LogEntry {
       rowVersion: asInt(json['row_version']),
       createdAt: asDateTime(json['created_at']),
       createdByUserId: asString(json['created_by_user_id']),
-      createdByDisplayName: asString(json['created_by_display_name']),
+      createdByDisplayName: _displayNameOrUserId(
+        json,
+        displayNameKey: 'created_by_display_name',
+        userIdKey: 'created_by_user_id',
+      ),
       updatedAt: asDateTime(json['updated_at']),
       updatedByUserId: asString(json['updated_by_user_id']),
-      updatedByDisplayName: asString(json['updated_by_display_name']),
+      updatedByDisplayName: _displayNameOrUserId(
+        json,
+        displayNameKey: 'updated_by_display_name',
+        userIdKey: 'updated_by_user_id',
+      ),
       canEdit: asBool(json['can_edit']),
       canDelete: asBool(json['can_delete']),
     );
@@ -241,10 +269,10 @@ class LogTypeMetricRequirement {
     final json = asJsonMap(data);
     return LogTypeMetricRequirement(
       metricId: asString(json['metric_id']),
-      metricName: asString(json['metric_name']),
-      metricScope: asString(json['metric_scope']),
-      inputKind: asString(json['input_kind']),
-      unitCode: asNullableString(json['unit_code']),
+      metricName: asNullableString(json['metric_name']) ?? '',
+      metricScope: asNullableString(json['metric_scope']) ?? '',
+      inputKind: asNullableString(json['input_kind']) ?? '',
+      unitCode: _readNullableString(json, 'unit', fallbackKey: 'unit_code'),
       minValue: (json['min_value'] as num?)?.toDouble(),
       maxValue: (json['max_value'] as num?)?.toDouble(),
       isRequired: asBool(json['is_required']),
@@ -264,6 +292,7 @@ class LogType {
     this.createdByUserId,
     this.updatedAt,
     this.updatedByUserId,
+    this.rowVersion,
     required this.isArchived,
   });
 
@@ -277,6 +306,7 @@ class LogType {
   final String? createdByUserId;
   final DateTime? updatedAt;
   final String? updatedByUserId;
+  final int? rowVersion;
   final bool isArchived;
 
   factory LogType.fromJson(Object? data) {
@@ -297,6 +327,7 @@ class LogType {
       createdByUserId: asNullableString(json['created_by_user_id']),
       updatedAt: asDateTime(json['updated_at']),
       updatedByUserId: asNullableString(json['updated_by_user_id']),
+      rowVersion: (json['row_version'] as num?)?.toInt(),
       isArchived: asBool(json['is_archived']),
     );
   }
@@ -335,6 +366,7 @@ class Metric {
     this.createdByUserId,
     this.updatedAt,
     this.updatedByUserId,
+    this.rowVersion,
     required this.isArchived,
     this.usage,
   });
@@ -352,6 +384,7 @@ class Metric {
   final String? createdByUserId;
   final DateTime? updatedAt;
   final String? updatedByUserId;
+  final int? rowVersion;
   final bool isArchived;
   final MetricUsage? usage;
 
@@ -364,13 +397,14 @@ class Metric {
       code: asNullableString(json['code']),
       name: asString(json['name']),
       inputKind: asString(json['input_kind']),
-      unitCode: asNullableString(json['unit_code']),
+      unitCode: _readNullableString(json, 'unit', fallbackKey: 'unit_code'),
       minValue: (json['min_value'] as num?)?.toDouble(),
       maxValue: (json['max_value'] as num?)?.toDouble(),
       createdAt: asDateTime(json['created_at']),
       createdByUserId: asNullableString(json['created_by_user_id']),
       updatedAt: asDateTime(json['updated_at']),
       updatedByUserId: asNullableString(json['updated_by_user_id']),
+      rowVersion: (json['row_version'] as num?)?.toInt(),
       isArchived: asBool(json['is_archived']),
       usage: json['usage'] == null ? null : MetricUsage.fromJson(json['usage']),
     );
@@ -468,7 +502,9 @@ class LogListResponse {
           ? rawItems.map(LogCard.fromJson).toList(growable: false)
           : const <LogCard>[],
       nextCursor: asNullableString(json['next_cursor']),
-      facets: json['facets'] == null ? null : LogListFacets.fromJson(json['facets']),
+      facets: json['facets'] == null
+          ? null
+          : LogListFacets.fromJson(json['facets']),
     );
   }
 }
@@ -583,7 +619,8 @@ class UpsertLogPayload {
         'occurred_at': occurredAt.toUtc().toIso8601String(),
         'log_type_id': logTypeId,
         'description': description,
-        'metric_values': metricValues.map((item) => item.toJson()).toList(growable: false),
+        'metric_values':
+            metricValues.map((item) => item.toJson()).toList(growable: false),
         'attachment_file_ids': attachmentFileIds,
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
@@ -608,8 +645,9 @@ class CreateLogTypePayload {
 
   JsonMap toJson() => <String, dynamic>{
         'name': name,
-        'metric_requirements':
-            metricRequirements.map((item) => item.toJson()).toList(growable: false),
+        'metric_requirements': metricRequirements
+            .map((item) => item.toJson())
+            .toList(growable: false),
       };
 }
 
@@ -647,7 +685,7 @@ class CreateMetricPayload {
   JsonMap toJson() => <String, dynamic>{
         'name': name,
         'input_kind': inputKind,
-        'unit_code': unitCode,
+        'unit': unitCode,
         'min_value': minValue,
         'max_value': maxValue,
       }..removeWhere((_, dynamic value) => value == null);
@@ -731,7 +769,7 @@ class AnalyticsMetricSummary {
       metricName: asString(json['metric_name']),
       metricScope: asString(json['metric_scope']),
       inputKind: asString(json['input_kind']),
-      unitCode: asNullableString(json['unit_code']),
+      unitCode: _readNullableString(json, 'unit', fallbackKey: 'unit_code'),
       pointsCount: asInt(json['points_count']),
       firstOccurredAt: asDateTime(json['first_occurred_at']),
       lastOccurredAt: asDateTime(json['last_occurred_at']),
@@ -863,4 +901,29 @@ List<Metric> _decodeMetricList(Object? data) {
     return const <Metric>[];
   }
   return data.map(Metric.fromJson).toList(growable: false);
+}
+
+String? _readNullableString(
+  JsonMap json,
+  String key, {
+  String? fallbackKey,
+}) {
+  final value = asNullableString(json[key]);
+  if (value != null) {
+    return value;
+  }
+  if (fallbackKey == null) {
+    return null;
+  }
+  return asNullableString(json[fallbackKey]);
+}
+
+String _displayNameOrUserId(
+  JsonMap json, {
+  required String displayNameKey,
+  required String userIdKey,
+}) {
+  return asNullableString(json[displayNameKey]) ??
+      asNullableString(json[userIdKey]) ??
+      '';
 }

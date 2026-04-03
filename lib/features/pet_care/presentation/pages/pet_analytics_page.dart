@@ -74,7 +74,7 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
       padding: const EdgeInsets.all(PawlySpacing.lg),
       children: <Widget>[
         DropdownButtonFormField<String>(
-          value: selectedMetric.metricId,
+          initialValue: selectedMetric.metricId,
           items: metrics
               .map(
                 (metric) => DropdownMenuItem<String>(
@@ -139,6 +139,7 @@ class _AnalyticsMetricView extends StatelessWidget {
   Widget build(BuildContext context) {
     final summary = series.summary;
     final unit = series.metric.unitCode;
+    final inputKind = series.metric.inputKind;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,6 +172,12 @@ class _AnalyticsMetricView extends StatelessWidget {
                                 Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
+                  Text(
+                    'Тип метрики: ${_metricKindLabel(inputKind)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
                 ],
               ),
               const SizedBox(height: PawlySpacing.md),
@@ -180,6 +187,7 @@ class _AnalyticsMetricView extends StatelessWidget {
                     ? const Center(child: Text('Нет данных для графика.'))
                     : _MetricLineChart(
                         points: series.points,
+                        inputKind: inputKind,
                         unit: unit,
                       ),
               ),
@@ -197,16 +205,16 @@ class _AnalyticsMetricView extends StatelessWidget {
           children: <Widget>[
             _SummaryCard(
                 title: 'Последнее',
-                value: _formatValue(summary?.lastValueNum, unit)),
+                value: _formatValue(summary?.lastValueNum, inputKind, unit)),
             _SummaryCard(
                 title: 'Минимум',
-                value: _formatValue(summary?.minValueNum, unit)),
+                value: _formatValue(summary?.minValueNum, inputKind, unit)),
             _SummaryCard(
                 title: 'Максимум',
-                value: _formatValue(summary?.maxValueNum, unit)),
+                value: _formatValue(summary?.maxValueNum, inputKind, unit)),
             _SummaryCard(
                 title: 'Среднее',
-                value: _formatValue(summary?.avgValueNum, unit)),
+                value: _formatValue(summary?.avgValueNum, inputKind, unit)),
           ],
         ),
       ],
@@ -252,16 +260,19 @@ class _SummaryCard extends StatelessWidget {
 class _MetricLineChart extends StatelessWidget {
   const _MetricLineChart({
     required this.points,
+    required this.inputKind,
     required this.unit,
   });
 
   final List<MetricSeriesPoint> points;
+  final String inputKind;
   final String? unit;
 
   @override
   Widget build(BuildContext context) {
     return _InteractiveMetricLineChart(
       points: points,
+      inputKind: inputKind,
       unit: unit,
       color: Theme.of(context).colorScheme.primary,
     );
@@ -271,11 +282,13 @@ class _MetricLineChart extends StatelessWidget {
 class _InteractiveMetricLineChart extends StatefulWidget {
   const _InteractiveMetricLineChart({
     required this.points,
+    required this.inputKind,
     required this.unit,
     required this.color,
   });
 
   final List<MetricSeriesPoint> points;
+  final String inputKind;
   final String? unit;
   final Color color;
 
@@ -328,7 +341,11 @@ class _InteractiveMetricLineChartState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        _formatValue(selectedPoint.valueNum, widget.unit),
+                        _formatValue(
+                          selectedPoint.valueNum,
+                          widget.inputKind,
+                          widget.unit,
+                        ),
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -391,14 +408,22 @@ class _InteractiveMetricLineChartState
                           top: 0,
                           left: 0,
                           child: _AxisLabel(
-                            label: _formatValue(geometry.maxValue, widget.unit),
+                            label: _formatValue(
+                              geometry.maxValue,
+                              widget.inputKind,
+                              widget.unit,
+                            ),
                           ),
                         ),
                         Positioned(
                           bottom: 16,
                           left: 0,
                           child: _AxisLabel(
-                            label: _formatValue(geometry.minValue, widget.unit),
+                            label: _formatValue(
+                              geometry.minValue,
+                              widget.inputKind,
+                              widget.unit,
+                            ),
                           ),
                         ),
                         if (_selectedIndex != null)
@@ -694,9 +719,21 @@ String _rangeLabel(String range) {
   }
 }
 
-String _formatValue(double? value, String? unit) {
+String _metricKindLabel(String inputKind) {
+  return switch (inputKind) {
+    'NUMERIC' => 'Число',
+    'SCALE' => 'Шкала',
+    'BOOLEAN' => 'Да / Нет',
+    _ => inputKind,
+  };
+}
+
+String _formatValue(double? value, String inputKind, String? unit) {
   if (value == null) {
     return '—';
+  }
+  if (inputKind == 'BOOLEAN') {
+    return value == 0 ? 'Нет' : 'Да';
   }
   final number =
       value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
@@ -710,8 +747,9 @@ String _formatAxisDate(DateTime? value) {
   if (value == null) {
     return '—';
   }
-  final day = value.day.toString().padLeft(2, '0');
-  final month = value.month.toString().padLeft(2, '0');
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
   return '$day.$month';
 }
 
@@ -724,9 +762,10 @@ String _formatPointSubtitle(MetricSeriesPoint point) {
 }
 
 String _formatPointDateTime(DateTime value) {
-  final day = value.day.toString().padLeft(2, '0');
-  final month = value.month.toString().padLeft(2, '0');
-  final hour = value.hour.toString().padLeft(2, '0');
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$day.$month.${value.year} $hour:$minute';
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.${local.year} $hour:$minute';
 }

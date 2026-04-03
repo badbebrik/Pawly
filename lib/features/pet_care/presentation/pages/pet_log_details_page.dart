@@ -113,6 +113,7 @@ class PetLogDetailsPage extends ConsumerWidget {
             rowVersion: log.rowVersion,
           );
       ref.invalidate(petLogsControllerProvider(petId));
+      ref.invalidate(petAnalyticsMetricsProvider(petId));
       ref.invalidate(petLogDetailsControllerProvider(PetLogRef(
         petId: petId,
         logId: logId,
@@ -195,8 +196,17 @@ class _PetLogDetailsView extends StatelessWidget {
                   Text(
                     log.sourceLabel!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ] else if (_relatedEntityLabel(log)
+                    case final relatedLabel?) ...[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Text(
+                    relatedLabel,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                 ],
                 if (!canMutate) ...<Widget>[
@@ -321,8 +331,8 @@ class _MetaRow extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ),
           Text(value),
@@ -372,20 +382,39 @@ String _formatOccurredAt(DateTime? value) {
     return 'Не указано';
   }
 
-  final day = value.day.toString().padLeft(2, '0');
-  final month = value.month.toString().padLeft(2, '0');
-  final hour = value.hour.toString().padLeft(2, '0');
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$day.$month.${value.year} $hour:$minute';
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.${local.year} $hour:$minute';
 }
 
 String _formatMetricValue(LogMetricValue value) {
+  if (value.inputKind == 'BOOLEAN') {
+    return value.valueNum == 0 ? 'Нет' : 'Да';
+  }
   final number = value.valueNum % 1 == 0
       ? value.valueNum.toStringAsFixed(0)
       : value.valueNum.toStringAsFixed(1);
   return value.unitCode == null || value.unitCode!.isEmpty
       ? number
       : '$number ${value.unitCode}';
+}
+
+String? _relatedEntityLabel(LogEntry log) {
+  final relatedType = log.sourceEntityType;
+  if (relatedType == null || relatedType.isEmpty) {
+    return null;
+  }
+
+  final label = switch (relatedType) {
+    'VACCINATION' => 'Связано с вакцинацией',
+    'PROCEDURE' => 'Связано с процедурой',
+    'VET_VISIT' => 'Связано с визитом',
+    _ => 'Связано: $relatedType',
+  };
+  return label;
 }
 
 String _attachmentSubtitle(LogAttachment attachment) {

@@ -22,31 +22,38 @@ final petLogDetailsControllerProvider = AsyncNotifierProvider.autoDispose
 
 final petLogComposerBootstrapProvider =
     FutureProvider.autoDispose.family<LogComposerBootstrapResponse, String>((
-      ref,
-      petId,
-    ) {
-      return ref.read(healthRepositoryProvider).getLogsBootstrap(petId);
-    });
+  ref,
+  petId,
+) {
+  return ref.read(healthRepositoryProvider).getLogsBootstrap(petId);
+});
 
-final petAnalyticsMetricsProvider =
-    FutureProvider.autoDispose.family<AnalyticsMetricSummaryListResponse, String>((
-      ref,
-      petId,
-    ) {
-      return ref.read(healthRepositoryProvider).listAnalyticsMetrics(petId);
-    });
+final petAnalyticsMetricsProvider = FutureProvider.autoDispose
+    .family<AnalyticsMetricSummaryListResponse, String>((
+  ref,
+  petId,
+) {
+  return ref.read(healthRepositoryProvider).listAnalyticsMetrics(
+        petId,
+        query: const AnalyticsMetricsQuery(),
+      );
+});
 
-final petMetricSeriesProvider =
-    FutureProvider.autoDispose.family<MetricSeriesResponse, PetMetricSeriesRef>((
-      ref,
-      args,
-    ) {
-      return ref.read(healthRepositoryProvider).getMetricSeries(
-            args.petId,
-            args.metricId,
-            query: AnalyticsSeriesQuery(range: args.range),
-          );
-    });
+final petMetricSeriesProvider = FutureProvider.autoDispose
+    .family<MetricSeriesResponse, PetMetricSeriesRef>((
+  ref,
+  args,
+) {
+  final dateRange = _resolveAnalyticsDateRange(args.range);
+  return ref.read(healthRepositoryProvider).getMetricSeries(
+        args.petId,
+        args.metricId,
+        query: AnalyticsSeriesQuery(
+          dateFrom: dateRange.dateFrom,
+          dateTo: dateRange.dateTo,
+        ),
+      );
+});
 
 class PetLogRef {
   const PetLogRef({
@@ -60,9 +67,7 @@ class PetLogRef {
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is PetLogRef &&
-            other.petId == petId &&
-            other.logId == logId;
+        other is PetLogRef && other.petId == petId && other.logId == logId;
   }
 
   @override
@@ -91,6 +96,39 @@ class PetMetricSeriesRef {
 
   @override
   int get hashCode => Object.hash(petId, metricId, range);
+}
+
+_AnalyticsDateRange _resolveAnalyticsDateRange(String range) {
+  if (range == 'all') {
+    return const _AnalyticsDateRange();
+  }
+
+  final nowUtc = DateTime.now().toUtc();
+  final duration = switch (range) {
+    '7d' => const Duration(days: 7),
+    '30d' => const Duration(days: 30),
+    '90d' => const Duration(days: 90),
+    _ => null,
+  };
+
+  if (duration == null) {
+    return const _AnalyticsDateRange();
+  }
+
+  return _AnalyticsDateRange(
+    dateFrom: nowUtc.subtract(duration).toIso8601String(),
+    dateTo: nowUtc.toIso8601String(),
+  );
+}
+
+class _AnalyticsDateRange {
+  const _AnalyticsDateRange({
+    this.dateFrom,
+    this.dateTo,
+  });
+
+  final String? dateFrom;
+  final String? dateTo;
 }
 
 class PetLogsState {
@@ -228,7 +266,8 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
   Future<void> setTypeFilters(Set<String> typeIds) async {
     final current = state.asData?.value;
     if (current == null) return;
-    state = AsyncData(current.copyWith(selectedTypeIds: Set<String>.from(typeIds)));
+    state =
+        AsyncData(current.copyWith(selectedTypeIds: Set<String>.from(typeIds)));
     await _reloadLogs();
   }
 
@@ -236,7 +275,8 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(
-      current.copyWith(selectedSource: value, clearSelectedSource: value == null),
+      current.copyWith(
+          selectedSource: value, clearSelectedSource: value == null),
     );
     await _reloadLogs();
   }
@@ -264,7 +304,9 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
 
   Future<void> loadMore() async {
     final current = state.asData?.value;
-    if (current == null || current.isLoadingMore || current.nextCursor == null) {
+    if (current == null ||
+        current.isLoadingMore ||
+        current.nextCursor == null) {
       return;
     }
 
@@ -309,7 +351,8 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
     return LogListQuery(
       cursor: cursor,
       searchQuery: base?.searchQuery,
-      typeIds: base?.selectedTypeIds.toList(growable: false) ?? const <String>[],
+      typeIds:
+          base?.selectedTypeIds.toList(growable: false) ?? const <String>[],
       source: base?.selectedSource,
       hasAttachments: base?.withAttachmentsOnly == true ? true : null,
       hasMetrics: base?.withMetricsOnly == true ? true : null,

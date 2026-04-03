@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:dio/dio.dart';
 
 import '../api_context.dart';
@@ -45,20 +47,74 @@ class ApiContextInterceptor extends Interceptor {
       options.headers['X-User-ID'] = userId;
     }
 
-    if (requiresAccessToken) {
-      final accessToken = session?.accessToken;
-      if (accessToken == null || accessToken.isEmpty) {
-        return handler.reject(
-          DioException(
-            requestOptions: options,
-            type: DioExceptionType.unknown,
-            error: StateError('Access token is required for this request'),
-          ),
-        );
-      }
-      options.headers['Authorization'] = 'Bearer $accessToken';
+    final accessToken = session?.accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      options.headers.putIfAbsent('Authorization', () => 'Bearer $accessToken');
+    } else if (requiresAccessToken) {
+      _logBootstrapRequest(
+        options,
+        sessionAvailable: session != null,
+        userIdPresent: session?.userId.isNotEmpty == true,
+        accessTokenPresent: false,
+      );
+      return handler.reject(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.unknown,
+          error: StateError('Access token is required for this request'),
+        ),
+      );
     }
 
+    _logBootstrapRequest(
+      options,
+      sessionAvailable: session != null,
+      userIdPresent: session?.userId.isNotEmpty == true,
+      accessTokenPresent: accessToken?.isNotEmpty == true,
+    );
+
     handler.next(options);
+  }
+
+  void _logBootstrapRequest(
+    RequestOptions options, {
+    required bool sessionAvailable,
+    required bool userIdPresent,
+    required bool accessTokenPresent,
+  }) {
+    if (!_isLogsBootstrapRequest(options.path)) {
+      return;
+    }
+
+    final authorization = options.headers['Authorization']?.toString();
+    final userId = options.headers['X-User-ID']?.toString();
+    debugPrint(
+      '[HealthBootstrap][onRequest] ${options.method} ${options.path} '
+      'session=$sessionAvailable '
+      'sessionUserId=$userIdPresent '
+      'sessionAccessToken=$accessTokenPresent '
+      'requiresUserId=${options.extra[ApiContextKeys.requiresUserId] == true} '
+      'requiresAccessToken=${options.extra[ApiContextKeys.requiresAccessToken] == true} '
+      'authHeader=${authorization != null} '
+      'authBearer=${authorization?.startsWith('Bearer ') == true} '
+      'authPreview=${_maskAuthorization(authorization)} '
+      'xUserIdHeader=${userId != null && userId.isNotEmpty} '
+      'headerKeys=${options.headers.keys.toList()}',
+    );
+  }
+
+  bool _isLogsBootstrapRequest(String path) => path.contains('/logs/bootstrap');
+
+  String _maskAuthorization(String? authorization) {
+    if (authorization == null || authorization.isEmpty) {
+      return '<none>';
+    }
+    if (!authorization.startsWith('Bearer ')) {
+      return authorization;
+    }
+
+    final token = authorization.substring('Bearer '.length);
+    final visible = token.length <= 10 ? token : '${token.substring(0, 10)}...';
+    return 'Bearer $visible';
   }
 }

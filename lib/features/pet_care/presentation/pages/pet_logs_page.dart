@@ -308,6 +308,15 @@ class _LogCardItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
+            if (_relatedEntityLabel(log) case final relatedLabel?) ...<Widget>[
+              const SizedBox(height: PawlySpacing.xs),
+              Text(
+                relatedLabel,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             const SizedBox(height: PawlySpacing.sm),
             Wrap(
               spacing: PawlySpacing.xs,
@@ -316,7 +325,8 @@ class _LogCardItem extends StatelessWidget {
                 if (log.metricValuesPreview.isNotEmpty)
                   for (final metric in log.metricValuesPreview.take(3))
                     PawlyBadge(
-                      label: '${metric.metricName} ${_formatMetricValue(metric)}',
+                      label:
+                          '${metric.metricName} ${_formatMetricValue(metric)}',
                     ),
                 if (log.hasAttachments)
                   PawlyBadge(
@@ -443,7 +453,8 @@ class _TypeFilterSheetState extends State<_TypeFilterSheet> {
               child: filteredTypes.isEmpty
                   ? const Center(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: PawlySpacing.xl),
+                        padding:
+                            EdgeInsets.symmetric(vertical: PawlySpacing.xl),
                         child: Text('Типы не найдены.'),
                       ),
                     )
@@ -523,18 +534,36 @@ String _formatOccurredAt(DateTime? value) {
     return 'Дата не указана';
   }
 
-  final day = value.day.toString().padLeft(2, '0');
-  final month = value.month.toString().padLeft(2, '0');
-  final hour = value.hour.toString().padLeft(2, '0');
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$day.$month.${value.year} $hour:$minute';
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.${local.year} $hour:$minute';
 }
 
 String _formatMetricValue(LogMetricValue value) {
+  if (value.inputKind == 'BOOLEAN') {
+    return value.valueNum == 0 ? 'Нет' : 'Да';
+  }
   final number = value.valueNum % 1 == 0
       ? value.valueNum.toStringAsFixed(0)
       : value.valueNum.toStringAsFixed(1);
   return value.unitCode == null || value.unitCode!.isEmpty
       ? number
       : '$number ${value.unitCode}';
+}
+
+String? _relatedEntityLabel(LogCard log) {
+  final relatedType = log.sourceEntityType;
+  if (relatedType == null || relatedType.isEmpty) {
+    return null;
+  }
+
+  return switch (relatedType) {
+    'VACCINATION' => 'Автолог вакцинации',
+    'PROCEDURE' => 'Автолог процедуры',
+    'VET_VISIT' => 'Связано с визитом',
+    _ => 'Связано: $relatedType',
+  };
 }

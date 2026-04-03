@@ -21,6 +21,7 @@ class PetMetricCreatePage extends ConsumerStatefulWidget {
 class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
   static const String _numericKind = 'NUMERIC';
   static const String _scaleKind = 'SCALE';
+  static const String _booleanKind = 'BOOLEAN';
 
   late final TextEditingController _nameController;
   late final TextEditingController _unitController;
@@ -56,7 +57,8 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Новая метрика')),
       body: bootstrapAsync.when(
-        data: (bootstrap) => _buildContent(context, bootstrap.permissions.logWrite),
+        data: (bootstrap) =>
+            _buildContent(context, bootstrap.permissions.logWrite),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _MetricCreateErrorView(
           onRetry: () => ref.invalidate(
@@ -82,7 +84,7 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
         ),
         const SizedBox(height: PawlySpacing.md),
         DropdownButtonFormField<String>(
-          value: _inputKind,
+          initialValue: _inputKind,
           items: const <DropdownMenuItem<String>>[
             DropdownMenuItem<String>(
               value: _numericKind,
@@ -92,6 +94,10 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
               value: _scaleKind,
               child: Text('Шкала'),
             ),
+            DropdownMenuItem<String>(
+              value: _booleanKind,
+              child: Text('Да / Нет'),
+            ),
           ],
           onChanged: canSubmit
               ? (value) {
@@ -100,6 +106,11 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
                   }
                   setState(() {
                     _inputKind = value;
+                    if (_inputKind == _booleanKind) {
+                      _unitController.clear();
+                      _minController.clear();
+                      _maxController.clear();
+                    }
                   });
                 }
               : null,
@@ -109,8 +120,9 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
         PawlyTextField(
           controller: _unitController,
           label: 'Единица измерения',
-          hintText: 'кг, мл, баллы',
-          enabled: canSubmit,
+          hintText:
+              _inputKind == _booleanKind ? 'Не используется' : 'кг, мл, баллы',
+          enabled: canSubmit && _inputKind != _booleanKind,
         ),
         const SizedBox(height: PawlySpacing.md),
         Row(
@@ -119,7 +131,7 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
               child: PawlyTextField(
                 controller: _minController,
                 label: 'Минимум',
-                enabled: canSubmit,
+                enabled: canSubmit && _inputKind != _booleanKind,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -130,7 +142,7 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
               child: PawlyTextField(
                 controller: _maxController,
                 label: 'Максимум',
-                enabled: canSubmit,
+                enabled: canSubmit && _inputKind != _booleanKind,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -140,9 +152,12 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
         ),
         const SizedBox(height: PawlySpacing.xs),
         Text(
-          _inputKind == _scaleKind
-              ? 'Для шкалы лучше задать оба значения диапазона.'
-              : 'Диапазон можно оставить пустым.',
+          switch (_inputKind) {
+            _scaleKind => 'Для шкалы нужно задать оба значения диапазона.',
+            _booleanKind =>
+              'Для boolean единица измерения и диапазон недоступны.',
+            _ => 'Диапазон можно оставить пустым.',
+          },
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -172,10 +187,20 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
 
     final minValue = _parseNumber(_minController.text);
     final maxValue = _parseNumber(_maxController.text);
+    final unitCode = _unitController.text.trim().isEmpty
+        ? null
+        : _unitController.text.trim();
 
     if (_inputKind == _scaleKind && (minValue == null || maxValue == null)) {
       _showError('Для шкалы нужно указать минимум и максимум.');
       return;
+    }
+    if (_inputKind == _booleanKind) {
+      if (unitCode != null || minValue != null || maxValue != null) {
+        _showError(
+            'Для boolean единица измерения и диапазон должны быть пустыми.');
+        return;
+      }
     }
     if (minValue != null && maxValue != null && minValue >= maxValue) {
       _showError('Минимум должен быть меньше максимума.');
@@ -192,11 +217,9 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
             input: UpsertMetricInput(
               name: name,
               inputKind: _inputKind,
-              unitCode: _unitController.text.trim().isEmpty
-                  ? null
-                  : _unitController.text.trim(),
-              minValue: minValue,
-              maxValue: maxValue,
+              unitCode: _inputKind == _booleanKind ? null : unitCode,
+              minValue: _inputKind == _booleanKind ? null : minValue,
+              maxValue: _inputKind == _booleanKind ? null : maxValue,
             ),
           );
       ref.invalidate(petLogComposerBootstrapProvider(widget.petId));

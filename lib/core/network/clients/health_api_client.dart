@@ -10,10 +10,7 @@ class HealthApiClient {
 
   final ApiClient _apiClient;
 
-  static const _withUserAndToken = ApiRequestOptions(
-    requiresUserId: true,
-    requiresAccessToken: true,
-  );
+  static const _withToken = ApiRequestOptions(requiresAccessToken: true);
 
   Future<LogComposerBootstrapResponse> getLogsBootstrap(
     String petId, {
@@ -24,7 +21,7 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{
         'include_catalog': includeCatalog,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogComposerBootstrapResponse.fromJson,
     );
   }
@@ -32,7 +29,7 @@ class HealthApiClient {
   Future<HealthBootstrapResponse> getHealthBootstrap(String petId) {
     return _apiClient.get<HealthBootstrapResponse>(
       ApiEndpoints.petHealthBootstrap(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: HealthBootstrapResponse.fromJson,
     );
   }
@@ -66,7 +63,7 @@ class HealthApiClient {
         'sort': sort,
         'include_facets': includeFacets,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogListResponse.fromJson,
     );
   }
@@ -74,7 +71,7 @@ class HealthApiClient {
   Future<LogEntry> getLog(String petId, String logId) {
     return _apiClient.get<LogEntry>(
       ApiEndpoints.petLogById(petId, logId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogEntry.fromJson,
     );
   }
@@ -83,7 +80,7 @@ class HealthApiClient {
     return _apiClient.post<LogEntry>(
       ApiEndpoints.petLogs(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogEntry.fromJson,
     );
   }
@@ -96,7 +93,7 @@ class HealthApiClient {
     return _apiClient.patch<LogEntry>(
       ApiEndpoints.petLogById(petId, logId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogEntry.fromJson,
     );
   }
@@ -109,7 +106,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petLogById(petId, logId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -129,7 +126,7 @@ class HealthApiClient {
         'include_archived': includeArchived,
         'only_with_metrics': onlyWithMetrics,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogTypeListResponse.fromJson,
     );
   }
@@ -138,7 +135,7 @@ class HealthApiClient {
     return _apiClient.post<LogType>(
       ApiEndpoints.petLogTypes(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogType.fromJson,
     );
   }
@@ -151,7 +148,7 @@ class HealthApiClient {
     return _apiClient.patch<LogType>(
       ApiEndpoints.petLogTypeById(petId, logTypeId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: LogType.fromJson,
     );
   }
@@ -164,7 +161,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petLogTypeById(petId, logTypeId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -186,7 +183,7 @@ class HealthApiClient {
         'only_with_data': onlyWithData,
         'only_with_usage': onlyWithUsage,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MetricListResponse.fromJson,
     );
   }
@@ -195,7 +192,7 @@ class HealthApiClient {
     return _apiClient.post<Metric>(
       ApiEndpoints.petMetrics(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Metric.fromJson,
     );
   }
@@ -208,7 +205,7 @@ class HealthApiClient {
     return _apiClient.patch<Metric>(
       ApiEndpoints.petMetricById(petId, metricId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Metric.fromJson,
     );
   }
@@ -221,7 +218,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petMetricById(petId, metricId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -230,18 +227,28 @@ class HealthApiClient {
     String petId, {
     String? query,
     String? range,
+    String? dateFrom,
+    String? dateTo,
     String? source,
+    List<String>? typeIds,
     int? limit,
   }) {
+    final resolvedRange = _resolveAnalyticsDateRange(
+      range: range,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+    );
     return _apiClient.get<AnalyticsMetricSummaryListResponse>(
       ApiEndpoints.petAnalyticsMetrics(petId),
       queryParameters: <String, dynamic>{
         'q': query,
-        'range': range,
+        'date_from': resolvedRange.dateFrom,
+        'date_to': resolvedRange.dateTo,
         'source': source,
+        'type_ids': _csv(typeIds),
         'limit': limit,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AnalyticsMetricSummaryListResponse.fromJson,
     );
   }
@@ -257,18 +264,22 @@ class HealthApiClient {
     String? sort,
     bool? includeSummary,
   }) {
+    final resolvedRange = _resolveAnalyticsDateRange(
+      range: range,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+    );
     return _apiClient.get<MetricSeriesResponse>(
       ApiEndpoints.petAnalyticsMetricSeries(petId, metricId),
       queryParameters: <String, dynamic>{
-        'range': range,
-        'date_from': dateFrom,
-        'date_to': dateTo,
+        'date_from': resolvedRange.dateFrom,
+        'date_to': resolvedRange.dateTo,
         'source': source,
         'type_ids': _csv(typeIds),
         'sort': sort,
         'include_summary': includeSummary,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MetricSeriesResponse.fromJson,
     );
   }
@@ -294,7 +305,7 @@ class HealthApiClient {
         'date_to': dateTo,
         'sort': sort,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: VetVisitListResponse.fromJson,
     );
   }
@@ -302,7 +313,7 @@ class HealthApiClient {
   Future<VetVisit> getVetVisit(String petId, String visitId) {
     return _apiClient.get<VetVisit>(
       ApiEndpoints.petVetVisitById(petId, visitId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: VetVisit.fromJson,
     );
   }
@@ -311,7 +322,7 @@ class HealthApiClient {
     return _apiClient.post<VetVisit>(
       ApiEndpoints.petVetVisits(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: VetVisit.fromJson,
     );
   }
@@ -324,7 +335,7 @@ class HealthApiClient {
     return _apiClient.patch<VetVisit>(
       ApiEndpoints.petVetVisitById(petId, visitId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: VetVisit.fromJson,
     );
   }
@@ -337,7 +348,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petVetVisitById(petId, visitId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -350,7 +361,7 @@ class HealthApiClient {
     return _apiClient.post<RelatedLog>(
       ApiEndpoints.petVetVisitLogs(petId, visitId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: RelatedLog.fromJson,
     );
   }
@@ -362,7 +373,7 @@ class HealthApiClient {
   ) {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petVetVisitLogById(petId, visitId, logId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -388,7 +399,7 @@ class HealthApiClient {
         'date_to': dateTo,
         'sort': sort,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: VaccinationListResponse.fromJson,
     );
   }
@@ -396,7 +407,7 @@ class HealthApiClient {
   Future<Vaccination> getVaccination(String petId, String vaccinationId) {
     return _apiClient.get<Vaccination>(
       ApiEndpoints.petVaccinationById(petId, vaccinationId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Vaccination.fromJson,
     );
   }
@@ -408,7 +419,7 @@ class HealthApiClient {
     return _apiClient.post<Vaccination>(
       ApiEndpoints.petVaccinations(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Vaccination.fromJson,
     );
   }
@@ -421,7 +432,7 @@ class HealthApiClient {
     return _apiClient.patch<Vaccination>(
       ApiEndpoints.petVaccinationById(petId, vaccinationId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Vaccination.fromJson,
     );
   }
@@ -434,7 +445,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petVaccinationById(petId, vaccinationId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -462,7 +473,7 @@ class HealthApiClient {
         'date_to': dateTo,
         'sort': sort,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ProcedureListResponse.fromJson,
     );
   }
@@ -470,7 +481,7 @@ class HealthApiClient {
   Future<Procedure> getProcedure(String petId, String procedureId) {
     return _apiClient.get<Procedure>(
       ApiEndpoints.petProcedureById(petId, procedureId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Procedure.fromJson,
     );
   }
@@ -482,7 +493,7 @@ class HealthApiClient {
     return _apiClient.post<Procedure>(
       ApiEndpoints.petProcedures(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Procedure.fromJson,
     );
   }
@@ -495,7 +506,7 @@ class HealthApiClient {
     return _apiClient.patch<Procedure>(
       ApiEndpoints.petProcedureById(petId, procedureId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: Procedure.fromJson,
     );
   }
@@ -508,7 +519,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petProcedureById(petId, procedureId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -532,7 +543,7 @@ class HealthApiClient {
         'record_type': recordType,
         'sort': sort,
       }..removeWhere((_, dynamic value) => value == null),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MedicalRecordListResponse.fromJson,
     );
   }
@@ -540,7 +551,7 @@ class HealthApiClient {
   Future<MedicalRecord> getMedicalRecord(String petId, String recordId) {
     return _apiClient.get<MedicalRecord>(
       ApiEndpoints.petMedicalRecordById(petId, recordId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MedicalRecord.fromJson,
     );
   }
@@ -552,7 +563,7 @@ class HealthApiClient {
     return _apiClient.post<MedicalRecord>(
       ApiEndpoints.petMedicalRecords(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MedicalRecord.fromJson,
     );
   }
@@ -565,7 +576,7 @@ class HealthApiClient {
     return _apiClient.patch<MedicalRecord>(
       ApiEndpoints.petMedicalRecordById(petId, recordId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MedicalRecord.fromJson,
     );
   }
@@ -578,7 +589,7 @@ class HealthApiClient {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.petMedicalRecordById(petId, recordId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -590,7 +601,7 @@ class HealthApiClient {
     return _apiClient.get<HealthDayResponse>(
       ApiEndpoints.petHealthDay(petId),
       queryParameters: <String, dynamic>{'date': date},
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: HealthDayResponse.fromJson,
     );
   }
@@ -601,4 +612,42 @@ class HealthApiClient {
     }
     return values.join(',');
   }
+
+  _AnalyticsDateRange _resolveAnalyticsDateRange({
+    String? range,
+    String? dateFrom,
+    String? dateTo,
+  }) {
+    if (dateFrom != null || dateTo != null || range == null || range == 'all') {
+      return _AnalyticsDateRange(dateFrom: dateFrom, dateTo: dateTo);
+    }
+
+    final nowUtc = DateTime.now().toUtc();
+    final duration = switch (range) {
+      '7d' => const Duration(days: 7),
+      '30d' => const Duration(days: 30),
+      '90d' => const Duration(days: 90),
+      _ => null,
+    };
+
+    if (duration == null) {
+      return _AnalyticsDateRange(dateFrom: dateFrom, dateTo: dateTo);
+    }
+
+    final fromUtc = nowUtc.subtract(duration);
+    return _AnalyticsDateRange(
+      dateFrom: fromUtc.toIso8601String(),
+      dateTo: nowUtc.toIso8601String(),
+    );
+  }
+}
+
+class _AnalyticsDateRange {
+  const _AnalyticsDateRange({
+    required this.dateFrom,
+    required this.dateTo,
+  });
+
+  final String? dateFrom;
+  final String? dateTo;
 }

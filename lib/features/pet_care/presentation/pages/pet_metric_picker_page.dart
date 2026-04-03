@@ -222,27 +222,38 @@ class _MetricPickerErrorView extends StatelessWidget {
 }
 
 String _metricSubtitle(Metric metric) {
-  final kind = metric.inputKind == 'NUMERIC' ? 'Число' : 'Шкала';
+  final kind = _metricKindLabel(metric.inputKind);
   final unit = metric.unitCode == null || metric.unitCode!.isEmpty
       ? 'без единиц'
       : metric.unitCode!;
   final hasRange = metric.minValue != null || metric.maxValue != null;
-  final range = hasRange
-      ? ' · ${_formatRange(metric.minValue, metric.maxValue)}'
-      : '';
+  final range =
+      hasRange ? ' · ${_formatRange(metric.minValue, metric.maxValue)}' : '';
+  if (metric.inputKind == 'BOOLEAN') {
+    return kind;
+  }
   return '$kind · $unit$range';
+}
+
+String _metricKindLabel(String inputKind) {
+  return switch (inputKind) {
+    'NUMERIC' => 'Число',
+    'SCALE' => 'Шкала',
+    'BOOLEAN' => 'Да / Нет',
+    _ => inputKind,
+  };
 }
 
 String _formatRange(double? minValue, double? maxValue) {
   final min = minValue == null
       ? '...'
       : (minValue % 1 == 0
-            ? minValue.toStringAsFixed(0)
-            : minValue.toStringAsFixed(1));
+          ? minValue.toStringAsFixed(0)
+          : minValue.toStringAsFixed(1));
   final max = maxValue == null
       ? '...'
       : (maxValue % 1 == 0
-            ? maxValue.toStringAsFixed(0)
-            : maxValue.toStringAsFixed(1));
+          ? maxValue.toStringAsFixed(0)
+          : maxValue.toStringAsFixed(1));
   return '$min-$max';
 }

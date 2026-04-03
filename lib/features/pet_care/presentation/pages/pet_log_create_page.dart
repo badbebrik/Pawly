@@ -24,6 +24,7 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
   late final TextEditingController _descriptionController;
   final Map<String, TextEditingController> _metricControllers =
       <String, TextEditingController>{};
+  final Map<String, bool?> _booleanMetricValues = <String, bool?>{};
   DateTime _occurredAt = DateTime.now();
   String? _selectedTypeId;
   bool _isSubmitting = false;
@@ -100,9 +101,8 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
                           ? 'Можно оставить запись без типа'
                           : _typeMetricsLabel(selectedType),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
                   ],
@@ -133,37 +133,28 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
           textCapitalization: TextCapitalization.sentences,
           enabled: canCreate,
         ),
-        if (selectedType != null && selectedType.metricRequirements.isNotEmpty)
-          ...<Widget>[
-            const SizedBox(height: PawlySpacing.lg),
-            Text(
-              'Метрики',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: PawlySpacing.sm),
-            ...selectedType.metricRequirements.map(
-              (requirement) => Padding(
-                padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-                child: PawlyTextField(
-                  controller: _controllerForMetric(requirement.metricId),
-                  label: requirement.isRequired
-                      ? '${requirement.metricName} *'
-                      : requirement.metricName,
-                  hintText: _metricHint(requirement),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  enabled: canCreate,
+        if (selectedType != null &&
+            selectedType.metricRequirements.isNotEmpty) ...<Widget>[
+          const SizedBox(height: PawlySpacing.lg),
+          Text(
+            'Метрики',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-              ),
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          ...selectedType.metricRequirements.map(
+            (requirement) => Padding(
+              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
+              child: _buildMetricField(requirement, canCreate),
             ),
-          ],
+          ),
+        ],
         if (!bootstrap.permissions.logWrite) ...<Widget>[
           const SizedBox(height: PawlySpacing.lg),
           const PawlyCard(
-            child: Text('У вас нет прав на создание записей для этого питомца.'),
+            child:
+                Text('У вас нет прав на создание записей для этого питомца.'),
           ),
         ],
         const SizedBox(height: PawlySpacing.lg),
@@ -204,6 +195,41 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
 
   TextEditingController _controllerForMetric(String metricId) {
     return _metricControllers.putIfAbsent(metricId, TextEditingController.new);
+  }
+
+  Widget _buildMetricField(
+    LogTypeMetricRequirement requirement,
+    bool enabled,
+  ) {
+    final label = _metricLabel(requirement);
+    if (requirement.inputKind == 'BOOLEAN') {
+      return DropdownButtonFormField<bool>(
+        initialValue: _booleanMetricValues[requirement.metricId],
+        decoration: InputDecoration(
+          labelText: label,
+          helperText: _metricHint(requirement),
+        ),
+        items: const <DropdownMenuItem<bool>>[
+          DropdownMenuItem<bool>(value: true, child: Text('Да')),
+          DropdownMenuItem<bool>(value: false, child: Text('Нет')),
+        ],
+        onChanged: enabled
+            ? (value) {
+                setState(() {
+                  _booleanMetricValues[requirement.metricId] = value;
+                });
+              }
+            : null,
+      );
+    }
+
+    return PawlyTextField(
+      controller: _controllerForMetric(requirement.metricId),
+      label: label,
+      hintText: _metricHint(requirement),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      enabled: enabled,
+    );
   }
 
   Future<void> _pickOccurredAt() async {
@@ -251,9 +277,8 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
       return;
     }
     setState(() {
-      _selectedTypeId = selectedTypeId == noLogTypeSelectionId
-          ? null
-          : selectedTypeId;
+      _selectedTypeId =
+          selectedTypeId == noLogTypeSelectionId ? null : selectedTypeId;
     });
   }
 
@@ -263,10 +288,29 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
     final metricInputs = <LogMetricInput>[];
 
     for (final requirement in selectedType?.metricRequirements ?? const []) {
+      if (requirement.inputKind == 'BOOLEAN') {
+        final selectedValue = _booleanMetricValues[requirement.metricId];
+        if (selectedValue == null) {
+          if (requirement.isRequired) {
+            _showError('Заполни метрику "${_metricName(requirement)}".');
+            return;
+          }
+          continue;
+        }
+
+        metricInputs.add(
+          LogMetricInput(
+            metricId: requirement.metricId,
+            valueNum: selectedValue ? 1 : 0,
+          ),
+        );
+        continue;
+      }
+
       final rawValue = _controllerForMetric(requirement.metricId).text.trim();
       if (rawValue.isEmpty) {
         if (requirement.isRequired) {
-          _showError('Заполни метрику "${requirement.metricName}".');
+          _showError('Заполни метрику "${_metricName(requirement)}".');
           return;
         }
         continue;
@@ -274,7 +318,7 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
 
       final value = double.tryParse(rawValue.replaceAll(',', '.'));
       if (value == null) {
-        _showError('Метрика "${requirement.metricName}" должна быть числом.');
+        _showError('Метрика "${_metricName(requirement)}" должна быть числом.');
         return;
       }
 
@@ -301,6 +345,7 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
           );
 
       ref.invalidate(petLogsControllerProvider(widget.petId));
+      ref.invalidate(petAnalyticsMetricsProvider(widget.petId));
 
       if (!mounted) {
         return;
@@ -356,6 +401,9 @@ class _CreateLogErrorView extends StatelessWidget {
 }
 
 String _metricHint(LogTypeMetricRequirement requirement) {
+  if (requirement.inputKind == 'BOOLEAN') {
+    return 'Выбери Да или Нет';
+  }
   final parts = <String>[];
   if (requirement.unitCode != null && requirement.unitCode!.isNotEmpty) {
     parts.add(requirement.unitCode!);
@@ -369,23 +417,50 @@ String _metricHint(LogTypeMetricRequirement requirement) {
 }
 
 String _formatOccurredAt(DateTime value) {
-  final day = value.day.toString().padLeft(2, '0');
-  final month = value.month.toString().padLeft(2, '0');
-  final hour = value.hour.toString().padLeft(2, '0');
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$day.$month.${value.year} $hour:$minute';
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.${local.year} $hour:$minute';
 }
 
-String _scopeLabel(String scope) {
-  return scope == 'SYSTEM' ? 'Системный' : 'Мой';
+String _metricLabel(LogTypeMetricRequirement requirement) {
+  final name = _metricName(requirement);
+  return requirement.isRequired ? '$name *' : name;
+}
+
+String _metricName(LogTypeMetricRequirement requirement) {
+  final name = requirement.metricName.trim();
+  if (name.isNotEmpty) {
+    return name;
+  }
+  return 'Метрика';
+}
+
+String _metricKindLabel(String inputKind) {
+  return switch (inputKind) {
+    'NUMERIC' => 'Число',
+    'SCALE' => 'Шкала',
+    'BOOLEAN' => 'Да / Нет',
+    _ => inputKind,
+  };
+}
+
+String _typeMetricSummary(LogTypeMetricRequirement requirement) {
+  final name = _metricName(requirement);
+  final kind = _metricKindLabel(requirement.inputKind);
+  return '$name ($kind)';
 }
 
 String _typeMetricsLabel(LogType type) {
   if (type.metricRequirements.isEmpty) {
     return 'Метрики не заданы';
   }
-  final metrics = type.metricRequirements
-      .map((metric) => metric.metricName)
-      .join(', ');
+  final metrics = type.metricRequirements.map(_typeMetricSummary).join(', ');
   return 'Метрики: $metrics';
+}
+
+String _scopeLabel(String scope) {
+  return scope == 'SYSTEM' ? 'Системный' : 'Мой';
 }
