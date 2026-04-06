@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/log_models.dart';
+import '../../../../core/services/attachment_launcher.dart';
 import '../../../../design_system/design_system.dart';
+import '../models/attachment_kind.dart';
+import '../models/attachment_viewer_item.dart';
 import '../providers/health_controllers.dart';
 
 class PetLogDetailsPage extends ConsumerWidget {
@@ -261,27 +264,63 @@ class _PetLogDetailsView extends StatelessWidget {
           ],
           if (log.attachments.isNotEmpty) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Вложения',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Column(
-                children: log.attachments
+            Builder(
+              builder: (context) {
+                final viewerItems = log.attachments
                     .map(
-                      (attachment) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          attachment.fileType.startsWith('image/')
-                              ? Icons.photo_rounded
-                              : Icons.description_rounded,
-                        ),
-                        title: Text(attachment.fileName),
-                        subtitle: Text(_attachmentSubtitle(attachment)),
+                      (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileType: attachment.fileType,
+                        fileName: attachment.fileName,
+                        previewUrl: attachment.previewUrl,
+                        downloadUrl: attachment.downloadUrl,
                       ),
                     )
-                    .toList(growable: false),
-              ),
+                    .toList(growable: false);
+                final imageItems = viewerItems
+                    .where(
+                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                    )
+                    .toList(growable: false);
+
+                return PawlyCard(
+                  title: Text(
+                    'Вложения',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  child: Column(
+                    children: List<Widget>.generate(log.attachments.length, (index) {
+                      final attachment = log.attachments[index];
+                      final viewerItem = viewerItems[index];
+                      final imageIndex = imageItems.indexWhere(
+                        (item) =>
+                            item.url == viewerItem.url && item.title == viewerItem.title,
+                      );
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          switch (viewerItem.kind) {
+                            AttachmentKind.image => Icons.photo_rounded,
+                            AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                            AttachmentKind.other => Icons.description_rounded,
+                          },
+                        ),
+                        title: Text(viewerItem.title),
+                        subtitle: Text(_attachmentSubtitle(attachment)),
+                        onTap: () => openAttachmentUrl(
+                          context,
+                          fileType: attachment.fileType,
+                          fileName: viewerItem.title,
+                          previewUrl: attachment.previewUrl,
+                          downloadUrl: attachment.downloadUrl,
+                          imageGalleryItems: imageItems,
+                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                        ),
+                      );
+                    }),
+                  ),
+                );
+              },
             ),
           ],
           const SizedBox(height: PawlySpacing.md),

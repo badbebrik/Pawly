@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/models/health_models.dart';
+import '../../../../core/providers/core_providers.dart';
+import '../../../../core/services/attachment_launcher.dart';
 import '../../../../design_system/design_system.dart';
+import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository_models.dart';
+import '../models/attachment_draft_item.dart';
+import '../models/attachment_kind.dart';
+import '../models/attachment_viewer_item.dart';
 import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_procedures_controller.dart';
+import '../widgets/health_attachments_field.dart';
 
 class PetProceduresPage extends ConsumerStatefulWidget {
   const PetProceduresPage({
@@ -72,6 +80,7 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _ProcedureComposerSheet(
+        petId: widget.petId,
         allowedStatuses: state.bootstrap.enums.procedureStatuses,
         allowedTypes: state.bootstrap.enums.procedureTypes,
       ),
@@ -380,8 +389,9 @@ class _ProcedureInfoLine extends StatelessWidget {
   }
 }
 
-class _ProcedureComposerSheet extends StatefulWidget {
+class _ProcedureComposerSheet extends ConsumerStatefulWidget {
   const _ProcedureComposerSheet({
+    required this.petId,
     required this.allowedStatuses,
     required this.allowedTypes,
     this.initialProcedure,
@@ -389,6 +399,7 @@ class _ProcedureComposerSheet extends StatefulWidget {
     this.submitLabel = 'Сохранить процедуру',
   });
 
+  final String petId;
   final List<String> allowedStatuses;
   final List<String> allowedTypes;
   final Procedure? initialProcedure;
@@ -396,22 +407,25 @@ class _ProcedureComposerSheet extends StatefulWidget {
   final String submitLabel;
 
   @override
-  State<_ProcedureComposerSheet> createState() =>
+  ConsumerState<_ProcedureComposerSheet> createState() =>
       _ProcedureComposerSheetState();
 }
 
-class _ProcedureComposerSheetState extends State<_ProcedureComposerSheet> {
+class _ProcedureComposerSheetState
+    extends ConsumerState<_ProcedureComposerSheet> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _productNameController = TextEditingController();
   final _notesController = TextEditingController();
+  final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
 
   late String _status;
   late String _procedureType;
   DateTime? _scheduledAt;
   DateTime? _performedAt;
   DateTime? _nextDueAt;
+  bool _isUploadingAttachments = false;
 
   @override
   void initState() {
@@ -432,6 +446,10 @@ class _ProcedureComposerSheetState extends State<_ProcedureComposerSheet> {
     _scheduledAt = initial?.scheduledAt;
     _performedAt = initial?.performedAt;
     _nextDueAt = initial?.nextDueAt;
+    _attachments.addAll(
+      initial?.attachments.map(AttachmentDraftItem.fromHealthAttachment) ??
+          const <AttachmentDraftItem>[],
+    );
   }
 
   @override
@@ -587,9 +605,19 @@ class _ProcedureComposerSheetState extends State<_ProcedureComposerSheet> {
                   textCapitalization: TextCapitalization.sentences,
                 ),
                 const SizedBox(height: PawlySpacing.lg),
+                HealthAttachmentsField(
+                  attachments: _attachments,
+                  isUploading: _isUploadingAttachments,
+                  enabled: true,
+                  onAddFiles: _pickAndUploadAttachments,
+                  onAddFromGallery: _pickAndUploadFromGallery,
+                  onAddFromCamera: _pickAndUploadFromCamera,
+                  onRemove: _removeAttachment,
+                ),
+                const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: widget.submitLabel,
-                  onPressed: _submit,
+                  onPressed: _isUploadingAttachments ? null : _submit,
                   icon: Icons.check_rounded,
                 ),
               ],
@@ -605,6 +633,13 @@ class _ProcedureComposerSheetState extends State<_ProcedureComposerSheet> {
       return;
     }
 
+    if (_isUploadingAttachments) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Дождитесь окончания загрузки файлов.')),
+      );
+      return;
+    }
+
     Navigator.of(context).pop(
       UpsertProcedureInput(
         status: _status,
@@ -616,9 +651,117 @@ class _ProcedureComposerSheetState extends State<_ProcedureComposerSheet> {
         performedAtIso: _toStoredDate(_performedAt)?.toIso8601String(),
         nextDueAtIso: _toStoredDate(_nextDueAt)?.toIso8601String(),
         notes: _nonEmpty(_notesController.text),
+        attachmentFileIds: _attachments
+            .map((attachment) => attachment.fileId)
+            .toList(growable: false),
         rowVersion: widget.initialProcedure?.rowVersion,
       ),
     );
+  }
+
+  Future<void> _pickAndUploadAttachments() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickFiles(
+          allowedExtensions: HealthFileUploadService.supportedExtensions,
+        );
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось загрузить файлы.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadFromGallery() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(files);
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
+    final file = await ref.read(mediaPickerServiceProvider).pickImage(
+          source: ImageSource.camera,
+        );
+    if (file == null || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(<XFile>[file]);
+  }
+
+  Future<void> _uploadPickedImages(List<XFile> files) async {
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadXFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось загрузить файлы.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  void _removeAttachment(String fileId) {
+    setState(() {
+      _attachments.removeWhere((attachment) => attachment.fileId == fileId);
+    });
   }
 
   DateTime? _toStoredDate(DateTime? value) {
@@ -717,6 +860,7 @@ class PetProcedureDetailsPage extends ConsumerWidget {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _ProcedureComposerSheet(
+        petId: petId,
         allowedStatuses: state?.bootstrap.enums.procedureStatuses ??
             const <String>['PLANNED', 'DONE', 'CANCELLED'],
         allowedTypes:
@@ -898,31 +1042,67 @@ class _ProcedureDetailsView extends StatelessWidget {
           ],
           if (procedure.attachments.isNotEmpty) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Вложения',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Column(
-                children: procedure.attachments
+            Builder(
+              builder: (context) {
+                final viewerItems = procedure.attachments
                     .map(
-                      (attachment) => ListTile(
+                      (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileType: attachment.fileType,
+                        fileName: attachment.fileName,
+                        previewUrl: attachment.previewUrl,
+                        downloadUrl: attachment.downloadUrl,
+                      ),
+                    )
+                    .toList(growable: false);
+                final imageItems = viewerItems
+                    .where(
+                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                    )
+                    .toList(growable: false);
+
+                return PawlyCard(
+                  title: Text(
+                    'Вложения',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  child: Column(
+                    children: List<Widget>.generate(procedure.attachments.length, (index) {
+                      final attachment = procedure.attachments[index];
+                      final viewerItem = viewerItems[index];
+                      final imageIndex = imageItems.indexWhere(
+                        (item) =>
+                            item.url == viewerItem.url && item.title == viewerItem.title,
+                      );
+
+                      return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(
-                          attachment.fileType.startsWith('image/')
-                              ? Icons.photo_rounded
-                              : Icons.description_rounded,
+                          switch (viewerItem.kind) {
+                            AttachmentKind.image => Icons.photo_rounded,
+                            AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                            AttachmentKind.other => Icons.description_rounded,
+                          },
                         ),
-                        title: Text(attachment.fileName ?? 'Файл'),
+                        title: Text(viewerItem.title),
                         subtitle: Text(
                           attachment.addedAt == null
                               ? attachment.fileType
                               : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
                         ),
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
+                        onTap: () => openAttachmentUrl(
+                          context,
+                          fileType: attachment.fileType,
+                          fileName: viewerItem.title,
+                          previewUrl: attachment.previewUrl,
+                          downloadUrl: attachment.downloadUrl,
+                          imageGalleryItems: imageItems,
+                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                        ),
+                      );
+                    }),
+                  ),
+                );
+              },
             ),
           ],
         ],

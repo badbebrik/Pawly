@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../core/network/models/log_models.dart';
+import '../../../../core/providers/core_providers.dart';
+import '../../../../core/services/attachment_launcher.dart';
 import '../../../../design_system/design_system.dart';
+import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository_models.dart';
+import '../models/attachment_draft_item.dart';
+import '../models/attachment_kind.dart';
+import '../models/attachment_viewer_item.dart';
 import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_vet_visits_controller.dart';
+import '../widgets/health_attachments_field.dart';
 
 class PetVetVisitsPage extends ConsumerStatefulWidget {
   const PetVetVisitsPage({
@@ -73,6 +81,7 @@ class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _VetVisitComposerSheet(
+        petId: widget.petId,
         allowedStatuses: state.bootstrap.enums.vetVisitStatuses,
         allowedTypes: state.bootstrap.enums.vetVisitTypes,
       ),
@@ -372,8 +381,9 @@ class _VisitInfoLine extends StatelessWidget {
   }
 }
 
-class _VetVisitComposerSheet extends StatefulWidget {
+class _VetVisitComposerSheet extends ConsumerStatefulWidget {
   const _VetVisitComposerSheet({
+    required this.petId,
     required this.allowedStatuses,
     required this.allowedTypes,
     this.initialVisit,
@@ -381,6 +391,7 @@ class _VetVisitComposerSheet extends StatefulWidget {
     this.submitLabel = 'Сохранить визит',
   });
 
+  final String petId;
   final List<String> allowedStatuses;
   final List<String> allowedTypes;
   final VetVisit? initialVisit;
@@ -388,20 +399,23 @@ class _VetVisitComposerSheet extends StatefulWidget {
   final String submitLabel;
 
   @override
-  State<_VetVisitComposerSheet> createState() => _VetVisitComposerSheetState();
+  ConsumerState<_VetVisitComposerSheet> createState() =>
+      _VetVisitComposerSheetState();
 }
 
-class _VetVisitComposerSheetState extends State<_VetVisitComposerSheet> {
+class _VetVisitComposerSheetState extends ConsumerState<_VetVisitComposerSheet> {
   final _formKey = GlobalKey<FormState>();
   final _clinicController = TextEditingController();
   final _vetController = TextEditingController();
   final _reasonController = TextEditingController();
   final _resultController = TextEditingController();
+  final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
 
   late String _status;
   late String _visitType;
   DateTime? _scheduledAt;
   DateTime? _completedAt;
+  bool _isUploadingAttachments = false;
 
   @override
   void initState() {
@@ -421,6 +435,10 @@ class _VetVisitComposerSheetState extends State<_VetVisitComposerSheet> {
     _resultController.text = initial?.resultText ?? '';
     _scheduledAt = initial?.scheduledAt;
     _completedAt = initial?.completedAt;
+    _attachments.addAll(
+      initial?.attachments.map(AttachmentDraftItem.fromHealthAttachment) ??
+          const <AttachmentDraftItem>[],
+    );
   }
 
   @override
@@ -551,9 +569,19 @@ class _VetVisitComposerSheetState extends State<_VetVisitComposerSheet> {
                   ),
                 ],
                 const SizedBox(height: PawlySpacing.lg),
+                HealthAttachmentsField(
+                  attachments: _attachments,
+                  isUploading: _isUploadingAttachments,
+                  enabled: true,
+                  onAddFiles: _pickAndUploadAttachments,
+                  onAddFromGallery: _pickAndUploadFromGallery,
+                  onAddFromCamera: _pickAndUploadFromCamera,
+                  onRemove: _removeAttachment,
+                ),
+                const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: widget.submitLabel,
-                  onPressed: _submit,
+                  onPressed: _isUploadingAttachments ? null : _submit,
                   icon: Icons.check_rounded,
                 ),
               ],
@@ -569,6 +597,13 @@ class _VetVisitComposerSheetState extends State<_VetVisitComposerSheet> {
       return;
     }
 
+    if (_isUploadingAttachments) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Дождитесь окончания загрузки файлов.')),
+      );
+      return;
+    }
+
     Navigator.of(context).pop(
       UpsertVetVisitInput(
         status: _status,
@@ -579,9 +614,117 @@ class _VetVisitComposerSheetState extends State<_VetVisitComposerSheet> {
         vetName: _nonEmpty(_vetController.text),
         reasonText: _nonEmpty(_reasonController.text),
         resultText: _nonEmpty(_resultController.text),
+        attachmentFileIds: _attachments
+            .map((attachment) => attachment.fileId)
+            .toList(growable: false),
         rowVersion: widget.initialVisit?.rowVersion,
       ),
     );
+  }
+
+  Future<void> _pickAndUploadAttachments() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickFiles(
+          allowedExtensions: HealthFileUploadService.supportedExtensions,
+        );
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось загрузить файлы.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadFromGallery() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(files);
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
+    final file = await ref.read(mediaPickerServiceProvider).pickImage(
+          source: ImageSource.camera,
+        );
+    if (file == null || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(<XFile>[file]);
+  }
+
+  Future<void> _uploadPickedImages(List<XFile> files) async {
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadXFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось загрузить файлы.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  void _removeAttachment(String fileId) {
+    setState(() {
+      _attachments.removeWhere((attachment) => attachment.fileId == fileId);
+    });
   }
 
   DateTime? _toStoredDate(DateTime? value) {
@@ -676,6 +819,7 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _VetVisitComposerSheet(
+        petId: petId,
         allowedStatuses: state?.bootstrap.enums.vetVisitStatuses ??
             const <String>['PLANNED', 'COMPLETED', 'CANCELLED'],
         allowedTypes:
@@ -906,26 +1050,67 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
           ],
           if (visit.attachments.isNotEmpty) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Вложения',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Column(
-                children: visit.attachments
+            Builder(
+              builder: (context) {
+                final viewerItems = visit.attachments
                     .map(
-                      (attachment) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          attachment.fileType.startsWith('image/')
-                              ? Icons.photo_rounded
-                              : Icons.description_rounded,
-                        ),
-                        title: Text(attachment.fileName ?? 'Файл'),
+                      (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileType: attachment.fileType,
+                        fileName: attachment.fileName,
+                        previewUrl: attachment.previewUrl,
+                        downloadUrl: attachment.downloadUrl,
                       ),
                     )
-                    .toList(growable: false),
-              ),
+                    .toList(growable: false);
+                final imageItems = viewerItems
+                    .where(
+                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                    )
+                    .toList(growable: false);
+
+                return PawlyCard(
+                  title: Text(
+                    'Вложения',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  child: Column(
+                    children: List<Widget>.generate(visit.attachments.length, (index) {
+                      final attachment = visit.attachments[index];
+                      final viewerItem = viewerItems[index];
+                      final imageIndex = imageItems.indexWhere(
+                        (item) =>
+                            item.url == viewerItem.url && item.title == viewerItem.title,
+                      );
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          switch (viewerItem.kind) {
+                            AttachmentKind.image => Icons.photo_rounded,
+                            AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                            AttachmentKind.other => Icons.description_rounded,
+                          },
+                        ),
+                        title: Text(viewerItem.title),
+                        subtitle: Text(
+                          attachment.addedAt == null
+                              ? attachment.fileType
+                              : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
+                        ),
+                        onTap: () => openAttachmentUrl(
+                          context,
+                          fileType: attachment.fileType,
+                          fileName: viewerItem.title,
+                          previewUrl: attachment.previewUrl,
+                          downloadUrl: attachment.downloadUrl,
+                          imageGalleryItems: imageItems,
+                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                        ),
+                      );
+                    }),
+                  ),
+                );
+              },
             ),
           ],
         ],

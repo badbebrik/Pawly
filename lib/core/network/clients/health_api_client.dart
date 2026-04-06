@@ -34,6 +34,50 @@ class HealthApiClient {
     );
   }
 
+  Future<InitUploadResponse> initAttachmentUpload(
+    String petId,
+    InitHealthAttachmentUploadPayload payload,
+  ) {
+    return _apiClient.post<InitUploadResponse>(
+      ApiEndpoints.petAttachmentsInitUpload(petId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: InitUploadResponse.fromJson,
+    );
+  }
+
+  Future<ConfirmHealthAttachmentUploadResponse> confirmAttachmentUpload(
+    String petId,
+    ConfirmHealthAttachmentUploadPayload payload,
+  ) {
+    return _apiClient.post<ConfirmHealthAttachmentUploadResponse>(
+      ApiEndpoints.petAttachmentsConfirmUpload(petId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: ConfirmHealthAttachmentUploadResponse.fromJson,
+    );
+  }
+
+  Future<PetDocumentsListResponse> listDocuments(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? entityType,
+    String? fileType,
+  }) {
+    return _apiClient.get<PetDocumentsListResponse>(
+      ApiEndpoints.petDocuments(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'entity_type': entityType,
+        'file_type': fileType,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withToken,
+      decoder: PetDocumentsListResponse.fromJson,
+    );
+  }
+
   Future<LogListResponse> listLogs(
     String petId, {
     String? cursor,

@@ -61,6 +61,10 @@ final dioProvider = Provider<Dio>((ref) {
   return bundle.dio;
 });
 
+final uploadDioProvider = Provider<Dio>((ref) {
+  return DioFactory.createUploadDio();
+});
+
 final apiClientProvider = Provider<ApiClient>((ref) {
   final dio = ref.watch(dioProvider);
   return ApiClient(dio);

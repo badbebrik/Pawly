@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/models/health_models.dart';
+import '../../../../core/providers/core_providers.dart';
+import '../../../../core/services/attachment_launcher.dart';
 import '../../../../design_system/design_system.dart';
+import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository_models.dart';
+import '../models/attachment_draft_item.dart';
+import '../models/attachment_kind.dart';
+import '../models/attachment_viewer_item.dart';
 import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_vaccinations_controller.dart';
+import '../widgets/health_attachments_field.dart';
 
 class PetVaccinationsPage extends ConsumerStatefulWidget {
   const PetVaccinationsPage({
@@ -76,6 +84,7 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _VaccinationComposerSheet(
+        petId: widget.petId,
         allowedStatuses: state.bootstrap.enums.vaccinationStatuses,
       ),
     );
@@ -524,35 +533,40 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-class _VaccinationComposerSheet extends StatefulWidget {
+class _VaccinationComposerSheet extends ConsumerStatefulWidget {
   const _VaccinationComposerSheet({
+    required this.petId,
     required this.allowedStatuses,
     this.initialVaccination,
     this.title = 'Новая вакцинация',
     this.submitLabel = 'Сохранить вакцинацию',
   });
 
+  final String petId;
   final List<String> allowedStatuses;
   final Vaccination? initialVaccination;
   final String title;
   final String submitLabel;
 
   @override
-  State<_VaccinationComposerSheet> createState() =>
+  ConsumerState<_VaccinationComposerSheet> createState() =>
       _VaccinationComposerSheetState();
 }
 
-class _VaccinationComposerSheetState extends State<_VaccinationComposerSheet> {
+class _VaccinationComposerSheetState
+    extends ConsumerState<_VaccinationComposerSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _clinicController = TextEditingController();
   final _vetController = TextEditingController();
   final _notesController = TextEditingController();
+  final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
 
   late String _status;
   DateTime? _scheduledAt;
   DateTime? _administeredAt;
   DateTime? _nextDueAt;
+  bool _isUploadingAttachments = false;
 
   @override
   void initState() {
@@ -569,6 +583,10 @@ class _VaccinationComposerSheetState extends State<_VaccinationComposerSheet> {
     _scheduledAt = initial?.scheduledAt;
     _administeredAt = initial?.administeredAt;
     _nextDueAt = initial?.nextDueAt;
+    _attachments.addAll(
+      initial?.attachments.map(AttachmentDraftItem.fromHealthAttachment) ??
+          const <AttachmentDraftItem>[],
+    );
   }
 
   @override
@@ -708,9 +726,19 @@ class _VaccinationComposerSheetState extends State<_VaccinationComposerSheet> {
                   textCapitalization: TextCapitalization.sentences,
                 ),
                 const SizedBox(height: PawlySpacing.lg),
+                HealthAttachmentsField(
+                  attachments: _attachments,
+                  isUploading: _isUploadingAttachments,
+                  enabled: true,
+                  onAddFiles: _pickAndUploadAttachments,
+                  onAddFromGallery: _pickAndUploadFromGallery,
+                  onAddFromCamera: _pickAndUploadFromCamera,
+                  onRemove: _removeAttachment,
+                ),
+                const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: widget.submitLabel,
-                  onPressed: _submit,
+                  onPressed: _isUploadingAttachments ? null : _submit,
                   icon: Icons.check_rounded,
                 ),
               ],
@@ -733,6 +761,13 @@ class _VaccinationComposerSheetState extends State<_VaccinationComposerSheet> {
       return;
     }
 
+    if (_isUploadingAttachments) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Дождитесь окончания загрузки файлов.')),
+      );
+      return;
+    }
+
     Navigator.of(context).pop(
       UpsertVaccinationInput(
         status: _status,
@@ -743,9 +778,117 @@ class _VaccinationComposerSheetState extends State<_VaccinationComposerSheet> {
         clinicName: _emptyToNull(_clinicController.text),
         vetName: _emptyToNull(_vetController.text),
         notes: _emptyToNull(_notesController.text),
+        attachmentFileIds: _attachments
+            .map((attachment) => attachment.fileId)
+            .toList(growable: false),
         rowVersion: widget.initialVaccination?.rowVersion,
       ),
     );
+  }
+
+  Future<void> _pickAndUploadAttachments() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickFiles(
+          allowedExtensions: HealthFileUploadService.supportedExtensions,
+        );
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось загрузить файлы.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadFromGallery() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(files);
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
+    final file = await ref.read(mediaPickerServiceProvider).pickImage(
+          source: ImageSource.camera,
+        );
+    if (file == null || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(<XFile>[file]);
+  }
+
+  Future<void> _uploadPickedImages(List<XFile> files) async {
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadXFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось загрузить файлы.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  void _removeAttachment(String fileId) {
+    setState(() {
+      _attachments.removeWhere((attachment) => attachment.fileId == fileId);
+    });
   }
 
   String? _emptyToNull(String value) {
@@ -1001,6 +1144,7 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _VaccinationComposerSheet(
+        petId: petId,
         allowedStatuses: statuses,
         initialVaccination: vaccination,
         title: 'Редактировать вакцинацию',
@@ -1203,31 +1347,71 @@ class _VaccinationDetailsView extends StatelessWidget {
           ],
           if (vaccination.attachments.isNotEmpty) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Вложения',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Column(
-                children: vaccination.attachments
+            Builder(
+              builder: (context) {
+                final viewerItems = vaccination.attachments
                     .map(
-                      (attachment) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          attachment.fileType.startsWith('image/')
-                              ? Icons.photo_rounded
-                              : Icons.description_rounded,
-                        ),
-                        title: Text(attachment.fileName ?? 'Файл'),
-                        subtitle: Text(
-                          attachment.addedAt == null
-                              ? attachment.fileType
-                              : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
-                        ),
+                      (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileType: attachment.fileType,
+                        fileName: attachment.fileName,
+                        previewUrl: attachment.previewUrl,
+                        downloadUrl: attachment.downloadUrl,
                       ),
                     )
-                    .toList(growable: false),
-              ),
+                    .toList(growable: false);
+                final imageItems = viewerItems
+                    .where(
+                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                    )
+                    .toList(growable: false);
+
+                return PawlyCard(
+                  title: Text(
+                    'Вложения',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  child: Column(
+                    children: List<Widget>.generate(
+                      vaccination.attachments.length,
+                      (index) {
+                        final attachment = vaccination.attachments[index];
+                        final viewerItem = viewerItems[index];
+                        final imageIndex = imageItems.indexWhere(
+                          (item) =>
+                              item.url == viewerItem.url &&
+                              item.title == viewerItem.title,
+                        );
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            switch (viewerItem.kind) {
+                              AttachmentKind.image => Icons.photo_rounded,
+                              AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                              AttachmentKind.other => Icons.description_rounded,
+                            },
+                          ),
+                          title: Text(viewerItem.title),
+                          subtitle: Text(
+                            attachment.addedAt == null
+                                ? attachment.fileType
+                                : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
+                          ),
+                          onTap: () => openAttachmentUrl(
+                            context,
+                            fileType: attachment.fileType,
+                            fileName: viewerItem.title,
+                            previewUrl: attachment.previewUrl,
+                            downloadUrl: attachment.downloadUrl,
+                            imageGalleryItems: imageItems,
+                            initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ],

@@ -74,7 +74,7 @@ class PetsState {
 final petsRepositoryProvider = Provider<PetsRepository>((ref) {
   final petsApiClient = ref.watch(petsApiClientProvider);
   final aclApiClient = ref.watch(aclApiClientProvider);
-  final uploadDio = ref.watch(dioProvider);
+  final uploadDio = ref.watch(uploadDioProvider);
 
   return PetsRepository(
     petsApiClient: petsApiClient,

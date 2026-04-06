@@ -25,6 +25,48 @@ class HealthRepository {
     return _healthApiClient.getHealthBootstrap(petId);
   }
 
+  Future<InitUploadResponse> initAttachmentUpload(
+    String petId, {
+    required UploadHealthAttachmentInput input,
+  }) {
+    return _healthApiClient.initAttachmentUpload(
+      petId,
+      InitHealthAttachmentUploadPayload(
+        mimeType: input.mimeType,
+        originalFilename: input.originalFilename,
+        expectedSizeBytes: input.expectedSizeBytes,
+      ),
+    );
+  }
+
+  Future<UploadedHealthFile> confirmAttachmentUpload(
+    String petId, {
+    required String fileId,
+    required int sizeBytes,
+  }) async {
+    final response = await _healthApiClient.confirmAttachmentUpload(
+      petId,
+      ConfirmHealthAttachmentUploadPayload(
+        fileId: fileId,
+        sizeBytes: sizeBytes,
+      ),
+    );
+    return response.file;
+  }
+
+  Future<PetDocumentsListResponse> listDocuments(
+    String petId, {
+    PetDocumentsQuery query = const PetDocumentsQuery(),
+  }) {
+    return _healthApiClient.listDocuments(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      entityType: query.entityType,
+      fileType: query.fileType,
+    );
+  }
+
   Future<LogListResponse> listLogs(
     String petId, {
     required LogListQuery query,

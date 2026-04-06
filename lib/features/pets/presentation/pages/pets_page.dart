@@ -8,6 +8,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/pet_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../pet_care/presentation/providers/health_controllers.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../../data/pets_repository.dart';
 import '../providers/active_pet_controller.dart';
@@ -430,6 +431,91 @@ class _PetFeatureCard extends StatelessWidget {
   }
 }
 
+class _PetWideFeatureCard extends StatelessWidget {
+  const _PetWideFeatureCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.tint,
+    this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color? tint;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final accent = tint ?? colorScheme.primary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Ink(
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(PawlyRadius.md),
+                ),
+                child: Icon(icon, size: 26, color: accent),
+              ),
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xxxs),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: PawlySpacing.sm),
+              Icon(
+                Icons.arrow_outward_rounded,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ActivePetView extends ConsumerWidget {
   const _ActivePetView();
 
@@ -449,6 +535,7 @@ class _ActivePetView extends ConsumerWidget {
 
         final pet = details.pet;
         final ageLabel = _petAgeLabel(pet.birthDate);
+        final documentsCountAsync = ref.watch(petDocumentsSummaryProvider(pet.id));
 
         return ListView(
           padding: const EdgeInsets.all(PawlySpacing.lg),
@@ -517,6 +604,20 @@ class _ActivePetView extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            _PetWideFeatureCard(
+              title: 'Документы',
+              subtitle: documentsCountAsync.maybeWhen(
+                data: (value) => value,
+                orElse: () => 'Все файлы питомца в одном месте',
+              ),
+              icon: Icons.folder_copy_rounded,
+              tint: const Color(0xFF6D5BD0),
+              onTap: () => context.pushNamed(
+                'petDocuments',
+                pathParameters: <String, String>{'petId': pet.id},
+              ),
             ),
             const SizedBox(height: PawlySpacing.xl),
           ],

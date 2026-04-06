@@ -49,4 +49,15 @@ class DioFactory {
 
     return DioBundle(dio: dio, refreshDio: refreshDio);
   }
+
+  static Dio createUploadDio() {
+    return Dio(
+      BaseOptions(
+        connectTimeout: ApiConstants.connectTimeout,
+        receiveTimeout: ApiConstants.receiveTimeout,
+        sendTimeout: ApiConstants.sendTimeout,
+        responseType: ResponseType.plain,
+      ),
+    );
+  }
 }

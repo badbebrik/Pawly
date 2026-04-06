@@ -109,6 +109,135 @@ class HealthAttachment {
   }
 }
 
+class InitHealthAttachmentUploadPayload {
+  const InitHealthAttachmentUploadPayload({
+    required this.mimeType,
+    required this.originalFilename,
+    required this.expectedSizeBytes,
+  });
+
+  final String mimeType;
+  final String originalFilename;
+  final int expectedSizeBytes;
+
+  JsonMap toJson() => <String, dynamic>{
+        'mime_type': mimeType,
+        'original_filename': originalFilename,
+        'expected_size_bytes': expectedSizeBytes,
+      };
+}
+
+class ConfirmHealthAttachmentUploadPayload {
+  const ConfirmHealthAttachmentUploadPayload({
+    required this.fileId,
+    required this.sizeBytes,
+  });
+
+  final String fileId;
+  final int sizeBytes;
+
+  JsonMap toJson() => <String, dynamic>{
+        'file_id': fileId,
+        'size_bytes': sizeBytes,
+      };
+}
+
+class UploadedHealthFile {
+  const UploadedHealthFile({
+    required this.id,
+    required this.mimeType,
+    required this.sizeBytes,
+    this.originalFilename,
+  });
+
+  final String id;
+  final String mimeType;
+  final int sizeBytes;
+  final String? originalFilename;
+
+  factory UploadedHealthFile.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return UploadedHealthFile(
+      id: asString(json['id']),
+      mimeType: asString(json['mime_type']),
+      sizeBytes: asInt(json['size_bytes']),
+      originalFilename: asNullableString(json['original_filename']),
+    );
+  }
+}
+
+class ConfirmHealthAttachmentUploadResponse {
+  const ConfirmHealthAttachmentUploadResponse({
+    required this.file,
+  });
+
+  final UploadedHealthFile file;
+
+  factory ConfirmHealthAttachmentUploadResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ConfirmHealthAttachmentUploadResponse(
+      file: UploadedHealthFile.fromJson(json['file']),
+    );
+  }
+}
+
+class PetDocument {
+  const PetDocument({
+    required this.fileId,
+    this.fileName,
+    required this.fileType,
+    this.downloadUrl,
+    this.previewUrl,
+    this.addedAt,
+    this.addedByUserId,
+    required this.entityType,
+    required this.entityId,
+  });
+
+  final String fileId;
+  final String? fileName;
+  final String fileType;
+  final String? downloadUrl;
+  final String? previewUrl;
+  final DateTime? addedAt;
+  final String? addedByUserId;
+  final String entityType;
+  final String entityId;
+
+  factory PetDocument.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return PetDocument(
+      fileId: asString(json['file_id']),
+      fileName: asNullableString(json['file_name']),
+      fileType: asString(json['file_type']),
+      downloadUrl: asNullableString(json['download_url']),
+      previewUrl: asNullableString(json['preview_url']),
+      addedAt: asDateTime(json['added_at']),
+      addedByUserId: asNullableString(json['added_by_user_id']),
+      entityType: asString(json['entity_type']),
+      entityId: asString(json['entity_id']),
+    );
+  }
+}
+
+class PetDocumentsListResponse {
+  const PetDocumentsListResponse({
+    required this.items,
+    this.nextCursor,
+  });
+
+  final List<PetDocument> items;
+  final String? nextCursor;
+
+  factory PetDocumentsListResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return PetDocumentsListResponse(
+      items: _decodeList(json['items'], PetDocument.fromJson),
+      nextCursor: asNullableString(json['next_cursor']),
+    );
+  }
+}
+
 class RelatedLog {
   const RelatedLog({
     required this.id,

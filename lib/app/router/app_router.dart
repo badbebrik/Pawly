@@ -25,6 +25,7 @@ import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_picker_page.dart';
 import '../../features/pet_care/presentation/pages/pet_analytics_page.dart';
 import '../../features/pet_care/presentation/pages/pet_health_home_page.dart';
+import '../../features/pet_care/presentation/pages/pet_documents_page.dart';
 import '../../features/pet_care/presentation/pages/pet_medical_records_page.dart';
 import '../../features/pet_care/presentation/pages/pet_procedures_page.dart';
 import '../../features/pet_care/presentation/pages/pet_vet_visits_page.dart';
@@ -201,6 +202,13 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
+                          GoRoute(
+                            path: 'documents',
+                            name: 'petDocuments',
+                            builder: (_, state) => PetDocumentsPage(
+                              petId: state.pathParameters['petId']!,
+                            ),
+                          ),
                           GoRoute(
                             path: 'visits',
                             name: 'petVetVisits',

@@ -10,6 +10,10 @@ class MediaPickerService {
     return _imagePicker.pickImage(source: source, imageQuality: 85);
   }
 
+  Future<List<XFile>> pickGalleryImages() {
+    return _imagePicker.pickMultiImage(imageQuality: 85);
+  }
+
   Future<PlatformFile?> pickFile() async {
     final result = await FilePicker.platform.pickFiles(withData: false);
 
@@ -18,5 +22,25 @@ class MediaPickerService {
     }
 
     return result.files.first;
+  }
+
+  Future<List<PlatformFile>> pickFiles({
+    bool allowMultiple = true,
+    List<String>? allowedExtensions,
+  }) async {
+    final result = await FilePicker.platform.pickFiles(
+      withData: false,
+      allowMultiple: allowMultiple,
+      type: allowedExtensions == null || allowedExtensions.isEmpty
+          ? FileType.any
+          : FileType.custom,
+      allowedExtensions: allowedExtensions,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return const <PlatformFile>[];
+    }
+
+    return result.files;
   }
 }

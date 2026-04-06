@@ -86,8 +86,10 @@ class SettingsRepository {
       data: bytes,
       options: Options(
         method: initResponse.upload.method,
+        contentType: mimeType,
         headers: <String, dynamic>{
           ...initResponse.upload.headers,
+          Headers.contentLengthHeader: bytes.length,
           if (!initResponse.upload.headers.containsKey('Content-Type'))
             'Content-Type': mimeType,
         },

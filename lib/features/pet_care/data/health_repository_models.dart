@@ -26,6 +26,20 @@ class LogListQuery {
   final bool includeFacets;
 }
 
+class PetDocumentsQuery {
+  const PetDocumentsQuery({
+    this.cursor,
+    this.limit = 30,
+    this.entityType,
+    this.fileType,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? entityType;
+  final String? fileType;
+}
+
 class LogMetricInput {
   const LogMetricInput({
     required this.metricId,
@@ -337,4 +351,16 @@ class UpsertMedicalRecordInput {
   final String? resolvedAtIso;
   final List<String> attachmentFileIds;
   final int? rowVersion;
+}
+
+class UploadHealthAttachmentInput {
+  const UploadHealthAttachmentInput({
+    required this.mimeType,
+    required this.originalFilename,
+    required this.expectedSizeBytes,
+  });
+
+  final String mimeType;
+  final String originalFilename;
+  final int expectedSizeBytes;
 }

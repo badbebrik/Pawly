@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/providers/core_providers.dart';
 import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository_models.dart';
+import '../models/attachment_draft_item.dart';
 import 'pet_log_type_picker_page.dart';
 import '../providers/health_controllers.dart';
+import '../widgets/health_attachments_field.dart';
 
 class PetLogEditPage extends ConsumerStatefulWidget {
   const PetLogEditPage({
@@ -27,9 +32,11 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
   final Map<String, TextEditingController> _metricControllers =
       <String, TextEditingController>{};
   final Map<String, bool?> _booleanMetricValues = <String, bool?>{};
+  final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
   DateTime _occurredAt = DateTime.now();
   String? _selectedTypeId;
   bool _isSubmitting = false;
+  bool _isUploadingAttachments = false;
   bool _didPopulate = false;
 
   @override
@@ -91,7 +98,10 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     final allTypes = _allTypes(bootstrap);
     final selectedType = _selectedType(allTypes);
     final canEdit =
-        bootstrap.permissions.logWrite && log.canEdit && !_isSubmitting;
+        bootstrap.permissions.logWrite &&
+        log.canEdit &&
+        !_isSubmitting &&
+        !_isUploadingAttachments;
 
     return ListView(
       padding: const EdgeInsets.all(PawlySpacing.lg),
@@ -161,6 +171,17 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
           textCapitalization: TextCapitalization.sentences,
           enabled: canEdit,
         ),
+        const SizedBox(height: PawlySpacing.lg),
+        HealthAttachmentsField(
+          attachments: _attachments,
+          isUploading: _isUploadingAttachments,
+          enabled:
+              bootstrap.permissions.logWrite && log.canEdit && !_isSubmitting,
+          onAddFiles: _pickAndUploadAttachments,
+          onAddFromGallery: _pickAndUploadFromGallery,
+          onAddFromCamera: _pickAndUploadFromCamera,
+          onRemove: _removeAttachment,
+        ),
         if (selectedType != null &&
             selectedType.metricRequirements.isNotEmpty) ...<Widget>[
           const SizedBox(height: PawlySpacing.lg),
@@ -196,6 +217,9 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     _selectedTypeId = log.logTypeId;
     _occurredAt = (log.occurredAt ?? DateTime.now()).toLocal();
     _descriptionController.text = log.description;
+    _attachments
+      ..clear()
+      ..addAll(log.attachments.map(AttachmentDraftItem.fromLogAttachment));
     for (final metric in log.metricValues) {
       if (metric.inputKind == 'BOOLEAN') {
         _booleanMetricValues[metric.metricId] = metric.valueNum != 0;
@@ -322,6 +346,11 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     LogEntry log,
     LogComposerBootstrapResponse bootstrap,
   ) async {
+    if (_isUploadingAttachments) {
+      _showError('Дождитесь окончания загрузки файлов.');
+      return;
+    }
+
     final selectedType = _selectedType(_allTypes(bootstrap));
     final metricInputs = <LogMetricInput>[];
 
@@ -377,6 +406,9 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
                   ? null
                   : _descriptionController.text.trim(),
               metricValues: metricInputs,
+              attachmentFileIds: _attachments
+                  .map((attachment) => attachment.fileId)
+                  .toList(growable: false),
               rowVersion: log.rowVersion,
             ),
           );
@@ -407,6 +439,105 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
         });
       }
     }
+  }
+
+  Future<void> _pickAndUploadAttachments() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickFiles(
+          allowedExtensions: HealthFileUploadService.supportedExtensions,
+        );
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(
+          uploaded.map(AttachmentDraftItem.fromUploaded),
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showError(
+        error is StateError
+            ? error.message.toString()
+            : 'Не удалось загрузить файлы.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadFromGallery() async {
+    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    if (files.isEmpty || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(files);
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
+    final file = await ref.read(mediaPickerServiceProvider).pickImage(
+          source: ImageSource.camera,
+        );
+    if (file == null || !mounted) {
+      return;
+    }
+    await _uploadPickedImages(<XFile>[file]);
+  }
+
+  Future<void> _uploadPickedImages(List<XFile> files) async {
+    setState(() {
+      _isUploadingAttachments = true;
+    });
+
+    try {
+      final uploaded = await ref
+          .read(healthFileUploadServiceProvider)
+          .uploadXFiles(widget.petId, files: files);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showError(
+        error is StateError
+            ? error.message.toString()
+            : 'Не удалось загрузить файлы.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAttachments = false;
+        });
+      }
+    }
+  }
+
+  void _removeAttachment(String fileId) {
+    setState(() {
+      _attachments.removeWhere((attachment) => attachment.fileId == fileId);
+    });
   }
 
   void _showError(String message) {

@@ -3,12 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/models/log_models.dart';
 import '../../../../core/providers/core_providers.dart';
+import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository.dart';
 import '../../data/health_repository_models.dart';
 
 final healthRepositoryProvider = Provider<HealthRepository>((ref) {
   final healthApiClient = ref.watch(healthApiClientProvider);
   return HealthRepository(healthApiClient: healthApiClient);
+});
+
+final healthFileUploadServiceProvider = Provider<HealthFileUploadService>((ref) {
+  final healthRepository = ref.watch(healthRepositoryProvider);
+  final uploadDio = ref.watch(uploadDioProvider);
+  return HealthFileUploadService(
+    healthRepository: healthRepository,
+    uploadDio: uploadDio,
+  );
+});
+
+final petDocumentsSummaryProvider =
+    FutureProvider.autoDispose.family<String, String>((ref, petId) async {
+  final response = await ref.read(healthRepositoryProvider).listDocuments(
+        petId,
+        query: const PetDocumentsQuery(limit: 20),
+      );
+  return _documentsCountLabel(response.items.length, response.nextCursor);
 });
 
 final petLogsControllerProvider = AsyncNotifierProvider.autoDispose
@@ -145,6 +164,34 @@ class PetAnalyticsMetricsRef {
         dateTo,
         Object.hashAll(typeIds),
       );
+}
+
+String _documentsCountLabel(int count, String? nextCursor) {
+  if (count == 0) {
+    return 'Пока пусто';
+  }
+
+  final hasMore = nextCursor != null && nextCursor.isNotEmpty;
+  if (hasMore) {
+    return '$count+ ${_documentsWord(count)}';
+  }
+
+  return '$count ${_documentsWord(count)}';
+}
+
+String _documentsWord(int value) {
+  final mod10 = value % 10;
+  final mod100 = value % 100;
+
+  if (mod10 == 1 && mod100 != 11) {
+    return 'файл';
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return 'файла';
+  }
+
+  return 'файлов';
 }
 
 class PetLogsState {

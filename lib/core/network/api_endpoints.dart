@@ -80,6 +80,14 @@ class ApiEndpoints {
 
   static String petHealthDay(String petId) => '/v1/pets/$petId/health/day';
 
+  static String petAttachmentsInitUpload(String petId) =>
+      '/v1/pets/$petId/attachments:init-upload';
+
+  static String petAttachmentsConfirmUpload(String petId) =>
+      '/v1/pets/$petId/attachments:confirm-upload';
+
+  static String petDocuments(String petId) => '/v1/pets/$petId/documents';
+
   static String petVetVisits(String petId) => '/v1/pets/$petId/vet-visits';
 
   static String petVetVisitById(String petId, String visitId) =>

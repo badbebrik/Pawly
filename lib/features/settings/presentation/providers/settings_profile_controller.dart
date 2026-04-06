@@ -27,7 +27,7 @@ class SettingsProfileState {
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final profileApiClient = ref.watch(profileApiClientProvider);
-  final uploadDio = ref.watch(dioProvider);
+  final uploadDio = ref.watch(uploadDioProvider);
   final authSessionStore = ref.watch(authSessionStoreProvider);
   final sharedPreferencesService = ref.watch(sharedPreferencesServiceProvider);
 
