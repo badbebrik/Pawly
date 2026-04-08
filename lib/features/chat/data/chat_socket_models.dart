@@ -145,6 +145,8 @@ abstract class ChatServerEvent extends Equatable {
       'conversation_updated' => ConversationUpdatedEvent(
           conversation: ChatConversation.fromJson(payload),
         ),
+      'conversation_presence_updated' =>
+        ConversationPresenceUpdatedEvent.fromPayload(payload),
       'global_unread_updated' => GlobalUnreadUpdatedEvent(
           summary: ChatUnreadSummary.fromJson(payload),
         ),
@@ -213,6 +215,31 @@ class ConversationUpdatedEvent extends ChatServerEvent {
 
   @override
   List<Object?> get props => <Object?>[type, conversation];
+}
+
+class ConversationPresenceUpdatedEvent extends ChatServerEvent {
+  const ConversationPresenceUpdatedEvent({
+    required this.conversationId,
+    required this.userId,
+    required this.isInChat,
+  }) : super('conversation_presence_updated');
+
+  final String conversationId;
+  final String userId;
+  final bool isInChat;
+
+  factory ConversationPresenceUpdatedEvent.fromPayload(Object? data) {
+    final json = asJsonMap(data);
+
+    return ConversationPresenceUpdatedEvent(
+      conversationId: asString(json['conversation_id']),
+      userId: asString(json['user_id']),
+      isInChat: asBool(json['is_in_chat']),
+    );
+  }
+
+  @override
+  List<Object?> get props => <Object?>[type, conversationId, userId, isInChat];
 }
 
 class GlobalUnreadUpdatedEvent extends ChatServerEvent {

@@ -38,7 +38,9 @@ class ChatListItem {
     required this.lastMessagePreview,
     required this.lastMessageSenderId,
     required this.lastReadMessageId,
+    required this.otherUserLastReadMessageId,
     required this.unreadCount,
+    required this.otherUserInChat,
     required this.canSend,
   });
 
@@ -50,7 +52,9 @@ class ChatListItem {
   final String? lastMessagePreview;
   final String? lastMessageSenderId;
   final String? lastReadMessageId;
+  final String? otherUserLastReadMessageId;
   final int unreadCount;
+  final bool otherUserInChat;
   final bool canSend;
 
   bool get hasUnread => unreadCount > 0;

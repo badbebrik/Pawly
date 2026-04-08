@@ -105,7 +105,9 @@ class ChatRepository {
       lastMessagePreview: source.lastMessagePreview,
       lastMessageSenderId: source.lastMessageSenderId,
       lastReadMessageId: source.lastReadMessageId,
+      otherUserLastReadMessageId: source.otherUserLastReadMessageId,
       unreadCount: source.unreadCount,
+      otherUserInChat: source.otherUserInChat,
       canSend: source.canSend,
     );
   }

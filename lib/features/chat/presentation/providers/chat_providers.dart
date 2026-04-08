@@ -336,7 +336,9 @@ class ChatInboxController extends AsyncNotifier<ChatInboxState> {
         lastMessagePreview: item.lastMessagePreview,
         lastMessageSenderId: item.lastMessageSenderId,
         lastReadMessageId: lastReadMessageId,
+        otherUserLastReadMessageId: item.otherUserLastReadMessageId,
         unreadCount: 0,
+        otherUserInChat: item.otherUserInChat,
         canSend: item.canSend,
       );
     }).toList(growable: false);
@@ -381,6 +383,8 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
           if (event.conversation.conversationId == _conversationId) {
             patchConversation(repository.mapConversation(event.conversation));
           }
+        case ConversationPresenceUpdatedEvent():
+          _handleConversationPresenceUpdated(event);
         default:
           break;
       }
@@ -674,10 +678,15 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
           lastMessageAt: current.conversation.lastMessageAt,
           lastMessagePreview: current.conversation.lastMessagePreview,
           lastMessageSenderId: current.conversation.lastMessageSenderId,
-          lastReadMessageId: event.lastReadMessageId,
-          unreadCount: event.userId == current.currentUserId
-              ? 0
-              : current.conversation.unreadCount,
+          lastReadMessageId: event.userId == current.currentUserId
+              ? event.lastReadMessageId
+              : current.conversation.lastReadMessageId,
+          otherUserLastReadMessageId: event.userId == current.currentUserId
+              ? current.conversation.otherUserLastReadMessageId
+              : event.lastReadMessageId,
+          unreadCount:
+              event.userId == current.currentUserId ? 0 : current.conversation.unreadCount,
+          otherUserInChat: current.conversation.otherUserInChat,
           canSend: current.conversation.canSend,
         ),
       ),
@@ -700,6 +709,39 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     }
   }
 
+  void _handleConversationPresenceUpdated(
+    ConversationPresenceUpdatedEvent event,
+  ) {
+    if (event.conversationId != _conversationId) {
+      return;
+    }
+
+    final current = state.asData?.value;
+    if (current == null || event.userId == current.currentUserId) {
+      return;
+    }
+
+    state = AsyncData(
+      current.copyWith(
+        conversation: ChatListItem(
+          conversationId: current.conversation.conversationId,
+          pet: current.conversation.pet,
+          peer: current.conversation.peer,
+          lastMessageId: current.conversation.lastMessageId,
+          lastMessageAt: current.conversation.lastMessageAt,
+          lastMessagePreview: current.conversation.lastMessagePreview,
+          lastMessageSenderId: current.conversation.lastMessageSenderId,
+          lastReadMessageId: current.conversation.lastReadMessageId,
+          otherUserLastReadMessageId:
+              current.conversation.otherUserLastReadMessageId,
+          unreadCount: current.conversation.unreadCount,
+          otherUserInChat: event.isInChat,
+          canSend: current.conversation.canSend,
+        ),
+      ),
+    );
+  }
+
   ChatListItem _mergeConversationWithMessage(
     ChatListItem conversation,
     ChatMessageItem message, {
@@ -714,7 +756,9 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
       lastMessagePreview: message.text,
       lastMessageSenderId: message.senderUserId,
       lastReadMessageId: conversation.lastReadMessageId,
+      otherUserLastReadMessageId: conversation.otherUserLastReadMessageId,
       unreadCount: unreadCount,
+      otherUserInChat: conversation.otherUserInChat,
       canSend: conversation.canSend,
     );
   }
@@ -857,7 +901,10 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
           lastMessagePreview: current.conversation.lastMessagePreview,
           lastMessageSenderId: current.conversation.lastMessageSenderId,
           lastReadMessageId: lastReadMessageId,
+          otherUserLastReadMessageId:
+              current.conversation.otherUserLastReadMessageId,
           unreadCount: 0,
+          otherUserInChat: current.conversation.otherUserInChat,
           canSend: current.conversation.canSend,
         ),
         isMarkingRead: true,

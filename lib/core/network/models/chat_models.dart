@@ -55,7 +55,9 @@ class ChatConversation {
     required this.lastMessagePreview,
     required this.lastMessageSenderId,
     required this.lastReadMessageId,
+    required this.otherUserLastReadMessageId,
     required this.unreadCount,
+    required this.otherUserInChat,
     required this.canSend,
   });
 
@@ -67,7 +69,9 @@ class ChatConversation {
   final String? lastMessagePreview;
   final String? lastMessageSenderId;
   final String? lastReadMessageId;
+  final String? otherUserLastReadMessageId;
   final int unreadCount;
+  final bool otherUserInChat;
   final bool canSend;
 
   factory ChatConversation.fromJson(Object? data) {
@@ -82,7 +86,10 @@ class ChatConversation {
       lastMessagePreview: asNullableString(json['last_message_preview']),
       lastMessageSenderId: asNullableString(json['last_message_sender_id']),
       lastReadMessageId: asNullableString(json['last_read_message_id']),
+      otherUserLastReadMessageId:
+          asNullableString(json['other_user_last_read_message_id']),
       unreadCount: asInt(json['unread_count']),
+      otherUserInChat: asBool(json['other_user_in_chat']),
       canSend: asBool(json['can_send']),
     );
   }

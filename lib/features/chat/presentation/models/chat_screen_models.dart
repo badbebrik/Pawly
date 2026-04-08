@@ -80,6 +80,25 @@ class ChatConversationState {
   bool get canMarkRead =>
       lastReadableMessageId != null && lastReadableMessageId!.isNotEmpty;
 
+  bool isMessageReadByPeer(String messageId) {
+    final peerReadMessageId = conversation.otherUserLastReadMessageId;
+    if (peerReadMessageId == null || peerReadMessageId.isEmpty) {
+      return false;
+    }
+
+    final readIndex = messages.indexWhere(
+      (message) => message.messageId == peerReadMessageId,
+    );
+    if (readIndex >= 0) {
+      final messageIndex = messages.indexWhere(
+        (message) => message.messageId == messageId,
+      );
+      return messageIndex >= 0 && messageIndex <= readIndex;
+    }
+
+    return messageId == peerReadMessageId;
+  }
+
   ChatConversationState copyWith({
     String? currentUserId,
     ChatListItem? conversation,

@@ -227,6 +227,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
             isMine: message.senderUserId == state.currentUserId,
             isSending: message.isSending,
             hasFailed: message.hasFailed,
+            isReadByPeer: state.isMessageReadByPeer(message.messageId),
           ),
         ),
       );
@@ -270,7 +271,7 @@ class _ConversationAppBarTitle extends StatelessWidget {
                 ),
               ),
               Text(
-                'По питомцу ${state.conversation.pet.name}',
+                '${state.conversation.otherUserInChat ? 'В чате сейчас' : 'Не в чате'} · ${state.conversation.pet.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -439,6 +440,7 @@ class _MessageBubble extends StatelessWidget {
     required this.isMine,
     required this.isSending,
     required this.hasFailed,
+    required this.isReadByPeer,
   });
 
   final String text;
@@ -446,6 +448,7 @@ class _MessageBubble extends StatelessWidget {
   final bool isMine;
   final bool isSending;
   final bool hasFailed;
+  final bool isReadByPeer;
 
   @override
   Widget build(BuildContext context) {
@@ -514,6 +517,18 @@ class _MessageBubble extends StatelessWidget {
                                   : colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          if (isMine && !hasFailed && !isSending) ...<Widget>[
+                            const SizedBox(width: PawlySpacing.xs),
+                            Icon(
+                              isReadByPeer
+                                  ? Icons.done_all_rounded
+                                  : Icons.done_rounded,
+                              size: 14,
+                              color: isReadByPeer
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ],
                         ],
                       ),
                     ),
