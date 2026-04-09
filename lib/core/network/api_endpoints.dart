@@ -78,7 +78,31 @@ class ApiEndpoints {
   static String petHealthBootstrap(String petId) =>
       '/v1/pets/$petId/health/bootstrap';
 
+  static const String healthDay = '/v1/health/day';
+
   static String petHealthDay(String petId) => '/v1/pets/$petId/health/day';
+
+  static String petScheduledItems(String petId) =>
+      '/v1/pets/$petId/scheduled-items';
+
+  static String petScheduledItemById(String petId, String itemId) =>
+      '/v1/pets/$petId/scheduled-items/$itemId';
+
+  static String petScheduledItemOccurrences(String petId) =>
+      '/v1/pets/$petId/scheduled-item-occurrences';
+
+  static String petScheduledItemOccurrenceById(
+    String petId,
+    String occurrenceId,
+  ) =>
+      '/v1/pets/$petId/scheduled-item-occurrences/$occurrenceId';
+
+  static const String pushDevices = '/v1/push/devices';
+
+  static String pushDeviceById(String deviceId) => '/v1/push/devices/$deviceId';
+
+  static String petPushSettings(String petId) =>
+      '/v1/pets/$petId/push-settings';
 
   static String petAttachmentsInitUpload(String petId) =>
       '/v1/pets/$petId/attachments:init-upload';

@@ -526,6 +526,125 @@ class HealthRepository {
     return _healthApiClient.getHealthDay(petId, date: date);
   }
 
+  Future<ScheduledDayResponse> getScheduleDay({
+    required String date,
+  }) {
+    return _healthApiClient.getScheduleDay(date: date);
+  }
+
+  Future<ScheduledDayResponse> getPetScheduleDay(
+    String petId, {
+    required String date,
+  }) {
+    return _healthApiClient.getPetScheduleDay(petId, date: date);
+  }
+
+  Future<ScheduledItemListResponse> listScheduledItems(
+    String petId, {
+    ScheduledItemsQuery query = const ScheduledItemsQuery(),
+  }) {
+    return _healthApiClient.listScheduledItems(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      sourceType: query.sourceType,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      includePast: query.includePast,
+    );
+  }
+
+  Future<ScheduledItem> getScheduledItem(String petId, String itemId) {
+    return _healthApiClient.getScheduledItem(petId, itemId);
+  }
+
+  Future<ScheduledItem> createScheduledItem(
+    String petId, {
+    required UpsertScheduledItemInput input,
+  }) {
+    return _healthApiClient.createScheduledItem(
+      petId,
+      _toUpsertScheduledItemPayload(input),
+    );
+  }
+
+  Future<ScheduledItem> updateScheduledItem(
+    String petId,
+    String itemId, {
+    required UpsertScheduledItemInput input,
+  }) {
+    return _healthApiClient.updateScheduledItem(
+      petId,
+      itemId,
+      _toUpsertScheduledItemPayload(input),
+    );
+  }
+
+  Future<EmptyResponse> deleteScheduledItem(
+    String petId,
+    String itemId, {
+    required int rowVersion,
+  }) {
+    return _healthApiClient.deleteScheduledItem(
+      petId,
+      itemId,
+      DeleteEntityPayload(rowVersion: rowVersion),
+    );
+  }
+
+  Future<ScheduledItemOccurrenceListResponse> listScheduledItemOccurrences(
+    String petId, {
+    ScheduledItemOccurrencesQuery query = const ScheduledItemOccurrencesQuery(),
+  }) {
+    return _healthApiClient.listScheduledItemOccurrences(
+      petId,
+      cursor: query.cursor,
+      limit: query.limit,
+      sourceType: query.sourceType,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    );
+  }
+
+  Future<ScheduledItemOccurrence> getScheduledItemOccurrence(
+    String petId,
+    String occurrenceId,
+  ) {
+    return _healthApiClient.getScheduledItemOccurrence(petId, occurrenceId);
+  }
+
+  Future<DeviceToken> registerPushDevice({
+    required RegisterPushDeviceInput input,
+  }) {
+    return _healthApiClient.registerPushDevice(
+      DeviceTokenPayload(
+        deviceId: input.deviceId,
+        platform: input.platform,
+        pushToken: input.pushToken,
+      ),
+    );
+  }
+
+  Future<EmptyResponse> deletePushDevice(String deviceId) {
+    return _healthApiClient.deletePushDevice(deviceId);
+  }
+
+  Future<PetPushSettings> getPetPushSettings(String petId) {
+    return _healthApiClient.getPetPushSettings(petId);
+  }
+
+  Future<PetPushSettings> updatePetPushSettings(
+    String petId, {
+    required bool scheduledItemsEnabled,
+  }) {
+    return _healthApiClient.updatePetPushSettings(
+      petId,
+      UpdatePetPushSettingsPayload(
+        scheduledItemsEnabled: scheduledItemsEnabled,
+      ),
+    );
+  }
+
   UpsertLogPayload _toUpsertLogPayload(UpsertLogInput input) {
     return UpsertLogPayload(
       occurredAt: DateTime.parse(input.occurredAtIso),
@@ -542,6 +661,26 @@ class HealthRepository {
           )
           .toList(growable: false),
       attachmentFileIds: input.attachmentFileIds,
+      rowVersion: input.rowVersion,
+    );
+  }
+
+  UpsertScheduledItemPayload _toUpsertScheduledItemPayload(
+    UpsertScheduledItemInput input,
+  ) {
+    return UpsertScheduledItemPayload(
+      sourceType: input.sourceType,
+      sourceId: input.sourceId,
+      title: input.title,
+      note: input.note,
+      startsAt: DateTime.parse(input.startsAtIso),
+      recurrence: input.recurrence == null
+          ? null
+          : ScheduledItemRecurrence(
+              rule: input.recurrence!.rule,
+              interval: input.recurrence!.interval,
+              until: _parseDateTime(input.recurrence!.untilIso),
+            ),
       rowVersion: input.rowVersion,
     );
   }

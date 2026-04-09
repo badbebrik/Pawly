@@ -364,3 +364,81 @@ class UploadHealthAttachmentInput {
   final String originalFilename;
   final int expectedSizeBytes;
 }
+
+class ScheduledItemsQuery {
+  const ScheduledItemsQuery({
+    this.cursor,
+    this.limit = 30,
+    this.sourceType,
+    this.dateFrom,
+    this.dateTo,
+    this.includePast,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? sourceType;
+  final String? dateFrom;
+  final String? dateTo;
+  final bool? includePast;
+}
+
+class ScheduledItemOccurrencesQuery {
+  const ScheduledItemOccurrencesQuery({
+    this.cursor,
+    this.limit = 30,
+    this.sourceType,
+    this.dateFrom,
+    this.dateTo,
+  });
+
+  final String? cursor;
+  final int limit;
+  final String? sourceType;
+  final String? dateFrom;
+  final String? dateTo;
+}
+
+class ScheduledItemRecurrenceInput {
+  const ScheduledItemRecurrenceInput({
+    required this.rule,
+    required this.interval,
+    this.untilIso,
+  });
+
+  final String rule;
+  final int interval;
+  final String? untilIso;
+}
+
+class UpsertScheduledItemInput {
+  const UpsertScheduledItemInput({
+    required this.sourceType,
+    this.sourceId,
+    required this.title,
+    this.note,
+    required this.startsAtIso,
+    this.recurrence,
+    this.rowVersion,
+  });
+
+  final String sourceType;
+  final String? sourceId;
+  final String title;
+  final String? note;
+  final String startsAtIso;
+  final ScheduledItemRecurrenceInput? recurrence;
+  final int? rowVersion;
+}
+
+class RegisterPushDeviceInput {
+  const RegisterPushDeviceInput({
+    required this.deviceId,
+    required this.platform,
+    required this.pushToken,
+  });
+
+  final String deviceId;
+  final String platform;
+  final String pushToken;
+}

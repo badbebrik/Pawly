@@ -337,6 +337,340 @@ class HealthDayResponse {
   }
 }
 
+class ScheduledItemRecurrence {
+  const ScheduledItemRecurrence({
+    required this.rule,
+    required this.interval,
+    this.until,
+  });
+
+  final String rule;
+  final int interval;
+  final DateTime? until;
+
+  factory ScheduledItemRecurrence.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledItemRecurrence(
+      rule: asString(json['rule']),
+      interval: asInt(json['interval']),
+      until: asDateTime(json['until']),
+    );
+  }
+
+  JsonMap toJson() => <String, dynamic>{
+        'rule': rule,
+        'interval': interval,
+        'until': _toIso8601String(until),
+      };
+}
+
+class ScheduledItem {
+  const ScheduledItem({
+    required this.id,
+    required this.petId,
+    required this.sourceType,
+    this.sourceId,
+    required this.title,
+    this.note,
+    this.startsAt,
+    this.recurrence,
+    required this.rowVersion,
+    this.createdAt,
+    required this.createdByUserId,
+    this.updatedAt,
+    required this.updatedByUserId,
+  });
+
+  final String id;
+  final String petId;
+  final String sourceType;
+  final String? sourceId;
+  final String title;
+  final String? note;
+  final DateTime? startsAt;
+  final ScheduledItemRecurrence? recurrence;
+  final int rowVersion;
+  final DateTime? createdAt;
+  final String createdByUserId;
+  final DateTime? updatedAt;
+  final String updatedByUserId;
+
+  factory ScheduledItem.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledItem(
+      id: asString(json['id']),
+      petId: asString(json['pet_id']),
+      sourceType: asString(json['source_type']),
+      sourceId: asNullableString(json['source_id']),
+      title: asString(json['title']),
+      note: asNullableString(json['note']),
+      startsAt: asDateTime(json['starts_at']),
+      recurrence: json['recurrence'] == null
+          ? null
+          : ScheduledItemRecurrence.fromJson(json['recurrence']),
+      rowVersion: asInt(json['row_version']),
+      createdAt: asDateTime(json['created_at']),
+      createdByUserId: asString(json['created_by_user_id']),
+      updatedAt: asDateTime(json['updated_at']),
+      updatedByUserId: asString(json['updated_by_user_id']),
+    );
+  }
+}
+
+class ScheduledItemCard {
+  const ScheduledItemCard({
+    required this.id,
+    required this.petId,
+    required this.sourceType,
+    this.sourceId,
+    required this.title,
+    this.notePreview,
+    this.startsAt,
+    this.recurrence,
+    required this.rowVersion,
+    this.createdAt,
+    required this.createdByUserId,
+    this.updatedAt,
+    required this.updatedByUserId,
+  });
+
+  final String id;
+  final String petId;
+  final String sourceType;
+  final String? sourceId;
+  final String title;
+  final String? notePreview;
+  final DateTime? startsAt;
+  final ScheduledItemRecurrence? recurrence;
+  final int rowVersion;
+  final DateTime? createdAt;
+  final String createdByUserId;
+  final DateTime? updatedAt;
+  final String updatedByUserId;
+
+  factory ScheduledItemCard.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledItemCard(
+      id: asString(json['id']),
+      petId: asString(json['pet_id']),
+      sourceType: asString(json['source_type']),
+      sourceId: asNullableString(json['source_id']),
+      title: asString(json['title']),
+      notePreview: asNullableString(json['note_preview']),
+      startsAt: asDateTime(json['starts_at']),
+      recurrence: json['recurrence'] == null
+          ? null
+          : ScheduledItemRecurrence.fromJson(json['recurrence']),
+      rowVersion: asInt(json['row_version']),
+      createdAt: asDateTime(json['created_at']),
+      createdByUserId: asString(json['created_by_user_id']),
+      updatedAt: asDateTime(json['updated_at']),
+      updatedByUserId: asString(json['updated_by_user_id']),
+    );
+  }
+}
+
+class ScheduledItemOccurrence {
+  const ScheduledItemOccurrence({
+    required this.id,
+    required this.scheduledItemId,
+    required this.petId,
+    this.scheduledFor,
+    this.createdAt,
+    required this.rule,
+  });
+
+  final String id;
+  final String scheduledItemId;
+  final String petId;
+  final DateTime? scheduledFor;
+  final DateTime? createdAt;
+  final ScheduledItem rule;
+
+  factory ScheduledItemOccurrence.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledItemOccurrence(
+      id: asString(json['id']),
+      scheduledItemId: asString(json['scheduled_item_id']),
+      petId: asString(json['pet_id']),
+      scheduledFor: asDateTime(json['scheduled_for']),
+      createdAt: asDateTime(json['created_at']),
+      rule: ScheduledItem.fromJson(json['rule']),
+    );
+  }
+}
+
+class ScheduledItemListResponse {
+  const ScheduledItemListResponse({
+    required this.items,
+    this.nextCursor,
+  });
+
+  final List<ScheduledItemCard> items;
+  final String? nextCursor;
+
+  factory ScheduledItemListResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledItemListResponse(
+      items: _decodeList(json['items'], ScheduledItemCard.fromJson),
+      nextCursor: asNullableString(json['next_cursor']),
+    );
+  }
+}
+
+class ScheduledItemOccurrenceListResponse {
+  const ScheduledItemOccurrenceListResponse({
+    required this.items,
+    this.nextCursor,
+  });
+
+  final List<ScheduledItemOccurrence> items;
+  final String? nextCursor;
+
+  factory ScheduledItemOccurrenceListResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledItemOccurrenceListResponse(
+      items: _decodeList(json['items'], ScheduledItemOccurrence.fromJson),
+      nextCursor: asNullableString(json['next_cursor']),
+    );
+  }
+}
+
+class ScheduledDayResponse {
+  const ScheduledDayResponse({
+    required this.date,
+    required this.items,
+  });
+
+  final String date;
+  final List<ScheduledItemOccurrence> items;
+
+  factory ScheduledDayResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return ScheduledDayResponse(
+      date: asString(json['date']),
+      items: _decodeList(json['items'], ScheduledItemOccurrence.fromJson),
+    );
+  }
+}
+
+class UpsertScheduledItemPayload {
+  const UpsertScheduledItemPayload({
+    required this.sourceType,
+    this.sourceId,
+    required this.title,
+    this.note,
+    required this.startsAt,
+    this.recurrence,
+    this.rowVersion,
+  });
+
+  final String sourceType;
+  final String? sourceId;
+  final String title;
+  final String? note;
+  final DateTime startsAt;
+  final ScheduledItemRecurrence? recurrence;
+  final int? rowVersion;
+
+  JsonMap toJson() => <String, dynamic>{
+        'source_type': sourceType,
+        'source_id': sourceId,
+        'title': title,
+        'note': note,
+        'starts_at': _toIso8601String(startsAt),
+        'recurrence': recurrence?.toJson(),
+        'row_version': rowVersion,
+      }..removeWhere((_, dynamic value) => value == null);
+}
+
+class DeviceTokenPayload {
+  const DeviceTokenPayload({
+    required this.deviceId,
+    required this.platform,
+    required this.pushToken,
+  });
+
+  final String deviceId;
+  final String platform;
+  final String pushToken;
+
+  JsonMap toJson() => <String, dynamic>{
+        'device_id': deviceId,
+        'platform': platform,
+        'push_token': pushToken,
+      };
+}
+
+class DeviceToken {
+  const DeviceToken({
+    required this.id,
+    required this.userId,
+    required this.deviceId,
+    required this.platform,
+    required this.pushToken,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String userId;
+  final String deviceId;
+  final String platform;
+  final String pushToken;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  factory DeviceToken.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return DeviceToken(
+      id: asString(json['id']),
+      userId: asString(json['user_id']),
+      deviceId: asString(json['device_id']),
+      platform: asString(json['platform']),
+      pushToken: asString(json['push_token']),
+      createdAt: asDateTime(json['created_at']),
+      updatedAt: asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PetPushSettings {
+  const PetPushSettings({
+    required this.petId,
+    required this.scheduledItemsEnabled,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String petId;
+  final bool scheduledItemsEnabled;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  factory PetPushSettings.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return PetPushSettings(
+      petId: asString(json['pet_id']),
+      scheduledItemsEnabled: asBool(json['scheduled_items_enabled']),
+      createdAt: asDateTime(json['created_at']),
+      updatedAt: asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class UpdatePetPushSettingsPayload {
+  const UpdatePetPushSettingsPayload({
+    required this.scheduledItemsEnabled,
+  });
+
+  final bool scheduledItemsEnabled;
+
+  JsonMap toJson() => <String, dynamic>{
+        'scheduled_items_enabled': scheduledItemsEnabled,
+      };
+}
+
 class VetVisitCard {
   const VetVisitCard({
     required this.id,

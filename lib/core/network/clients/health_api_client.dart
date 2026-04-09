@@ -638,6 +638,15 @@ class HealthApiClient {
     );
   }
 
+  Future<ScheduledDayResponse> getScheduleDay({required String date}) {
+    return _apiClient.get<ScheduledDayResponse>(
+      ApiEndpoints.healthDay,
+      queryParameters: <String, dynamic>{'date': date},
+      requestOptions: _withToken,
+      decoder: ScheduledDayResponse.fromJson,
+    );
+  }
+
   Future<HealthDayResponse> getHealthDay(
     String petId, {
     required String date,
@@ -647,6 +656,158 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{'date': date},
       requestOptions: _withToken,
       decoder: HealthDayResponse.fromJson,
+    );
+  }
+
+  Future<ScheduledDayResponse> getPetScheduleDay(
+    String petId, {
+    required String date,
+  }) {
+    return _apiClient.get<ScheduledDayResponse>(
+      ApiEndpoints.petHealthDay(petId),
+      queryParameters: <String, dynamic>{'date': date},
+      requestOptions: _withToken,
+      decoder: ScheduledDayResponse.fromJson,
+    );
+  }
+
+  Future<ScheduledItemListResponse> listScheduledItems(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? sourceType,
+    String? dateFrom,
+    String? dateTo,
+    bool? includePast,
+  }) {
+    return _apiClient.get<ScheduledItemListResponse>(
+      ApiEndpoints.petScheduledItems(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'source_type': sourceType,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'include_past': includePast,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withToken,
+      decoder: ScheduledItemListResponse.fromJson,
+    );
+  }
+
+  Future<ScheduledItem> getScheduledItem(String petId, String itemId) {
+    return _apiClient.get<ScheduledItem>(
+      ApiEndpoints.petScheduledItemById(petId, itemId),
+      requestOptions: _withToken,
+      decoder: ScheduledItem.fromJson,
+    );
+  }
+
+  Future<ScheduledItem> createScheduledItem(
+    String petId,
+    UpsertScheduledItemPayload payload,
+  ) {
+    return _apiClient.post<ScheduledItem>(
+      ApiEndpoints.petScheduledItems(petId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: ScheduledItem.fromJson,
+    );
+  }
+
+  Future<ScheduledItem> updateScheduledItem(
+    String petId,
+    String itemId,
+    UpsertScheduledItemPayload payload,
+  ) {
+    return _apiClient.patch<ScheduledItem>(
+      ApiEndpoints.petScheduledItemById(petId, itemId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: ScheduledItem.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> deleteScheduledItem(
+    String petId,
+    String itemId,
+    DeleteEntityPayload payload,
+  ) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.petScheduledItemById(petId, itemId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<ScheduledItemOccurrenceListResponse> listScheduledItemOccurrences(
+    String petId, {
+    String? cursor,
+    int? limit,
+    String? sourceType,
+    String? dateFrom,
+    String? dateTo,
+  }) {
+    return _apiClient.get<ScheduledItemOccurrenceListResponse>(
+      ApiEndpoints.petScheduledItemOccurrences(petId),
+      queryParameters: <String, dynamic>{
+        'cursor': cursor,
+        'limit': limit,
+        'source_type': sourceType,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+      }..removeWhere((_, dynamic value) => value == null),
+      requestOptions: _withToken,
+      decoder: ScheduledItemOccurrenceListResponse.fromJson,
+    );
+  }
+
+  Future<ScheduledItemOccurrence> getScheduledItemOccurrence(
+    String petId,
+    String occurrenceId,
+  ) {
+    return _apiClient.get<ScheduledItemOccurrence>(
+      ApiEndpoints.petScheduledItemOccurrenceById(petId, occurrenceId),
+      requestOptions: _withToken,
+      decoder: ScheduledItemOccurrence.fromJson,
+    );
+  }
+
+  Future<DeviceToken> registerPushDevice(DeviceTokenPayload payload) {
+    return _apiClient.post<DeviceToken>(
+      ApiEndpoints.pushDevices,
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: DeviceToken.fromJson,
+    );
+  }
+
+  Future<EmptyResponse> deletePushDevice(String deviceId) {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.pushDeviceById(deviceId),
+      requestOptions: _withToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
+
+  Future<PetPushSettings> getPetPushSettings(String petId) {
+    return _apiClient.get<PetPushSettings>(
+      ApiEndpoints.petPushSettings(petId),
+      requestOptions: _withToken,
+      decoder: PetPushSettings.fromJson,
+    );
+  }
+
+  Future<PetPushSettings> updatePetPushSettings(
+    String petId,
+    UpdatePetPushSettingsPayload payload,
+  ) {
+    return _apiClient.patch<PetPushSettings>(
+      ApiEndpoints.petPushSettings(petId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: PetPushSettings.fromJson,
     );
   }
 
