@@ -10,6 +10,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final sessionStore = ref.watch(authSessionStoreProvider);
   final devicePreferencesService = ref.watch(devicePreferencesServiceProvider);
   final googleSignInService = ref.watch(googleSignInServiceProvider);
+  final pushNotificationsService = ref.watch(pushNotificationsServiceProvider);
   final sharedPreferencesService = ref.watch(sharedPreferencesServiceProvider);
 
   return AuthRepository(
@@ -17,6 +18,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
     authSessionStore: sessionStore,
     devicePreferencesService: devicePreferencesService,
     googleSignInService: googleSignInService,
+    pushNotificationsService: pushNotificationsService,
     sharedPreferencesService: sharedPreferencesService,
   );
 });

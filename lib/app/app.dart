@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'dart:async';
 
 import 'deep_links/pawly_deep_link_listener.dart';
 import 'providers/theme_mode_controller.dart';
 import '../core/providers/core_providers.dart';
+import '../core/services/push_notifications_service.dart';
 import '../design_system/design_system.dart';
+import 'router/app_routes.dart';
 
 class PawlyApp extends ConsumerWidget {
   const PawlyApp({super.key});
@@ -33,10 +37,83 @@ class PawlyApp extends ConsumerWidget {
       ],
       routerConfig: router,
       builder: (context, child) {
-        return PawlyDeepLinkListener(
-          child: child ?? const SizedBox.shrink(),
+        return _PushNotificationsBinding(
+          child: PawlyDeepLinkListener(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );
+  }
+}
+
+class _PushNotificationsBinding extends ConsumerStatefulWidget {
+  const _PushNotificationsBinding({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  ConsumerState<_PushNotificationsBinding> createState() =>
+      _PushNotificationsBindingState();
+}
+
+class _PushNotificationsBindingState
+    extends ConsumerState<_PushNotificationsBinding> {
+  StreamSubscription<PushNotificationPayload>? _openedMessagesSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(() async {
+      final service = ref.read(pushNotificationsServiceProvider);
+      _openedMessagesSubscription = service.openedMessages.listen(
+        _handleOpenedMessage,
+      );
+      await service.initialize();
+      if (!mounted) {
+        return;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _openedMessagesSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _handleOpenedMessage(PushNotificationPayload payload) {
+    if (!payload.isScheduledOccurrence) {
+      return;
+    }
+
+    final router = ref.read(appRouterProvider);
+    _openScheduledOccurrence(router, payload);
+  }
+
+  void _openScheduledOccurrence(
+    GoRouter router,
+    PushNotificationPayload payload,
+  ) {
+    router.go(
+      Uri(
+        path: AppRoutes.calendar,
+        queryParameters: <String, String>{
+          if (payload.petId != null) 'pet_id': payload.petId!,
+          if (payload.occurrenceId != null)
+            'occurrence_id': payload.occurrenceId!,
+          if (payload.scheduledItemId != null)
+            'scheduled_item_id': payload.scheduledItemId!,
+          if (payload.sourceType != null) 'source_type': payload.sourceType!,
+        },
+      ).toString(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

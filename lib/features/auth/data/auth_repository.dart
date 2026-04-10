@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/clients/auth_api_client.dart';
 import '../../../core/network/models/auth_models.dart';
@@ -6,6 +8,7 @@ import '../../../core/network/session/auth_session.dart';
 import '../../../core/network/session/auth_session_store.dart';
 import '../../../core/services/device_preferences_service.dart';
 import '../../../core/services/google_sign_in_service.dart';
+import '../../../core/services/push_notifications_service.dart';
 import '../../../core/storage/shared_preferences_service.dart';
 
 class AuthRepository {
@@ -14,17 +17,20 @@ class AuthRepository {
     required AuthSessionStore authSessionStore,
     required DevicePreferencesService devicePreferencesService,
     required GoogleSignInService googleSignInService,
+    required PushNotificationsService pushNotificationsService,
     required SharedPreferencesService sharedPreferencesService,
   })  : _authApiClient = authApiClient,
         _authSessionStore = authSessionStore,
         _devicePreferencesService = devicePreferencesService,
         _googleSignInService = googleSignInService,
+        _pushNotificationsService = pushNotificationsService,
         _sharedPreferencesService = sharedPreferencesService;
 
   final AuthApiClient _authApiClient;
   final AuthSessionStore _authSessionStore;
   final DevicePreferencesService _devicePreferencesService;
   final GoogleSignInService _googleSignInService;
+  final PushNotificationsService _pushNotificationsService;
   final SharedPreferencesService _sharedPreferencesService;
 
   Future<bool> tryRestoreSession() async {
@@ -42,6 +48,7 @@ class AuthRepository {
         refreshed,
         locale: existingSession.locale,
       );
+      _syncPushTokenInBackground();
 
       return true;
     } on ApiException {
@@ -60,6 +67,7 @@ class AuthRepository {
     );
 
     await _persistTokens(tokens, locale: devicePreferences.locale);
+    _syncPushTokenInBackground();
   }
 
   Future<void> loginWithGoogle({required String idToken}) async {
@@ -69,6 +77,7 @@ class AuthRepository {
     );
 
     await _persistTokens(tokens, locale: devicePreferences.locale);
+    _syncPushTokenInBackground();
   }
 
   Future<RegisterEmailResponse> registerWithEmail({
@@ -108,6 +117,7 @@ class AuthRepository {
     );
 
     await _persistTokens(tokens, locale: devicePreferences.locale);
+    _syncPushTokenInBackground();
   }
 
   Future<StatusResponse> requestPasswordReset({
@@ -138,6 +148,7 @@ class AuthRepository {
       ),
     );
 
+    await _pushNotificationsService.unregisterCurrentDevice();
     await _googleSignInService.signOut();
     await _authSessionStore.clear();
     await _sharedPreferencesService.clearProfilePreferences();
@@ -156,6 +167,7 @@ class AuthRepository {
       ),
     );
 
+    await _pushNotificationsService.unregisterCurrentDevice();
     await _googleSignInService.signOut();
     await _authSessionStore.clear();
     await _sharedPreferencesService.clearProfilePreferences();
@@ -164,6 +176,7 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
+    await _pushNotificationsService.unregisterCurrentDevice();
     try {
       await _authApiClient.logout();
     } catch (_) {}
@@ -174,6 +187,7 @@ class AuthRepository {
   }
 
   Future<void> logoutAll() async {
+    await _pushNotificationsService.unregisterCurrentDevice();
     try {
       await _authApiClient.logoutAll();
     } catch (_) {}
@@ -186,8 +200,8 @@ class AuthRepository {
   Future<void> _persistTokens(
     AuthTokensResponse tokens, {
     String locale = 'ru',
-  }) {
-    return _authSessionStore.write(
+  }) async {
+    await _authSessionStore.write(
       AuthSession(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -195,5 +209,9 @@ class AuthRepository {
         locale: locale,
       ),
     );
+  }
+
+  void _syncPushTokenInBackground() {
+    unawaited(_pushNotificationsService.syncTokenForCurrentSession());
   }
 }

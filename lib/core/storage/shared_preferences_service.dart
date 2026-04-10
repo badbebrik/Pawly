@@ -41,6 +41,21 @@ class SharedPreferencesService {
     await preferences.remove(timeZoneKey);
   }
 
+  Future<void> saveString(String key, String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(key, value);
+  }
+
+  Future<String?> getString(String key) async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(key);
+  }
+
+  Future<void> remove(String key) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(key);
+  }
+
   Future<void> writeJson(String key, Map<String, dynamic> payload) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(key, jsonEncode(payload));

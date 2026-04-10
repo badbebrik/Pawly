@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +22,7 @@ import '../network/dio_factory.dart';
 import '../network/session/auth_session_store.dart';
 import '../services/google_sign_in_service.dart';
 import '../services/media_picker_service.dart';
+import '../services/push_notifications_service.dart';
 import '../services/device_preferences_service.dart';
 import '../storage/secure_storage_service.dart';
 import '../storage/shared_preferences_service.dart';
@@ -44,6 +48,10 @@ final sharedPreferencesServiceProvider = Provider<SharedPreferencesService>((
   ref,
 ) {
   return SharedPreferencesService();
+});
+
+final firebaseMessagingProvider = Provider<FirebaseMessaging>((ref) {
+  return FirebaseMessaging.instance;
 });
 
 final authSessionStoreProvider = Provider<AuthSessionStore>((ref) {
@@ -105,6 +113,26 @@ final chatApiClientProvider = Provider<ChatApiClient>((ref) {
 final healthApiClientProvider = Provider<HealthApiClient>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return HealthApiClient(apiClient);
+});
+
+final pushNotificationsServiceProvider = Provider<PushNotificationsService>((
+  ref,
+) {
+  final messaging = ref.watch(firebaseMessagingProvider);
+  final healthApiClient = ref.watch(healthApiClientProvider);
+  final sharedPreferencesService = ref.watch(sharedPreferencesServiceProvider);
+  final authSessionStore = ref.watch(authSessionStoreProvider);
+
+  final service = PushNotificationsService(
+    messaging: messaging,
+    healthApiClient: healthApiClient,
+    sharedPreferencesService: sharedPreferencesService,
+    authSessionStore: authSessionStore,
+  );
+  ref.onDispose(() {
+    unawaited(service.dispose());
+  });
+  return service;
 });
 
 final imagePickerProvider = Provider<ImagePicker>((ref) {
