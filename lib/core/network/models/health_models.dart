@@ -373,6 +373,8 @@ class ScheduledItem {
     required this.title,
     this.note,
     this.startsAt,
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
     this.recurrence,
     required this.rowVersion,
     this.createdAt,
@@ -388,6 +390,8 @@ class ScheduledItem {
   final String title;
   final String? note;
   final DateTime? startsAt;
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
   final ScheduledItemRecurrence? recurrence;
   final int rowVersion;
   final DateTime? createdAt;
@@ -405,6 +409,10 @@ class ScheduledItem {
       title: asString(json['title']),
       note: asNullableString(json['note']),
       startsAt: asDateTime(json['starts_at']),
+      pushEnabled: asBool(json['push_enabled']),
+      remindOffsetMinutes: json['remind_offset_minutes'] == null
+          ? null
+          : asInt(json['remind_offset_minutes']),
       recurrence: json['recurrence'] == null
           ? null
           : ScheduledItemRecurrence.fromJson(json['recurrence']),
@@ -426,6 +434,8 @@ class ScheduledItemCard {
     required this.title,
     this.notePreview,
     this.startsAt,
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
     this.recurrence,
     required this.rowVersion,
     this.createdAt,
@@ -441,6 +451,8 @@ class ScheduledItemCard {
   final String title;
   final String? notePreview;
   final DateTime? startsAt;
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
   final ScheduledItemRecurrence? recurrence;
   final int rowVersion;
   final DateTime? createdAt;
@@ -458,6 +470,10 @@ class ScheduledItemCard {
       title: asString(json['title']),
       notePreview: asNullableString(json['note_preview']),
       startsAt: asDateTime(json['starts_at']),
+      pushEnabled: asBool(json['push_enabled']),
+      remindOffsetMinutes: json['remind_offset_minutes'] == null
+          ? null
+          : asInt(json['remind_offset_minutes']),
       recurrence: json['recurrence'] == null
           ? null
           : ScheduledItemRecurrence.fromJson(json['recurrence']),
@@ -561,6 +577,8 @@ class UpsertScheduledItemPayload {
     required this.title,
     this.note,
     required this.startsAt,
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
     this.recurrence,
     this.rowVersion,
   });
@@ -570,6 +588,8 @@ class UpsertScheduledItemPayload {
   final String title;
   final String? note;
   final DateTime startsAt;
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
   final ScheduledItemRecurrence? recurrence;
   final int? rowVersion;
 
@@ -579,7 +599,27 @@ class UpsertScheduledItemPayload {
         'title': title,
         'note': note,
         'starts_at': _toIso8601String(startsAt),
+        'push_enabled': pushEnabled,
+        'remind_offset_minutes': remindOffsetMinutes,
         'recurrence': recurrence?.toJson(),
+        'row_version': rowVersion,
+      }..removeWhere((_, dynamic value) => value == null);
+}
+
+class UpdateScheduledItemReminderSettingsPayload {
+  const UpdateScheduledItemReminderSettingsPayload({
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
+    required this.rowVersion,
+  });
+
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
+  final int rowVersion;
+
+  JsonMap toJson() => <String, dynamic>{
+        'push_enabled': pushEnabled,
+        'remind_offset_minutes': remindOffsetMinutes,
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
 }

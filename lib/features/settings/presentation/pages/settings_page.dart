@@ -3,18 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/providers/session_state_reset.dart';
 import '../../../../app/providers/theme_mode_controller.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/profile_models.dart';
+import '../../../../core/providers/core_providers.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/utils/auth_error_message.dart';
 import '../../../auth/presentation/utils/auth_validators.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../providers/settings_profile_controller.dart';
+
+final notificationSettingsProvider =
+    FutureProvider.autoDispose<NotificationSettings?>((ref) {
+  return ref
+      .read(pushNotificationsServiceProvider)
+      .getNotificationSettings();
+});
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -27,6 +37,7 @@ class SettingsPage extends ConsumerWidget {
     final profile = profileState.whenOrNull(data: (state) => state.profile);
     final themeMode = ref.watch(themeModeControllerProvider).asData?.value ??
         ThemeMode.system;
+    final notificationSettingsAsync = ref.watch(notificationSettingsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -98,6 +109,17 @@ class SettingsPage extends ConsumerWidget {
                         .read(themeModeControllerProvider.notifier)
                         .setThemeMode(selectedMode);
                   },
+                ),
+                const Divider(height: 1),
+                _SettingsTile(
+                  icon: Icons.notifications_outlined,
+                  title: 'Уведомления',
+                  subtitle: notificationSettingsAsync.when(
+                    data: _notificationStatusLabel,
+                    loading: () => 'Проверяем статус устройства',
+                    error: (_, __) => 'Не удалось определить статус',
+                  ),
+                  onTap: () => _showNotificationSettingsSheet(context, ref),
                 ),
                 const Divider(height: 1),
                 _SettingsTile(
@@ -308,6 +330,159 @@ class SettingsPage extends ConsumerWidget {
       showDragHandle: true,
       builder: (context) => const _SecuritySettingsSheet(),
     );
+  }
+
+  static Future<void> _showNotificationSettingsSheet(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => const _NotificationSettingsSheet(),
+    );
+    ref.invalidate(notificationSettingsProvider);
+  }
+}
+
+String _notificationStatusLabel(NotificationSettings? settings) {
+  if (settings == null) {
+    return 'Недоступно на этом устройстве';
+  }
+
+  return switch (settings.authorizationStatus) {
+    AuthorizationStatus.authorized => 'Разрешены',
+    AuthorizationStatus.provisional => 'Разрешены частично',
+    AuthorizationStatus.denied => 'Выключены',
+    AuthorizationStatus.notDetermined => 'Не настроены',
+  };
+}
+
+class _NotificationSettingsSheet extends ConsumerStatefulWidget {
+  const _NotificationSettingsSheet();
+
+  @override
+  ConsumerState<_NotificationSettingsSheet> createState() =>
+      _NotificationSettingsSheetState();
+}
+
+class _NotificationSettingsSheetState
+    extends ConsumerState<_NotificationSettingsSheet> {
+  bool _isRequesting = false;
+  bool _isOpeningSettings = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(notificationSettingsProvider);
+    final settings = settingsAsync.asData?.value;
+    final status = settings?.authorizationStatus;
+    final canRequest = status == AuthorizationStatus.notDetermined;
+    final isGranted = status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          PawlySpacing.lg,
+          PawlySpacing.sm,
+          PawlySpacing.lg,
+          PawlySpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Уведомления',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            Text(
+              settingsAsync.when(
+                data: _notificationStatusLabel,
+                loading: () => 'Проверяем статус уведомлений на устройстве.',
+                error: (_, __) => 'Не удалось получить статус уведомлений.',
+              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: PawlySpacing.lg),
+            if (canRequest)
+              PawlyButton(
+                label: _isRequesting ? 'Запрашиваем...' : 'Разрешить уведомления',
+                onPressed: _isRequesting
+                    ? null
+                    : () => _requestNotifications(context),
+                icon: Icons.notifications_active_rounded,
+              ),
+            if (!canRequest)
+              PawlyButton(
+                label: _isOpeningSettings ? 'Открываем...' : 'Открыть настройки устройства',
+                onPressed: _isOpeningSettings
+                    ? null
+                    : () => _openDeviceSettings(context),
+                icon: Icons.open_in_new_rounded,
+              ),
+            if (isGranted) ...<Widget>[
+              const SizedBox(height: PawlySpacing.sm),
+              Text(
+                'Уведомления на устройстве включены.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _requestNotifications(BuildContext context) async {
+    setState(() {
+      _isRequesting = true;
+    });
+
+    try {
+      final service = ref.read(pushNotificationsServiceProvider);
+      final granted = await service.requestPermissionsIfNeeded();
+      if (granted) {
+        await service.syncTokenForCurrentSession();
+      }
+      ref.invalidate(notificationSettingsProvider);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequesting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openDeviceSettings(BuildContext context) async {
+    setState(() {
+      _isOpeningSettings = true;
+    });
+
+    try {
+      final opened = await launchUrl(
+        Uri.parse('app-settings:'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Не удалось открыть настройки устройства'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningSettings = false;
+        });
+      }
+    }
   }
 }
 

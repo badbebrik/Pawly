@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/models/health_models.dart';
+import '../../../../core/network/models/json_parsers.dart';
 import '../../../../core/network/models/log_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../data/health_file_upload_service.dart';
@@ -28,6 +30,31 @@ final petDocumentsSummaryProvider =
         query: const PetDocumentsQuery(limit: 20),
       );
   return _documentsCountLabel(response.items.length, response.nextCursor);
+});
+
+final petScheduledItemsProvider = FutureProvider.autoDispose
+    .family<List<ScheduledItemCard>, String>((ref, petId) async {
+  final response = await ref.read(healthRepositoryProvider).listScheduledItems(
+        petId,
+        query: ScheduledItemsQuery(
+          limit: 50,
+          includePast: false,
+          dateFrom: formatDate(DateTime.now()),
+        ),
+      );
+  return response.items;
+});
+
+final petScheduledItemProvider = FutureProvider.autoDispose
+    .family<ScheduledItem, PetScheduledItemRef>((ref, args) {
+  return ref
+      .read(healthRepositoryProvider)
+      .getScheduledItem(args.petId, args.itemId);
+});
+
+final petPushSettingsProvider =
+    FutureProvider.autoDispose.family<PetPushSettings, String>((ref, petId) {
+  return ref.read(healthRepositoryProvider).getPetPushSettings(petId);
 });
 
 final petLogsControllerProvider = AsyncNotifierProvider.autoDispose
@@ -96,6 +123,27 @@ class PetLogRef {
 
   @override
   int get hashCode => Object.hash(petId, logId);
+}
+
+class PetScheduledItemRef {
+  const PetScheduledItemRef({
+    required this.petId,
+    required this.itemId,
+  });
+
+  final String petId;
+  final String itemId;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PetScheduledItemRef &&
+            other.petId == petId &&
+            other.itemId == itemId;
+  }
+
+  @override
+  int get hashCode => Object.hash(petId, itemId);
 }
 
 class PetMetricSeriesRef {

@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uni_links/uni_links.dart';
 
 import '../router/app_routes.dart';
 
@@ -22,6 +21,7 @@ class PawlyDeepLinkListener extends StatefulWidget {
 }
 
 class _PawlyDeepLinkListenerState extends State<PawlyDeepLinkListener> {
+  late final AppLinks _appLinks;
   StreamSubscription<Uri?>? _subscription;
   bool _didHandleInitialUri = false;
 
@@ -31,6 +31,7 @@ class _PawlyDeepLinkListenerState extends State<PawlyDeepLinkListener> {
     if (!_supportsDeepLinks) {
       return;
     }
+    _appLinks = AppLinks();
     _listenForDeepLinks();
   }
 
@@ -47,7 +48,7 @@ class _PawlyDeepLinkListenerState extends State<PawlyDeepLinkListener> {
 
   Future<void> _listenForDeepLinks() async {
     await _handleInitialUri();
-    _subscription = uriLinkStream.listen(
+    _subscription = _appLinks.uriLinkStream.listen(
       _handleUri,
       onError: (_) {},
     );
@@ -60,14 +61,12 @@ class _PawlyDeepLinkListenerState extends State<PawlyDeepLinkListener> {
     _didHandleInitialUri = true;
 
     try {
-      final uri = await getInitialUri();
+      final uri = await _appLinks.getInitialLink();
       if (!mounted) {
         return;
       }
       _handleUri(uri);
-    } on PlatformException {
-      return;
-    } on FormatException {
+    } catch (_) {
       return;
     }
   }
@@ -105,9 +104,8 @@ class _PawlyDeepLinkListenerState extends State<PawlyDeepLinkListener> {
     }
 
     final host = uri.host.toLowerCase();
-    final firstPath = uri.pathSegments.isEmpty
-        ? ''
-        : uri.pathSegments.first.toLowerCase();
+    final firstPath =
+        uri.pathSegments.isEmpty ? '' : uri.pathSegments.first.toLowerCase();
     final isInviteLink = host == 'invite' || firstPath == 'invite';
     if (!isInviteLink) {
       return null;

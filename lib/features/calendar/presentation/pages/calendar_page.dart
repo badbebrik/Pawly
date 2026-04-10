@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../app/router/app_routes.dart';
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
-import '../../../pets/presentation/providers/active_pet_controller.dart';
+import '../../../pets/presentation/providers/pets_controller.dart';
 import '../providers/calendar_controllers.dart';
 
 class CalendarPage extends ConsumerStatefulWidget {
@@ -20,8 +18,15 @@ class CalendarPage extends ConsumerStatefulWidget {
 class _CalendarPageState extends ConsumerState<CalendarPage> {
   @override
   Widget build(BuildContext context) {
-    final activePetAsync = ref.watch(activePetControllerProvider);
     final selectedDate = ref.watch(calendarSelectedDateProvider);
+    final petsState = ref.watch(petsControllerProvider).asData?.value;
+    final petItems = petsState?.items ?? const [];
+    final petNamesById = <String, String>{
+      for (final item in petItems) item.id: item.name,
+    };
+    final dayAsync = ref.watch(
+      calendarDayProvider(CalendarDayRef(date: selectedDate)),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -30,68 +35,40 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           ChatAppBarAction(),
         ],
       ),
-      body: activePetAsync.when(
-        data: (petId) {
-          if (petId == null || petId.isEmpty) {
-            return _CalendarEmptyPetView(
-              onOpenPets: () => context.go(AppRoutes.pets),
-            );
-          }
-
-          final dayAsync = ref.watch(
-            calendarDayProvider(
-                CalendarDayRef(petId: petId, date: selectedDate)),
-          );
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(
-                calendarDayProvider(
-                    CalendarDayRef(petId: petId, date: selectedDate)),
-              );
-              await ref.read(
-                calendarDayProvider(
-                        CalendarDayRef(petId: petId, date: selectedDate))
-                    .future,
-              );
-            },
-            child: ListView(
-              padding: const EdgeInsets.all(PawlySpacing.lg),
-              children: <Widget>[
-                _WeekStrip(
-                  selectedDate: selectedDate,
-                  onSelectDate: _selectDate,
-                ),
-                const SizedBox(height: PawlySpacing.lg),
-                _CalendarDatePickerCard(
-                  selectedDate: selectedDate,
-                  onPickDate: _pickDate,
-                ),
-                const SizedBox(height: PawlySpacing.lg),
-                dayAsync.when(
-                  data: (response) => _CalendarDayContent(
-                    response: response,
-                    selectedDate: selectedDate,
-                  ),
-                  loading: () => const _CalendarLoadingView(),
-                  error: (error, _) => _CalendarErrorView(
-                    onRetry: () {
-                      ref.invalidate(
-                        calendarDayProvider(
-                          CalendarDayRef(petId: petId, date: selectedDate),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(
+              calendarDayProvider(CalendarDayRef(date: selectedDate)));
+          ref.invalidate(petsControllerProvider);
+          await ref.read(
+            calendarDayProvider(CalendarDayRef(date: selectedDate)).future,
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _CalendarErrorView(
-          onRetry: () =>
-              ref.read(activePetControllerProvider.notifier).reload(),
+        child: ListView(
+          padding: const EdgeInsets.all(PawlySpacing.lg),
+          children: <Widget>[
+            _CalendarDateHeader(
+              selectedDate: selectedDate,
+              onSelectDate: _selectDate,
+              onPickDate: _pickDate,
+            ),
+            const SizedBox(height: PawlySpacing.lg),
+            dayAsync.when(
+              data: (response) => _CalendarDayContent(
+                response: response,
+                selectedDate: selectedDate,
+                petNamesById: petNamesById,
+              ),
+              loading: () => const _CalendarLoadingView(),
+              error: (error, _) => _CalendarErrorView(
+                onRetry: () {
+                  ref.invalidate(
+                    calendarDayProvider(CalendarDayRef(date: selectedDate)),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -101,12 +78,17 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final selectedDate = ref.read(calendarSelectedDateProvider);
     final now = DateTime.now();
 
-    final pickedDate = await showDatePicker(
+    final pickedDate = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 5),
-      locale: const Locale('ru'),
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _CalendarPickerSheet(
+          selectedDate: selectedDate,
+          firstDate: DateTime(now.year - 5),
+          lastDate: DateTime(now.year + 5),
+        );
+      },
     );
 
     if (!mounted || pickedDate == null) {
@@ -121,13 +103,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   }
 }
 
-class _CalendarDatePickerCard extends StatelessWidget {
-  const _CalendarDatePickerCard({
+class _CalendarDateHeader extends StatelessWidget {
+  const _CalendarDateHeader({
     required this.selectedDate,
+    required this.onSelectDate,
     required this.onPickDate,
   });
 
   final DateTime selectedDate;
+  final ValueChanged<DateTime> onSelectDate;
   final Future<void> Function() onPickDate;
 
   @override
@@ -136,30 +120,97 @@ class _CalendarDatePickerCard extends StatelessWidget {
     final formatter = DateFormat('d MMMM, EEEE', 'ru');
     final title = _capitalize(formatter.format(selectedDate));
 
-    return PawlyCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
+            const SizedBox(width: PawlySpacing.sm),
+            IconButton.filledTonal(
+              onPressed: onPickDate,
+              icon: const Icon(Icons.calendar_month_rounded),
+              tooltip: 'Выбрать дату',
+            ),
+          ],
+        ),
+        const SizedBox(height: PawlySpacing.md),
+        _WeekStrip(
+          selectedDate: selectedDate,
+          onSelectDate: onSelectDate,
+        ),
+      ],
+    );
+  }
+}
+
+class _CalendarPickerSheet extends StatelessWidget {
+  const _CalendarPickerSheet({
+    required this.selectedDate,
+    required this.firstDate,
+    required this.lastDate,
+  });
+
+  final DateTime selectedDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height * 0.58;
+
+    return SafeArea(
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PawlySpacing.md,
+            0,
+            PawlySpacing.md,
+            PawlySpacing.lg,
           ),
-          const SizedBox(height: PawlySpacing.md),
-          PawlyButton(
-            label: 'Выбрать дату',
-            onPressed: onPickDate,
-            variant: PawlyButtonVariant.secondary,
-            icon: Icons.event_rounded,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  PawlySpacing.sm,
+                  PawlySpacing.xs,
+                  PawlySpacing.sm,
+                  PawlySpacing.sm,
+                ),
+                child: Text(
+                  'Выбери дату',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Expanded(
+                child: CalendarDatePicker(
+                  initialDate: selectedDate,
+                  firstDate: firstDate,
+                  lastDate: lastDate,
+                  onDateChanged: (value) {
+                    Navigator.of(context).pop(value);
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _WeekStrip extends StatelessWidget {
+class _WeekStrip extends StatefulWidget {
   const _WeekStrip({
     required this.selectedDate,
     required this.onSelectDate,
@@ -169,82 +220,163 @@ class _WeekStrip extends StatelessWidget {
   final ValueChanged<DateTime> onSelectDate;
 
   @override
+  State<_WeekStrip> createState() => _WeekStripState();
+}
+
+class _WeekStripState extends State<_WeekStrip> {
+  static const double _itemWidth = 76;
+  static const double _itemSpacing = PawlySpacing.sm;
+  static const int _selectedIndex = 15;
+  static const int _daysBefore = 15;
+  static const int _daysAfter = 15;
+
+  late final ScrollController _scrollController;
+  late DateTime _anchorDate;
+  double _viewportWidth = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _anchorDate = normalizeCalendarDate(widget.selectedDate);
+    _scrollController = ScrollController();
+    _scheduleCenterSelected(jump: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WeekStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextSelected = normalizeCalendarDate(widget.selectedDate);
+    final rangeStart = _anchorDate.subtract(const Duration(days: _daysBefore));
+    final rangeEnd = _anchorDate.add(const Duration(days: _daysAfter));
+    final isOutsideCurrentRange =
+        nextSelected.isBefore(rangeStart) || nextSelected.isAfter(rangeEnd);
+
+    if (isOutsideCurrentRange) {
+      _anchorDate = nextSelected;
+      _scheduleCenterSelected(jump: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scheduleCenterSelected({bool jump = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (!_scrollController.hasClients || _viewportWidth <= 0) {
+        return;
+      }
+
+      final targetOffset = (_selectedIndex * (_itemWidth + _itemSpacing)) -
+          ((_viewportWidth - _itemWidth) / 2);
+      final clampedOffset = targetOffset.clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+
+      if (jump) {
+        _scrollController.jumpTo(clampedOffset);
+        return;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final weekDates = buildWeekStripDates(selectedDate);
+    final stripDates = buildCalendarStripDates(
+      _anchorDate,
+      daysBefore: _daysBefore,
+      daysAfter: _daysAfter,
+    );
     final dayLabelFormat = DateFormat('EE', 'ru');
     final isTodayDate = normalizeCalendarDate(DateTime.now());
 
-    return SizedBox(
-      height: 108,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: weekDates.length,
-        separatorBuilder: (_, __) => const SizedBox(width: PawlySpacing.sm),
-        itemBuilder: (context, index) {
-          final date = weekDates[index];
-          final isSelected = _isSameDate(date, selectedDate);
-          final isToday = _isSameDate(date, isTodayDate);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (_viewportWidth != constraints.maxWidth) {
+          _viewportWidth = constraints.maxWidth;
+          _scheduleCenterSelected(jump: true);
+        }
 
-          return InkWell(
-            onTap: () => onSelectDate(date),
-            borderRadius: BorderRadius.circular(PawlyRadius.lg),
-            child: Ink(
-              width: 76,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
+        return SizedBox(
+          height: 108,
+          child: ListView.separated(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            itemCount: stripDates.length,
+            separatorBuilder: (_, __) => const SizedBox(width: PawlySpacing.sm),
+            itemBuilder: (context, index) {
+              final date = stripDates[index];
+              final isSelected = _isSameDate(date, widget.selectedDate);
+              final isToday = _isSameDate(date, isTodayDate);
+
+              return InkWell(
+                onTap: () => widget.onSelectDate(date),
                 borderRadius: BorderRadius.circular(PawlyRadius.lg),
-                border: Border.all(
-                  color: isToday && !isSelected
-                      ? colorScheme.primary
-                      : Colors.transparent,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: PawlySpacing.sm,
-                  vertical: PawlySpacing.md,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      _capitalize(dayLabelFormat.format(date)),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: isSelected
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurfaceVariant,
-                      ),
+                child: Ink(
+                  width: _itemWidth,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primary
+                        : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(PawlyRadius.lg),
+                    border: Border.all(
+                      color: isToday && !isSelected
+                          ? colorScheme.primary
+                          : Colors.transparent,
                     ),
-                    const SizedBox(height: PawlySpacing.xs),
-                    Text(
-                      '${date.day}',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurface,
-                      ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PawlySpacing.sm,
+                      vertical: PawlySpacing.md,
                     ),
-                    const SizedBox(height: PawlySpacing.xxs),
-                    Text(
-                      DateFormat('MMM', 'ru').format(date),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: isSelected
-                            ? colorScheme.onPrimary.withValues(alpha: 0.9)
-                            : colorScheme.onSurfaceVariant,
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Text(
+                          _capitalize(dayLabelFormat.format(date)),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: isSelected
+                                ? colorScheme.onPrimary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: PawlySpacing.xs),
+                        Text(
+                          '${date.day}',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? colorScheme.onPrimary
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: PawlySpacing.xxs),
+                        Text(
+                          DateFormat('MMM', 'ru').format(date),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: isSelected
+                                ? colorScheme.onPrimary.withValues(alpha: 0.9)
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -253,10 +385,12 @@ class _CalendarDayContent extends StatelessWidget {
   const _CalendarDayContent({
     required this.response,
     required this.selectedDate,
+    required this.petNamesById,
   });
 
-  final HealthDayResponse response;
+  final ScheduledDayResponse response;
   final DateTime selectedDate;
+  final Map<String, String> petNamesById;
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +409,10 @@ class _CalendarDayContent extends StatelessWidget {
         ...response.items.map(
           (item) => Padding(
             padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-            child: _CalendarEventCard(item: item),
+            child: _CalendarEventCard(
+              item: item,
+              petName: petNamesById[item.petId],
+            ),
           ),
         ),
       ],
@@ -284,14 +421,19 @@ class _CalendarDayContent extends StatelessWidget {
 }
 
 class _CalendarEventCard extends StatelessWidget {
-  const _CalendarEventCard({required this.item});
+  const _CalendarEventCard({
+    required this.item,
+    this.petName,
+  });
 
-  final HealthDayItem item;
+  final ScheduledItemOccurrence item;
+  final String? petName;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final rule = item.rule;
 
     return PawlyCard(
       child: Row(
@@ -305,7 +447,7 @@ class _CalendarEventCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(PawlyRadius.md),
             ),
             child: Icon(
-              _itemIcon(item.itemType),
+              _itemIcon(rule.sourceType),
               color: colorScheme.primary,
             ),
           ),
@@ -315,17 +457,27 @@ class _CalendarEventCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  item.title,
+                  rule.title,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
+                if (rule.note != null && rule.note!.isNotEmpty) ...[
                   const SizedBox(height: PawlySpacing.xxs),
                   Text(
-                    item.subtitle!,
+                    rule.note!,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (petName != null && petName!.isNotEmpty) ...[
+                  const SizedBox(height: PawlySpacing.xs),
+                  Text(
+                    petName!,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -340,16 +492,9 @@ class _CalendarEventCard extends StatelessWidget {
                       foregroundColor: colorScheme.onSecondaryContainer,
                     ),
                     _InlineBadge(
-                      label: _itemTypeLabel(item.itemType),
+                      label: _itemTypeLabel(rule.sourceType),
                       backgroundColor: colorScheme.surfaceContainerHighest,
                       foregroundColor: colorScheme.onSurfaceVariant,
-                    ),
-                    _InlineBadge(
-                      label: _statusLabel(item.status),
-                      backgroundColor:
-                          _statusBackground(item.status, colorScheme),
-                      foregroundColor:
-                          _statusForeground(item.status, colorScheme),
                     ),
                   ],
                 ),
@@ -369,6 +514,10 @@ class _CalendarEventCard extends StatelessWidget {
         return Icons.vaccines_rounded;
       case 'PROCEDURE':
         return Icons.medical_services_rounded;
+      case 'LOG_TYPE':
+        return Icons.monitor_weight_rounded;
+      case 'MANUAL':
+        return Icons.notifications_active_rounded;
       default:
         return Icons.event_note_rounded;
     }
@@ -382,23 +531,12 @@ class _CalendarEventCard extends StatelessWidget {
         return 'Вакцинация';
       case 'PROCEDURE':
         return 'Процедура';
+      case 'LOG_TYPE':
+        return 'По типу лога';
+      case 'MANUAL':
+        return 'Напоминание';
       default:
         return type;
-    }
-  }
-
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'PLANNED':
-        return 'Запланировано';
-      case 'DONE':
-        return 'Выполнено';
-      case 'COMPLETED':
-        return 'Завершено';
-      case 'CANCELLED':
-        return 'Отменено';
-      default:
-        return status;
     }
   }
 
@@ -407,34 +545,6 @@ class _CalendarEventCard extends StatelessWidget {
       return 'Без времени';
     }
     return DateFormat('HH:mm').format(value.toLocal());
-  }
-
-  Color _statusBackground(String status, ColorScheme colorScheme) {
-    switch (status) {
-      case 'PLANNED':
-        return colorScheme.primaryContainer;
-      case 'DONE':
-      case 'COMPLETED':
-        return Colors.green.withValues(alpha: 0.16);
-      case 'CANCELLED':
-        return colorScheme.errorContainer;
-      default:
-        return colorScheme.surfaceContainerHighest;
-    }
-  }
-
-  Color _statusForeground(String status, ColorScheme colorScheme) {
-    switch (status) {
-      case 'PLANNED':
-        return colorScheme.onPrimaryContainer;
-      case 'DONE':
-      case 'COMPLETED':
-        return Colors.green.shade800;
-      case 'CANCELLED':
-        return colorScheme.onErrorContainer;
-      default:
-        return colorScheme.onSurfaceVariant;
-    }
   }
 }
 
@@ -487,53 +597,10 @@ class _CalendarNoEventsView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            'На $formatted событий нет',
+            'На $formatted нет событий',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: PawlySpacing.xs),
-          Text(
-            'В этом дне нет запланированных визитов, вакцинаций или процедур.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _CalendarEmptyPetView extends StatelessWidget {
-  const _CalendarEmptyPetView({required this.onOpenPets});
-
-  final VoidCallback onOpenPets;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Сначала выберите питомца',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: PawlySpacing.xs),
-              Text(
-                'Календарь показывает health-события только для активного питомца.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: PawlySpacing.md),
-              PawlyButton(
-                label: 'Перейти к питомцам',
-                onPressed: onOpenPets,
-                icon: Icons.pets_rounded,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

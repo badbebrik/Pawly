@@ -28,6 +28,9 @@ import '../../features/pet_care/presentation/pages/pet_health_home_page.dart';
 import '../../features/pet_care/presentation/pages/pet_documents_page.dart';
 import '../../features/pet_care/presentation/pages/pet_medical_records_page.dart';
 import '../../features/pet_care/presentation/pages/pet_procedures_page.dart';
+import '../../features/pet_care/presentation/pages/pet_reminder_create_page.dart';
+import '../../features/pet_care/presentation/pages/pet_reminder_edit_page.dart';
+import '../../features/pet_care/presentation/pages/pet_reminders_page.dart';
 import '../../features/pet_care/presentation/pages/pet_vet_visits_page.dart';
 import '../../features/pet_care/presentation/pages/pet_vaccinations_page.dart';
 import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
@@ -194,6 +197,30 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                         builder: (_, state) => PetMetricPickerPage(
                           petId: state.pathParameters['petId']!,
                         ),
+                      ),
+                      GoRoute(
+                        path: 'reminders',
+                        name: 'petReminders',
+                        builder: (_, state) => PetRemindersPage(
+                          petId: state.pathParameters['petId']!,
+                        ),
+                        routes: <RouteBase>[
+                          GoRoute(
+                            path: 'create',
+                            name: 'petReminderCreate',
+                            builder: (_, state) => PetReminderCreatePage(
+                              petId: state.pathParameters['petId']!,
+                            ),
+                          ),
+                          GoRoute(
+                            path: ':itemId/edit',
+                            name: 'petReminderEdit',
+                            builder: (_, state) => PetReminderEditPage(
+                              petId: state.pathParameters['petId']!,
+                              itemId: state.pathParameters['itemId']!,
+                            ),
+                          ),
+                        ],
                       ),
                       GoRoute(
                         path: 'health',

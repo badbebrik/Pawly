@@ -418,6 +418,8 @@ class UpsertScheduledItemInput {
     required this.title,
     this.note,
     required this.startsAtIso,
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
     this.recurrence,
     this.rowVersion,
   });
@@ -427,8 +429,22 @@ class UpsertScheduledItemInput {
   final String title;
   final String? note;
   final String startsAtIso;
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
   final ScheduledItemRecurrenceInput? recurrence;
   final int? rowVersion;
+}
+
+class UpdateScheduledItemReminderSettingsInput {
+  const UpdateScheduledItemReminderSettingsInput({
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
+    required this.rowVersion,
+  });
+
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
+  final int rowVersion;
 }
 
 class RegisterPushDeviceInput {

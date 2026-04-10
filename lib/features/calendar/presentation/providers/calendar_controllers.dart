@@ -10,30 +10,27 @@ final calendarSelectedDateProvider =
 );
 
 final calendarDayProvider = FutureProvider.autoDispose
-    .family<HealthDayResponse, CalendarDayRef>((ref, args) {
-  return ref.read(healthRepositoryProvider).getHealthDay(
-        args.petId,
+    .family<ScheduledDayResponse, CalendarDayRef>((ref, args) {
+  return ref.read(healthRepositoryProvider).getScheduleDay(
         date: _formatApiDate(args.date),
       );
 });
 
 class CalendarDayRef {
   const CalendarDayRef({
-    required this.petId,
     required this.date,
   });
 
-  final String petId;
   final DateTime date;
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is CalendarDayRef && other.petId == petId && other.date == date;
+        other is CalendarDayRef && other.date == date;
   }
 
   @override
-  int get hashCode => Object.hash(petId, date);
+  int get hashCode => date.hashCode;
 }
 
 class CalendarSelectedDateController extends Notifier<DateTime> {
@@ -57,6 +54,22 @@ List<DateTime> buildWeekStripDates(DateTime selectedDate) {
 
   return List<DateTime>.generate(
     7,
+    (index) => start.add(Duration(days: index)),
+    growable: false,
+  );
+}
+
+List<DateTime> buildCalendarStripDates(
+  DateTime selectedDate, {
+  int daysBefore = 15,
+  int daysAfter = 15,
+}) {
+  final normalized = _normalizeDate(selectedDate);
+  final start = normalized.subtract(Duration(days: daysBefore));
+  final total = daysBefore + daysAfter + 1;
+
+  return List<DateTime>.generate(
+    total,
     (index) => start.add(Duration(days: index)),
     growable: false,
   );

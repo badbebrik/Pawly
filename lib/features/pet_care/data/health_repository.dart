@@ -580,6 +580,22 @@ class HealthRepository {
     );
   }
 
+  Future<ScheduledItem> updateScheduledItemReminderSettings(
+    String petId,
+    String itemId, {
+    required UpdateScheduledItemReminderSettingsInput input,
+  }) {
+    return _healthApiClient.updateScheduledItemReminderSettings(
+      petId,
+      itemId,
+      UpdateScheduledItemReminderSettingsPayload(
+        pushEnabled: input.pushEnabled,
+        remindOffsetMinutes: input.remindOffsetMinutes,
+        rowVersion: input.rowVersion,
+      ),
+    );
+  }
+
   Future<EmptyResponse> deleteScheduledItem(
     String petId,
     String itemId, {
@@ -674,6 +690,8 @@ class HealthRepository {
       title: input.title,
       note: input.note,
       startsAt: DateTime.parse(input.startsAtIso),
+      pushEnabled: input.pushEnabled,
+      remindOffsetMinutes: input.remindOffsetMinutes,
       recurrence: input.recurrence == null
           ? null
           : ScheduledItemRecurrence(

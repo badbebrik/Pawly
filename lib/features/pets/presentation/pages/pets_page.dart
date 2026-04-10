@@ -535,7 +535,8 @@ class _ActivePetView extends ConsumerWidget {
 
         final pet = details.pet;
         final ageLabel = _petAgeLabel(pet.birthDate);
-        final documentsCountAsync = ref.watch(petDocumentsSummaryProvider(pet.id));
+        final documentsCountAsync =
+            ref.watch(petDocumentsSummaryProvider(pet.id));
 
         return ListView(
           padding: const EdgeInsets.all(PawlySpacing.lg),
@@ -604,6 +605,17 @@ class _ActivePetView extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            _PetWideFeatureCard(
+              title: 'Напоминания',
+              subtitle: '',
+              icon: Icons.notifications_active_rounded,
+              tint: const Color(0xFFEAA05D),
+              onTap: () => context.pushNamed(
+                'petReminders',
+                pathParameters: <String, String>{'petId': pet.id},
+              ),
             ),
             const SizedBox(height: PawlySpacing.md),
             _PetWideFeatureCard(

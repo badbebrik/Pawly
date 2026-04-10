@@ -88,6 +88,9 @@ class ApiEndpoints {
   static String petScheduledItemById(String petId, String itemId) =>
       '/v1/pets/$petId/scheduled-items/$itemId';
 
+  static String petScheduledItemReminderSettings(String petId, String itemId) =>
+      '/v1/pets/$petId/scheduled-items/$itemId/reminder-settings';
+
   static String petScheduledItemOccurrences(String petId) =>
       '/v1/pets/$petId/scheduled-item-occurrences';
 

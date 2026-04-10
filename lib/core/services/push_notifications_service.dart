@@ -96,6 +96,15 @@ class PushNotificationsService {
   Stream<PushNotificationPayload> get openedMessages =>
       _openedMessagesController.stream;
 
+  Future<NotificationSettings?> getNotificationSettings() async {
+    if (!_supportsPushPlatform()) {
+      return null;
+    }
+
+    await initialize();
+    return _messaging.getNotificationSettings();
+  }
+
   Future<void> initialize() async {
     if (!_supportsPushPlatform()) {
       _initialized = true;

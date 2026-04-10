@@ -728,6 +728,19 @@ class HealthApiClient {
     );
   }
 
+  Future<ScheduledItem> updateScheduledItemReminderSettings(
+    String petId,
+    String itemId,
+    UpdateScheduledItemReminderSettingsPayload payload,
+  ) {
+    return _apiClient.patch<ScheduledItem>(
+      ApiEndpoints.petScheduledItemReminderSettings(petId, itemId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: ScheduledItem.fromJson,
+    );
+  }
+
   Future<EmptyResponse> deleteScheduledItem(
     String petId,
     String itemId,
