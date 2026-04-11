@@ -171,7 +171,7 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Дата ревакцинации сохранена: ${_formatDate(nextDueAt)}.',
+            'Дата и время ревакцинации сохранены: ${_formatDate(nextDueAt)}.',
           ),
         ),
       );
@@ -474,7 +474,8 @@ class _VaccinationListCard extends StatelessWidget {
                   const SizedBox(height: PawlySpacing.xs),
                   _InfoLine(
                     icon: Icons.refresh_rounded,
-                    text: 'Ревакцинация ${_formatDate(item.nextDueAt!)}',
+                    text:
+                        'Дата и время ревакцинации ${_formatDate(item.nextDueAt!)}',
                   ),
                 ],
                 if (item.attachmentsCount > 0) ...<Widget>[
@@ -598,6 +599,9 @@ class _VaccinationComposerSheetState
   DateTime? _scheduledAt;
   DateTime? _administeredAt;
   DateTime? _nextDueAt;
+  bool _pushEnabled = true;
+  int? _remindOffsetMinutes = 0;
+  late bool _shouldSendReminder;
   bool _isUploadingAttachments = false;
 
   @override
@@ -615,6 +619,7 @@ class _VaccinationComposerSheetState
     _scheduledAt = initial?.scheduledAt;
     _administeredAt = initial?.administeredAt;
     _nextDueAt = initial?.nextDueAt;
+    _shouldSendReminder = initial == null;
     _attachments.addAll(
       initial?.attachments.map(AttachmentDraftItem.fromHealthAttachment) ??
           const <AttachmentDraftItem>[],
@@ -693,28 +698,44 @@ class _VaccinationComposerSheetState
                   },
                 ),
                 const SizedBox(height: PawlySpacing.sm),
-                _DateFieldButton(
-                  label: _scheduledAt == null
-                      ? 'Плановая дата'
-                      : 'Плановая дата: ${_formatDate(_scheduledAt!)}',
-                  onTap: () async {
-                    final picked = await _pickDate(
-                      context,
-                      initialDate: _scheduledAt ?? DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => _scheduledAt = picked);
-                    }
-                  },
-                ),
+                if (_status != 'DONE')
+                  _DateFieldButton(
+                    label: _scheduledAt == null
+                        ? 'Дата и время по плану'
+                        : 'Дата и время по плану: ${_formatDateTime(_scheduledAt!)}',
+                    onTap: () async {
+                      final picked = await _pickDateTime(
+                        context,
+                        initialDate: _scheduledAt ?? DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => _scheduledAt = picked);
+                      }
+                    },
+                  ),
                 if (_status == 'DONE') ...<Widget>[
+                  if (_scheduledAt != null)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.schedule_rounded),
+                      title: const Text('Дата и время по плану'),
+                      subtitle: Text(_formatDateTime(_scheduledAt!)),
+                      trailing: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _scheduledAt = null;
+                          });
+                        },
+                        child: const Text('Сбросить'),
+                      ),
+                    ),
                   const SizedBox(height: PawlySpacing.sm),
                   _DateFieldButton(
                     label: _administeredAt == null
-                        ? 'Дата выполнения'
-                        : 'Дата выполнения: ${_formatDate(_administeredAt!)}',
+                        ? 'Дата и время выполнения'
+                        : 'Дата и время выполнения: ${_formatDateTime(_administeredAt!)}',
                     onTap: () async {
-                      final picked = await _pickDate(
+                      final picked = await _pickDateTime(
                         context,
                         initialDate:
                             _administeredAt ?? _scheduledAt ?? DateTime.now(),
@@ -727,10 +748,10 @@ class _VaccinationComposerSheetState
                   const SizedBox(height: PawlySpacing.sm),
                   _DateFieldButton(
                     label: _nextDueAt == null
-                        ? 'Дата ревакцинации'
-                        : 'Дата ревакцинации: ${_formatDate(_nextDueAt!)}',
+                        ? 'Дата и время ревакцинации'
+                        : 'Дата и время ревакцинации: ${_formatDateTime(_nextDueAt!)}',
                     onTap: () async {
-                      final picked = await _pickDate(
+                      final picked = await _pickDateTime(
                         context,
                         initialDate: _nextDueAt ?? DateTime.now(),
                         firstDate: _administeredAt ?? DateTime.now(),
@@ -771,6 +792,63 @@ class _VaccinationComposerSheetState
                   onAddFromCamera: _pickAndUploadFromCamera,
                   onRemove: _removeAttachment,
                 ),
+                if (_status == 'PLANNED') ...<Widget>[
+                  const SizedBox(height: PawlySpacing.lg),
+                  PawlyCard(
+                    child: Column(
+                      children: <Widget>[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _pushEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _pushEnabled = value;
+                              _shouldSendReminder = true;
+                            });
+                          },
+                          title: const Text('Напоминание включено'),
+                        ),
+                        if (_pushEnabled) ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          DropdownButtonFormField<int>(
+                            initialValue: _remindOffsetMinutes ?? 0,
+                            decoration: const InputDecoration(
+                              labelText: 'Когда напомнить',
+                            ),
+                            items: const <DropdownMenuItem<int>>[
+                              DropdownMenuItem<int>(
+                                value: 0,
+                                child: Text('В момент события'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 15,
+                                child: Text('За 15 минут'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 30,
+                                child: Text('За 30 минут'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 60,
+                                child: Text('За 1 час'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 1440,
+                                child: Text('За 1 день'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _remindOffsetMinutes = value;
+                                _shouldSendReminder = true;
+                              });
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: widget.submitLabel,
@@ -790,9 +868,11 @@ class _VaccinationComposerSheetState
       return;
     }
 
-    if (_status == 'DONE' && _administeredAt == null) {
+                if (_status == 'DONE' && _administeredAt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Укажите дату выполнения вакцинации.')),
+        const SnackBar(
+          content: Text('Укажите дату и время выполнения вакцинации.'),
+        ),
       );
       return;
     }
@@ -808,15 +888,23 @@ class _VaccinationComposerSheetState
       UpsertVaccinationInput(
         status: _status,
         vaccineName: _nameController.text.trim(),
-        scheduledAtIso: _toStoredDate(_scheduledAt)?.toIso8601String(),
-        administeredAtIso: _toStoredDate(_administeredAt)?.toIso8601String(),
-        nextDueAtIso: _toStoredDate(_nextDueAt)?.toIso8601String(),
+        scheduledAtIso: _scheduledAt?.toIso8601String(),
+        administeredAtIso: _administeredAt?.toIso8601String(),
+        nextDueAtIso: _nextDueAt?.toIso8601String(),
         clinicName: _emptyToNull(_clinicController.text),
         vetName: _emptyToNull(_vetController.text),
         notes: _emptyToNull(_notesController.text),
         attachmentFileIds: _attachments
             .map((attachment) => attachment.fileId)
             .toList(growable: false),
+        reminder: _status == 'PLANNED' && _shouldSendReminder
+            ? HealthEntityReminderInput(
+                pushEnabled: _pushEnabled,
+                remindOffsetMinutes: _pushEnabled
+                    ? (_remindOffsetMinutes ?? 0)
+                    : null,
+              )
+            : null,
         rowVersion: widget.initialVaccination?.rowVersion,
       ),
     );
@@ -932,13 +1020,6 @@ class _VaccinationComposerSheetState
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
   }
-
-  DateTime? _toStoredDate(DateTime? value) {
-    if (value == null) {
-      return null;
-    }
-    return DateTime(value.year, value.month, value.day, 12);
-  }
 }
 
 class _DateFieldButton extends StatelessWidget {
@@ -991,10 +1072,10 @@ class _CompletionDateDialogState extends State<_CompletionDateDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text('Укажите дату, когда вакцинация была выполнена.'),
+          const Text('Укажите дату и время, когда вакцинация была выполнена.'),
           const SizedBox(height: PawlySpacing.md),
           Text(
-            _formatDate(_selectedDate),
+            _formatDateTime(_selectedDate),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -1002,7 +1083,7 @@ class _CompletionDateDialogState extends State<_CompletionDateDialog> {
           const SizedBox(height: PawlySpacing.sm),
           TextButton.icon(
             onPressed: () async {
-              final picked = await _pickDate(
+              final picked = await _pickDateTime(
                 context,
                 initialDate: _selectedDate,
               );
@@ -1011,7 +1092,7 @@ class _CompletionDateDialogState extends State<_CompletionDateDialog> {
               }
             },
             icon: const Icon(Icons.event_rounded),
-            label: const Text('Изменить дату'),
+            label: const Text('Изменить дату и время'),
           ),
         ],
       ),
@@ -1053,7 +1134,7 @@ class _RevaccinationDateDialogState extends State<_RevaccinationDateDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Дата ревакцинации'),
+      title: const Text('Дата и время ревакцинации'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,7 +1145,7 @@ class _RevaccinationDateDialogState extends State<_RevaccinationDateDialog> {
           const SizedBox(height: PawlySpacing.md),
           if (_selectedDate != null)
             Text(
-              _formatDate(_selectedDate!),
+              _formatDateTime(_selectedDate!),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -1072,7 +1153,7 @@ class _RevaccinationDateDialogState extends State<_RevaccinationDateDialog> {
           const SizedBox(height: PawlySpacing.sm),
           TextButton.icon(
             onPressed: () async {
-              final picked = await _pickDate(
+              final picked = await _pickDateTime(
                 context,
                 initialDate: _selectedDate ?? widget.initialDate,
                 firstDate: widget.initialDate,
@@ -1082,7 +1163,7 @@ class _RevaccinationDateDialogState extends State<_RevaccinationDateDialog> {
               }
             },
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Выбрать дату'),
+            label: const Text('Выбрать дату и время'),
           ),
         ],
       ),
@@ -1345,17 +1426,17 @@ class _VaccinationDetailsView extends StatelessWidget {
               children: <Widget>[
                 if (_dateValue(vaccination.scheduledAt) case final value?)
                   _DetailsRow(
-                    label: 'План',
+                    label: 'Дата и время по плану',
                     value: value,
                   ),
                 if (_dateValue(vaccination.administeredAt) case final value?)
                   _DetailsRow(
-                    label: 'Выполнено',
+                    label: 'Дата и время выполнения',
                     value: value,
                   ),
                 if (_dateValue(vaccination.nextDueAt) case final value?)
                   _DetailsRow(
-                    label: 'Ревакцинация',
+                    label: 'Дата и время ревакцинации',
                     value: value,
                   ),
                 if (_textValue(vaccination.clinicName) case final value?)
@@ -1560,32 +1641,55 @@ class _VaccinationsErrorView extends StatelessWidget {
   }
 }
 
-Future<DateTime?> _pickDate(
+Future<DateTime?> _pickDateTime(
   BuildContext context, {
   required DateTime initialDate,
   DateTime? firstDate,
 }) async {
-  return showDatePicker(
+  final date = await showDatePicker(
     context: context,
     initialDate: initialDate,
     firstDate: firstDate ?? DateTime(2000),
     lastDate: DateTime.now().add(const Duration(days: 3650)),
   );
+  if (date == null || !context.mounted) {
+    return null;
+  }
+
+  final time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(initialDate),
+  );
+  if (time == null) {
+    return null;
+  }
+
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+    time.hour,
+    time.minute,
+  );
 }
 
-String _formatDate(DateTime value) {
+String _formatDateTime(DateTime value) {
   final local = value.toLocal();
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   final year = local.year.toString();
-  return '$day.$month.$year';
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.$year $hour:$minute';
 }
+
+String _formatDate(DateTime value) => _formatDateTime(value);
 
 String? _dateValue(DateTime? value) {
   if (value == null) {
     return null;
   }
-  return _formatDate(value);
+  return _formatDateTime(value);
 }
 
 String? _textValue(String? value) {

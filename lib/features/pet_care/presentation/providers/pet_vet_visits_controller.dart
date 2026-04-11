@@ -195,10 +195,17 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
     state = AsyncData(current.copyWith(isCreating: true));
 
     try {
-      await ref.read(healthRepositoryProvider).createVetVisit(
+      final visit = await ref.read(healthRepositoryProvider).createVetVisit(
             _petId,
             input: input,
           );
+      for (final logId in input.relatedLogIds) {
+        await ref.read(healthRepositoryProvider).linkLogToVetVisit(
+              _petId,
+              visit.id,
+              logId: logId,
+            );
+      }
       state = AsyncData(
         await _reloadLists(current.copyWith(isCreating: false)),
       );

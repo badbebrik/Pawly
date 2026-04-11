@@ -194,6 +194,8 @@ class UpsertVetVisitInput {
     this.clinicName,
     this.vetName,
     this.attachmentFileIds = const <String>[],
+    this.relatedLogIds = const <String>[],
+    this.reminder,
     this.rowVersion,
   });
 
@@ -206,7 +208,19 @@ class UpsertVetVisitInput {
   final String? clinicName;
   final String? vetName;
   final List<String> attachmentFileIds;
+  final List<String> relatedLogIds;
+  final HealthEntityReminderInput? reminder;
   final int? rowVersion;
+}
+
+class HealthEntityReminderInput {
+  const HealthEntityReminderInput({
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
+  });
+
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
 }
 
 class VaccinationListQuery {
@@ -242,6 +256,7 @@ class UpsertVaccinationInput {
     this.vetName,
     this.notes,
     this.attachmentFileIds = const <String>[],
+    this.reminder,
     this.rowVersion,
   });
 
@@ -256,6 +271,7 @@ class UpsertVaccinationInput {
   final String? vetName;
   final String? notes;
   final List<String> attachmentFileIds;
+  final HealthEntityReminderInput? reminder;
   final int? rowVersion;
 }
 
@@ -295,6 +311,7 @@ class UpsertProcedureInput {
     this.vetVisitId,
     this.notes,
     this.attachmentFileIds = const <String>[],
+    this.reminder,
     this.rowVersion,
   });
 
@@ -310,6 +327,7 @@ class UpsertProcedureInput {
   final String? vetVisitId;
   final String? notes;
   final List<String> attachmentFileIds;
+  final HealthEntityReminderInput? reminder;
   final int? rowVersion;
 }
 

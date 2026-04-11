@@ -714,6 +714,7 @@ class HealthRepository {
       clinicName: input.clinicName,
       vetName: input.vetName,
       attachmentFileIds: input.attachmentFileIds,
+      reminder: _toHealthEntityReminderPayload(input.reminder),
       rowVersion: input.rowVersion,
     );
   }
@@ -733,6 +734,7 @@ class HealthRepository {
       vetName: input.vetName,
       notes: input.notes,
       attachmentFileIds: input.attachmentFileIds,
+      reminder: _toHealthEntityReminderPayload(input.reminder),
       rowVersion: input.rowVersion,
     );
   }
@@ -753,6 +755,7 @@ class HealthRepository {
       vetVisitId: input.vetVisitId,
       notes: input.notes,
       attachmentFileIds: input.attachmentFileIds,
+      reminder: _toHealthEntityReminderPayload(input.reminder),
       rowVersion: input.rowVersion,
     );
   }
@@ -786,5 +789,17 @@ class HealthRepository {
       return null;
     }
     return DateTime.parse(value);
+  }
+
+  HealthEntityReminderPayload? _toHealthEntityReminderPayload(
+    HealthEntityReminderInput? input,
+  ) {
+    if (input == null) {
+      return null;
+    }
+    return HealthEntityReminderPayload(
+      pushEnabled: input.pushEnabled,
+      remindOffsetMinutes: input.remindOffsetMinutes,
+    );
   }
 }

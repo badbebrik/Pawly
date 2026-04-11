@@ -460,6 +460,9 @@ class _ProcedureComposerSheetState
   DateTime? _scheduledAt;
   DateTime? _performedAt;
   DateTime? _nextDueAt;
+  bool _pushEnabled = true;
+  int? _remindOffsetMinutes = 0;
+  late bool _shouldSendReminder;
   bool _isUploadingAttachments = false;
 
   @override
@@ -481,6 +484,7 @@ class _ProcedureComposerSheetState
     _scheduledAt = initial?.scheduledAt;
     _performedAt = initial?.performedAt;
     _nextDueAt = initial?.nextDueAt;
+    _shouldSendReminder = initial == null;
     _attachments.addAll(
       initial?.attachments.map(AttachmentDraftItem.fromHealthAttachment) ??
           const <AttachmentDraftItem>[],
@@ -584,10 +588,10 @@ class _ProcedureComposerSheetState
                 const SizedBox(height: PawlySpacing.sm),
                 _DateButton(
                   label: _scheduledAt == null
-                      ? 'Дата по плану'
-                      : 'Дата по плану: ${_formatDate(_scheduledAt!)}',
+                      ? 'Дата и время по плану'
+                      : 'Дата и время по плану: ${_formatDateTime(_scheduledAt!)}',
                   onTap: () async {
-                    final picked = await _pickDate(
+                    final picked = await _pickDateTime(
                       context,
                       initialDate: _scheduledAt ?? DateTime.now(),
                     );
@@ -600,10 +604,10 @@ class _ProcedureComposerSheetState
                   const SizedBox(height: PawlySpacing.sm),
                   _DateButton(
                     label: _performedAt == null
-                        ? 'Дата выполнения'
-                        : 'Дата выполнения: ${_formatDate(_performedAt!)}',
+                        ? 'Дата и время выполнения'
+                        : 'Дата и время выполнения: ${_formatDateTime(_performedAt!)}',
                     onTap: () async {
-                      final picked = await _pickDate(
+                      final picked = await _pickDateTime(
                         context,
                         initialDate:
                             _performedAt ?? _scheduledAt ?? DateTime.now(),
@@ -619,10 +623,10 @@ class _ProcedureComposerSheetState
                   const SizedBox(height: PawlySpacing.sm),
                   _DateButton(
                     label: _nextDueAt == null
-                        ? 'Дата повтора'
-                        : 'Дата повтора: ${_formatDate(_nextDueAt!)}',
+                        ? 'Дата и время повтора'
+                        : 'Дата и время повтора: ${_formatDateTime(_nextDueAt!)}',
                     onTap: () async {
-                      final picked = await _pickDate(
+                      final picked = await _pickDateTime(
                         context,
                         initialDate: _nextDueAt ??
                             _performedAt ??
@@ -653,6 +657,63 @@ class _ProcedureComposerSheetState
                   onAddFromCamera: _pickAndUploadFromCamera,
                   onRemove: _removeAttachment,
                 ),
+                if (_status == 'PLANNED') ...<Widget>[
+                  const SizedBox(height: PawlySpacing.lg),
+                  PawlyCard(
+                    child: Column(
+                      children: <Widget>[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _pushEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _pushEnabled = value;
+                              _shouldSendReminder = true;
+                            });
+                          },
+                          title: const Text('Напоминание включено'),
+                        ),
+                        if (_pushEnabled) ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          DropdownButtonFormField<int>(
+                            initialValue: _remindOffsetMinutes ?? 0,
+                            decoration: const InputDecoration(
+                              labelText: 'Когда напомнить',
+                            ),
+                            items: const <DropdownMenuItem<int>>[
+                              DropdownMenuItem<int>(
+                                value: 0,
+                                child: Text('В момент события'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 15,
+                                child: Text('За 15 минут'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 30,
+                                child: Text('За 30 минут'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 60,
+                                child: Text('За 1 час'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 1440,
+                                child: Text('За 1 день'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _remindOffsetMinutes = value;
+                                _shouldSendReminder = true;
+                              });
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: widget.submitLabel,
@@ -686,13 +747,21 @@ class _ProcedureComposerSheetState
         title: _titleController.text.trim(),
         description: _nonEmpty(_descriptionController.text),
         productName: _nonEmpty(_productNameController.text),
-        scheduledAtIso: _toStoredDate(_scheduledAt)?.toIso8601String(),
-        performedAtIso: _toStoredDate(_performedAt)?.toIso8601String(),
-        nextDueAtIso: _toStoredDate(_nextDueAt)?.toIso8601String(),
+        scheduledAtIso: _scheduledAt?.toIso8601String(),
+        performedAtIso: _performedAt?.toIso8601String(),
+        nextDueAtIso: _nextDueAt?.toIso8601String(),
         notes: _nonEmpty(_notesController.text),
         attachmentFileIds: _attachments
             .map((attachment) => attachment.fileId)
             .toList(growable: false),
+        reminder: _status == 'PLANNED' && _shouldSendReminder
+            ? HealthEntityReminderInput(
+                pushEnabled: _pushEnabled,
+                remindOffsetMinutes: _pushEnabled
+                    ? (_remindOffsetMinutes ?? 0)
+                    : null,
+              )
+            : null,
         rowVersion: widget.initialProcedure?.rowVersion,
       ),
     );
@@ -802,11 +871,6 @@ class _ProcedureComposerSheetState
     setState(() {
       _attachments.removeWhere((attachment) => attachment.fileId == fileId);
     });
-  }
-
-  DateTime? _toStoredDate(DateTime? value) {
-    if (value == null) return null;
-    return DateTime(value.year, value.month, value.day, 12);
   }
 }
 
@@ -1156,11 +1220,11 @@ class _ProcedureDetailsView extends StatelessWidget {
   List<(String, String)> _detailsLines(Procedure procedure) {
     return <(String, String)>[
       if (_dateValue(procedure.scheduledAt) case final value?)
-        ('Дата по плану', value),
+        ('Дата и время по плану', value),
       if (_dateValue(procedure.performedAt) case final value?)
-        ('Дата выполнения', value),
+        ('Дата и время выполнения', value),
       if (_dateValue(procedure.nextDueAt) case final value?)
-        ('Дата повтора', value),
+        ('Дата и время повтора', value),
       if (_nonEmpty(procedure.productName) case final value?)
         ('Препарат или средство', value),
     ];
@@ -1266,28 +1330,51 @@ class _ProceduresErrorView extends StatelessWidget {
   }
 }
 
-Future<DateTime?> _pickDate(
+Future<DateTime?> _pickDateTime(
   BuildContext context, {
   required DateTime initialDate,
-}) {
-  return showDatePicker(
+}) async {
+  final date = await showDatePicker(
     context: context,
     initialDate: initialDate,
     firstDate: DateTime(2000),
     lastDate: DateTime.now().add(const Duration(days: 3650)),
   );
+  if (date == null || !context.mounted) {
+    return null;
+  }
+
+  final time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(initialDate),
+  );
+  if (time == null) {
+    return null;
+  }
+
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+    time.hour,
+    time.minute,
+  );
 }
 
-String _formatDate(DateTime value) {
+String _formatDateTime(DateTime value) {
   final local = value.toLocal();
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   final year = local.year.toString();
-  return '$day.$month.$year';
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.$year $hour:$minute';
 }
 
+String _formatDate(DateTime value) => _formatDateTime(value);
+
 String? _dateValue(DateTime? value) =>
-    value == null ? null : _formatDate(value);
+    value == null ? null : _formatDateTime(value);
 
 String? _nonEmpty(String? value) {
   final trimmed = value?.trim() ?? '';

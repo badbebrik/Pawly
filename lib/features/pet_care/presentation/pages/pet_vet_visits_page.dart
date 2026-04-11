@@ -412,11 +412,15 @@ class _VetVisitComposerSheetState
   final _reasonController = TextEditingController();
   final _resultController = TextEditingController();
   final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
+  final List<LogCard> _selectedLogs = <LogCard>[];
 
   late String _status;
   late String _visitType;
   DateTime? _scheduledAt;
   DateTime? _completedAt;
+  bool _pushEnabled = true;
+  int? _remindOffsetMinutes = 0;
+  late bool _shouldSendReminder;
   bool _isUploadingAttachments = false;
 
   @override
@@ -437,6 +441,7 @@ class _VetVisitComposerSheetState
     _resultController.text = initial?.resultText ?? '';
     _scheduledAt = initial?.scheduledAt;
     _completedAt = initial?.completedAt;
+    _shouldSendReminder = initial == null;
     _attachments.addAll(
       initial?.attachments.map(AttachmentDraftItem.fromHealthAttachment) ??
           const <AttachmentDraftItem>[],
@@ -514,9 +519,9 @@ class _VetVisitComposerSheetState
                 _DateButton(
                   label: _scheduledAt == null
                       ? 'Дата визита'
-                      : 'Дата визита: ${_formatDate(_scheduledAt!)}',
+                      : 'Дата визита: ${_formatDateTime(_scheduledAt!)}',
                   onTap: () async {
-                    final picked = await _pickDate(
+                    final picked = await _pickDateTime(
                       context,
                       initialDate: _scheduledAt ?? DateTime.now(),
                     );
@@ -530,9 +535,9 @@ class _VetVisitComposerSheetState
                   _DateButton(
                     label: _completedAt == null
                         ? 'Дата завершения'
-                        : 'Дата завершения: ${_formatDate(_completedAt!)}',
+                        : 'Дата завершения: ${_formatDateTime(_completedAt!)}',
                     onTap: () async {
-                      final picked = await _pickDate(
+                      final picked = await _pickDateTime(
                         context,
                         initialDate:
                             _completedAt ?? _scheduledAt ?? DateTime.now(),
@@ -582,6 +587,100 @@ class _VetVisitComposerSheetState
                   onAddFromCamera: _pickAndUploadFromCamera,
                   onRemove: _removeAttachment,
                 ),
+                if (_status == 'PLANNED') ...<Widget>[
+                  const SizedBox(height: PawlySpacing.lg),
+                  PawlyCard(
+                    child: Column(
+                      children: <Widget>[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _pushEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _pushEnabled = value;
+                              _shouldSendReminder = true;
+                            });
+                          },
+                          title: const Text('Напоминание включено'),
+                        ),
+                        if (_pushEnabled) ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          DropdownButtonFormField<int>(
+                            initialValue: _remindOffsetMinutes ?? 0,
+                            decoration: const InputDecoration(
+                              labelText: 'Когда напомнить',
+                            ),
+                            items: const <DropdownMenuItem<int>>[
+                              DropdownMenuItem<int>(
+                                value: 0,
+                                child: Text('В момент события'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 15,
+                                child: Text('За 15 минут'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 30,
+                                child: Text('За 30 минут'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 60,
+                                child: Text('За 1 час'),
+                              ),
+                              DropdownMenuItem<int>(
+                                value: 1440,
+                                child: Text('За 1 день'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _remindOffsetMinutes = value;
+                                _shouldSendReminder = true;
+                              });
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+                if (widget.initialVisit == null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.lg),
+                  PawlyCard(
+                    title: Text(
+                      'Прикрепленные записи',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    footer: Align(
+                      alignment: Alignment.centerLeft,
+                      child: PawlyButton(
+                        label: 'Прикрепить запись',
+                        onPressed: _pickRelatedLog,
+                        variant: PawlyButtonVariant.secondary,
+                      ),
+                    ),
+                    child: _selectedLogs.isEmpty
+                        ? const _AttachedLogsEmptyState()
+                        : Column(
+                            children: _selectedLogs
+                                .map(
+                                  (log) => ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.notes_rounded),
+                                    title: Text(log.logTypeName ?? 'Запись'),
+                                    subtitle: Text(_logCardSubtitle(log)),
+                                    trailing: IconButton(
+                                      onPressed: () =>
+                                          _removeRelatedLog(log.id),
+                                      icon: const Icon(Icons.close_rounded),
+                                      tooltip: 'Убрать',
+                                    ),
+                                  ),
+                                )
+                                .toList(growable: false),
+                          ),
+                  ),
+                ],
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label: widget.submitLabel,
@@ -612,8 +711,8 @@ class _VetVisitComposerSheetState
       UpsertVetVisitInput(
         status: _status,
         visitType: _visitType,
-        scheduledAtIso: _toStoredDate(_scheduledAt)?.toIso8601String(),
-        completedAtIso: _toStoredDate(_completedAt)?.toIso8601String(),
+        scheduledAtIso: _scheduledAt?.toIso8601String(),
+        completedAtIso: _completedAt?.toIso8601String(),
         clinicName: _nonEmpty(_clinicController.text),
         vetName: _nonEmpty(_vetController.text),
         reasonText: _nonEmpty(_reasonController.text),
@@ -621,6 +720,16 @@ class _VetVisitComposerSheetState
         attachmentFileIds: _attachments
             .map((attachment) => attachment.fileId)
             .toList(growable: false),
+        relatedLogIds:
+            _selectedLogs.map((log) => log.id).toList(growable: false),
+        reminder: _status == 'PLANNED' && _shouldSendReminder
+            ? HealthEntityReminderInput(
+                pushEnabled: _pushEnabled,
+                remindOffsetMinutes: _pushEnabled
+                    ? (_remindOffsetMinutes ?? 0)
+                    : null,
+              )
+            : null,
         rowVersion: widget.initialVisit?.rowVersion,
       ),
     );
@@ -732,9 +841,29 @@ class _VetVisitComposerSheetState
     });
   }
 
-  DateTime? _toStoredDate(DateTime? value) {
-    if (value == null) return null;
-    return DateTime(value.year, value.month, value.day, 12);
+  Future<void> _pickRelatedLog() async {
+    final selected = await showModalBottomSheet<LogCard>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _VisitLogPickerSheet(
+        petId: widget.petId,
+        excludedLogIds: _selectedLogs.map((log) => log.id).toSet(),
+      ),
+    );
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedLogs.add(selected);
+    });
+  }
+
+  void _removeRelatedLog(String logId) {
+    setState(() {
+      _selectedLogs.removeWhere((log) => log.id == logId);
+    });
   }
 }
 
@@ -1596,28 +1725,51 @@ class _VetVisitsErrorView extends StatelessWidget {
   }
 }
 
-Future<DateTime?> _pickDate(
+Future<DateTime?> _pickDateTime(
   BuildContext context, {
   required DateTime initialDate,
-}) {
-  return showDatePicker(
+}) async {
+  final date = await showDatePicker(
     context: context,
     initialDate: initialDate,
     firstDate: DateTime(2000),
     lastDate: DateTime.now().add(const Duration(days: 3650)),
   );
+  if (date == null || !context.mounted) {
+    return null;
+  }
+
+  final time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(initialDate),
+  );
+  if (time == null) {
+    return null;
+  }
+
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+    time.hour,
+    time.minute,
+  );
 }
 
-String _formatDate(DateTime value) {
+String _formatDateTime(DateTime value) {
   final local = value.toLocal();
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   final year = local.year.toString();
-  return '$day.$month.$year';
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.$year $hour:$minute';
 }
 
+String _formatDate(DateTime value) => _formatDateTime(value);
+
 String? _dateValue(DateTime? value) =>
-    value == null ? null : _formatDate(value);
+    value == null ? null : _formatDateTime(value);
 
 String? _nonEmpty(String? value) {
   final trimmed = value?.trim() ?? '';
@@ -1632,6 +1784,15 @@ String _mutationErrorMessage(Object error, String fallback) {
 }
 
 String _relatedLogSubtitle(RelatedLog log) {
+  final parts = <String>[
+    if (_dateValue(log.occurredAt) case final date?) date,
+    if (_nonEmpty(log.descriptionPreview) case final preview?) preview,
+    _logSourceLabel(log.source),
+  ];
+  return parts.join(' · ');
+}
+
+String _logCardSubtitle(LogCard log) {
   final parts = <String>[
     if (_dateValue(log.occurredAt) case final date?) date,
     if (_nonEmpty(log.descriptionPreview) case final preview?) preview,

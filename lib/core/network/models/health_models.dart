@@ -872,6 +872,7 @@ class UpsertVetVisitPayload {
     this.clinicName,
     this.vetName,
     this.attachmentFileIds = const <String>[],
+    this.reminder,
     this.rowVersion,
   });
 
@@ -884,6 +885,7 @@ class UpsertVetVisitPayload {
   final String? clinicName;
   final String? vetName;
   final List<String> attachmentFileIds;
+  final HealthEntityReminderPayload? reminder;
   final int? rowVersion;
 
   JsonMap toJson() => <String, dynamic>{
@@ -896,7 +898,23 @@ class UpsertVetVisitPayload {
         'clinic_name': clinicName,
         'vet_name': vetName,
         'attachment_file_ids': attachmentFileIds,
+        'reminder': reminder?.toJson(),
         'row_version': rowVersion,
+      }..removeWhere((_, dynamic value) => value == null);
+}
+
+class HealthEntityReminderPayload {
+  const HealthEntityReminderPayload({
+    required this.pushEnabled,
+    this.remindOffsetMinutes,
+  });
+
+  final bool pushEnabled;
+  final int? remindOffsetMinutes;
+
+  JsonMap toJson() => <String, dynamic>{
+        'push_enabled': pushEnabled,
+        'remind_offset_minutes': remindOffsetMinutes,
       }..removeWhere((_, dynamic value) => value == null);
 }
 
@@ -1079,6 +1097,7 @@ class UpsertVaccinationPayload {
     this.vetName,
     this.notes,
     this.attachmentFileIds = const <String>[],
+    this.reminder,
     this.rowVersion,
   });
 
@@ -1093,6 +1112,7 @@ class UpsertVaccinationPayload {
   final String? vetName;
   final String? notes;
   final List<String> attachmentFileIds;
+  final HealthEntityReminderPayload? reminder;
   final int? rowVersion;
 
   JsonMap toJson() => <String, dynamic>{
@@ -1107,6 +1127,7 @@ class UpsertVaccinationPayload {
         'vet_name': vetName,
         'notes': notes,
         'attachment_file_ids': attachmentFileIds,
+        'reminder': reminder?.toJson(),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
 }
@@ -1287,6 +1308,7 @@ class UpsertProcedurePayload {
     this.vetVisitId,
     this.notes,
     this.attachmentFileIds = const <String>[],
+    this.reminder,
     this.rowVersion,
   });
 
@@ -1302,6 +1324,7 @@ class UpsertProcedurePayload {
   final String? vetVisitId;
   final String? notes;
   final List<String> attachmentFileIds;
+  final HealthEntityReminderPayload? reminder;
   final int? rowVersion;
 
   JsonMap toJson() => <String, dynamic>{
@@ -1317,6 +1340,7 @@ class UpsertProcedurePayload {
         'vet_visit_id': vetVisitId,
         'notes': notes,
         'attachment_file_ids': attachmentFileIds,
+        'reminder': reminder?.toJson(),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
 }
