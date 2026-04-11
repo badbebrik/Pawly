@@ -329,6 +329,8 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                             name: 'petLogCreate',
                             builder: (_, state) => PetLogCreatePage(
                               petId: state.pathParameters['petId']!,
+                              initialLogTypeId:
+                                  state.uri.queryParameters['logTypeId'],
                             ),
                           ),
                           GoRoute(

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
+import '../../../pets/presentation/providers/active_pet_controller.dart';
+import '../../../pets/presentation/providers/active_pet_details_controller.dart';
 import '../../../pets/presentation/providers/pets_controller.dart';
 import '../providers/calendar_controllers.dart';
 
@@ -58,6 +61,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 response: response,
                 selectedDate: selectedDate,
                 petNamesById: petNamesById,
+                onOpenOccurrence: _openOccurrence,
               ),
               loading: () => const _CalendarLoadingView(),
               error: (error, _) => _CalendarErrorView(
@@ -100,6 +104,94 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   void _selectDate(DateTime value) {
     ref.read(calendarSelectedDateProvider.notifier).setDate(value);
+  }
+
+  Future<void> _openOccurrence(ScheduledItemOccurrence occurrence) async {
+    final petId = occurrence.petId;
+    if (petId.isEmpty) {
+      return;
+    }
+
+    await ref.read(activePetControllerProvider.notifier).selectPet(petId);
+    ref.invalidate(activePetDetailsControllerProvider);
+
+    if (!mounted) {
+      return;
+    }
+
+    final rule = occurrence.rule;
+    final sourceType = rule.sourceType;
+    final sourceId = rule.sourceId;
+
+    if (sourceType == 'VET_VISIT' &&
+        sourceId != null &&
+        sourceId.isNotEmpty) {
+      context.pushNamed(
+        'petVetVisitDetails',
+        pathParameters: <String, String>{
+          'petId': petId,
+          'visitId': sourceId,
+        },
+      );
+      return;
+    }
+
+    if (sourceType == 'VACCINATION' &&
+        sourceId != null &&
+        sourceId.isNotEmpty) {
+      context.pushNamed(
+        'petVaccinationDetails',
+        pathParameters: <String, String>{
+          'petId': petId,
+          'vaccinationId': sourceId,
+        },
+      );
+      return;
+    }
+
+    if (sourceType == 'PROCEDURE' &&
+        sourceId != null &&
+        sourceId.isNotEmpty) {
+      context.pushNamed(
+        'petProcedureDetails',
+        pathParameters: <String, String>{
+          'petId': petId,
+          'procedureId': sourceId,
+        },
+      );
+      return;
+    }
+
+    if (sourceType == 'LOG_TYPE' &&
+        sourceId != null &&
+        sourceId.isNotEmpty) {
+      context.pushNamed(
+        'petLogCreate',
+        pathParameters: <String, String>{
+          'petId': petId,
+        },
+        queryParameters: <String, String>{
+          'logTypeId': sourceId,
+        },
+      );
+      return;
+    }
+
+    if (sourceType == 'MANUAL' || sourceType == 'PET_EVENT') {
+      context.pushNamed(
+        'petReminderEdit',
+        pathParameters: <String, String>{
+          'petId': petId,
+          'itemId': occurrence.scheduledItemId,
+        },
+      );
+      return;
+    }
+
+    context.pushNamed(
+      'petReminders',
+      pathParameters: <String, String>{'petId': petId},
+    );
   }
 }
 
@@ -386,11 +478,14 @@ class _CalendarDayContent extends StatelessWidget {
     required this.response,
     required this.selectedDate,
     required this.petNamesById,
+    required this.onOpenOccurrence,
   });
 
   final ScheduledDayResponse response;
   final DateTime selectedDate;
   final Map<String, String> petNamesById;
+  final Future<void> Function(ScheduledItemOccurrence occurrence)
+      onOpenOccurrence;
 
   @override
   Widget build(BuildContext context) {
@@ -412,6 +507,7 @@ class _CalendarDayContent extends StatelessWidget {
             child: _CalendarEventCard(
               item: item,
               petName: petNamesById[item.petId],
+              onTap: () => onOpenOccurrence(item),
             ),
           ),
         ),
@@ -424,10 +520,12 @@ class _CalendarEventCard extends StatelessWidget {
   const _CalendarEventCard({
     required this.item,
     this.petName,
+    this.onTap,
   });
 
   final ScheduledItemOccurrence item;
   final String? petName;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -436,6 +534,7 @@ class _CalendarEventCard extends StatelessWidget {
     final rule = item.rule;
 
     return PawlyCard(
+      onTap: onTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

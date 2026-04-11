@@ -16,10 +16,12 @@ import '../widgets/health_attachments_field.dart';
 class PetLogCreatePage extends ConsumerStatefulWidget {
   const PetLogCreatePage({
     required this.petId,
+    this.initialLogTypeId,
     super.key,
   });
 
   final String petId;
+  final String? initialLogTypeId;
 
   @override
   ConsumerState<PetLogCreatePage> createState() => _PetLogCreatePageState();
@@ -40,6 +42,7 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
   void initState() {
     super.initState();
     _descriptionController = TextEditingController();
+    _selectedTypeId = widget.initialLogTypeId;
   }
 
   @override
