@@ -80,14 +80,13 @@ class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
       return;
     }
 
-    final input = await showModalBottomSheet<UpsertMedicalRecordInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _MedicalRecordComposerSheet(
-        petId: widget.petId,
-        allowedStatuses: state.bootstrap.enums.medicalRecordStatuses,
-        allowedTypes: state.bootstrap.enums.medicalRecordTypes,
+    final input = await Navigator.of(context).push<UpsertMedicalRecordInput>(
+      MaterialPageRoute<UpsertMedicalRecordInput>(
+        builder: (context) => _MedicalRecordComposerPage(
+          petId: widget.petId,
+          allowedStatuses: state.bootstrap.enums.medicalRecordStatuses,
+          allowedTypes: state.bootstrap.enums.medicalRecordTypes,
+        ),
       ),
     );
     if (input == null || !mounted) {
@@ -121,6 +120,40 @@ class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
         ),
       );
     }
+  }
+}
+
+class _MedicalRecordComposerPage extends StatelessWidget {
+  const _MedicalRecordComposerPage({
+    required this.petId,
+    required this.allowedStatuses,
+    required this.allowedTypes,
+    this.initialRecord,
+    this.title = 'Новая запись',
+    this.submitLabel = 'Сохранить запись',
+  });
+
+  final String petId;
+  final List<String> allowedStatuses;
+  final List<String> allowedTypes;
+  final MedicalRecord? initialRecord;
+  final String title;
+  final String submitLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: _MedicalRecordComposerSheet(
+        petId: petId,
+        allowedStatuses: allowedStatuses,
+        allowedTypes: allowedTypes,
+        initialRecord: initialRecord,
+        title: title,
+        submitLabel: submitLabel,
+        showHeader: false,
+      ),
+    );
   }
 }
 
@@ -394,6 +427,7 @@ class _MedicalRecordComposerSheet extends ConsumerStatefulWidget {
     this.initialRecord,
     this.title = 'Новая запись',
     this.submitLabel = 'Сохранить запись',
+    this.showHeader = true,
   });
 
   final String petId;
@@ -402,6 +436,7 @@ class _MedicalRecordComposerSheet extends ConsumerStatefulWidget {
   final MedicalRecord? initialRecord;
   final String title;
   final String submitLabel;
+  final bool showHeader;
 
   @override
   ConsumerState<_MedicalRecordComposerSheet> createState() =>
@@ -469,13 +504,17 @@ class _MedicalRecordComposerSheetState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.lg),
+                if (widget.showHeader) ...<Widget>[
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: PawlySpacing.lg),
+                ] else ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                ],
                 Wrap(
                   spacing: PawlySpacing.xs,
                   runSpacing: PawlySpacing.xs,
@@ -491,7 +530,7 @@ class _MedicalRecordComposerSheetState
                 ),
                 const SizedBox(height: PawlySpacing.md),
                 DropdownButtonFormField<String>(
-                  value: _recordType,
+                  initialValue: _recordType,
                   decoration: const InputDecoration(labelText: 'Тип записи'),
                   items: widget.allowedTypes
                       .map(
@@ -656,7 +695,8 @@ class _MedicalRecordComposerSheetState
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files =
+        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -804,19 +844,18 @@ class PetMedicalRecordDetailsPage extends ConsumerWidget {
   ) async {
     final state =
         ref.read(petMedicalRecordsControllerProvider(petId)).asData?.value;
-    final input = await showModalBottomSheet<UpsertMedicalRecordInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _MedicalRecordComposerSheet(
-        petId: petId,
-        allowedStatuses: state?.bootstrap.enums.medicalRecordStatuses ??
-            const <String>['ACTIVE', 'RESOLVED'],
-        allowedTypes: state?.bootstrap.enums.medicalRecordTypes ??
-            const <String>['CLINICAL_NOTE'],
-        initialRecord: record,
-        title: 'Редактировать запись',
-        submitLabel: 'Сохранить изменения',
+    final input = await Navigator.of(context).push<UpsertMedicalRecordInput>(
+      MaterialPageRoute<UpsertMedicalRecordInput>(
+        builder: (context) => _MedicalRecordComposerPage(
+          petId: petId,
+          allowedStatuses: state?.bootstrap.enums.medicalRecordStatuses ??
+              const <String>['ACTIVE', 'RESOLVED'],
+          allowedTypes: state?.bootstrap.enums.medicalRecordTypes ??
+              const <String>['CLINICAL_NOTE'],
+          initialRecord: record,
+          title: 'Редактировать запись',
+          submitLabel: 'Сохранить изменения',
+        ),
       ),
     );
     if (input == null || !context.mounted) return;
@@ -1001,7 +1040,8 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                     .toList(growable: false);
                 final imageItems = viewerItems
                     .where(
-                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                      (item) =>
+                          item.kind == AttachmentKind.image && item.url != null,
                     )
                     .toList(growable: false);
 
@@ -1011,12 +1051,14 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   child: Column(
-                    children: List<Widget>.generate(record.attachments.length, (index) {
+                    children: List<Widget>.generate(record.attachments.length,
+                        (index) {
                       final attachment = record.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
                         (item) =>
-                            item.url == viewerItem.url && item.title == viewerItem.title,
+                            item.url == viewerItem.url &&
+                            item.title == viewerItem.title,
                       );
 
                       return ListTile(
@@ -1041,7 +1083,8 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                           previewUrl: attachment.previewUrl,
                           downloadUrl: attachment.downloadUrl,
                           imageGalleryItems: imageItems,
-                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                          initialImageIndex:
+                              imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
                     }),

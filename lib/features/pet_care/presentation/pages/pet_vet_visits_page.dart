@@ -76,14 +76,13 @@ class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
       return;
     }
 
-    final input = await showModalBottomSheet<UpsertVetVisitInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _VetVisitComposerSheet(
-        petId: widget.petId,
-        allowedStatuses: state.bootstrap.enums.vetVisitStatuses,
-        allowedTypes: state.bootstrap.enums.vetVisitTypes,
+    final input = await Navigator.of(context).push<UpsertVetVisitInput>(
+      MaterialPageRoute<UpsertVetVisitInput>(
+        builder: (context) => _VetVisitComposerPage(
+          petId: widget.petId,
+          allowedStatuses: state.bootstrap.enums.vetVisitStatuses,
+          allowedTypes: state.bootstrap.enums.vetVisitTypes,
+        ),
       ),
     );
     if (input == null || !mounted) {
@@ -389,6 +388,7 @@ class _VetVisitComposerSheet extends ConsumerStatefulWidget {
     this.initialVisit,
     this.title = 'Новый визит',
     this.submitLabel = 'Сохранить визит',
+    this.showHeader = true,
   });
 
   final String petId;
@@ -397,13 +397,15 @@ class _VetVisitComposerSheet extends ConsumerStatefulWidget {
   final VetVisit? initialVisit;
   final String title;
   final String submitLabel;
+  final bool showHeader;
 
   @override
   ConsumerState<_VetVisitComposerSheet> createState() =>
       _VetVisitComposerSheetState();
 }
 
-class _VetVisitComposerSheetState extends ConsumerState<_VetVisitComposerSheet> {
+class _VetVisitComposerSheetState
+    extends ConsumerState<_VetVisitComposerSheet> {
   final _formKey = GlobalKey<FormState>();
   final _clinicController = TextEditingController();
   final _vetController = TextEditingController();
@@ -469,13 +471,15 @@ class _VetVisitComposerSheetState extends ConsumerState<_VetVisitComposerSheet> 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.lg),
+                if (widget.showHeader) ...<Widget>[
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: PawlySpacing.lg),
+                ],
                 Wrap(
                   spacing: PawlySpacing.xs,
                   runSpacing: PawlySpacing.xs,
@@ -491,7 +495,7 @@ class _VetVisitComposerSheetState extends ConsumerState<_VetVisitComposerSheet> 
                 ),
                 const SizedBox(height: PawlySpacing.md),
                 DropdownButtonFormField<String>(
-                  value: _visitType,
+                  initialValue: _visitType,
                   decoration: const InputDecoration(labelText: 'Тип визита'),
                   items: widget.allowedTypes
                       .map(
@@ -667,7 +671,8 @@ class _VetVisitComposerSheetState extends ConsumerState<_VetVisitComposerSheet> 
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files =
+        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -730,6 +735,40 @@ class _VetVisitComposerSheetState extends ConsumerState<_VetVisitComposerSheet> 
   DateTime? _toStoredDate(DateTime? value) {
     if (value == null) return null;
     return DateTime(value.year, value.month, value.day, 12);
+  }
+}
+
+class _VetVisitComposerPage extends StatelessWidget {
+  const _VetVisitComposerPage({
+    required this.petId,
+    required this.allowedStatuses,
+    required this.allowedTypes,
+    this.initialVisit,
+    this.title = 'Новый визит',
+    this.submitLabel = 'Сохранить визит',
+  });
+
+  final String petId;
+  final List<String> allowedStatuses;
+  final List<String> allowedTypes;
+  final VetVisit? initialVisit;
+  final String title;
+  final String submitLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: _VetVisitComposerSheet(
+        petId: petId,
+        allowedStatuses: allowedStatuses,
+        allowedTypes: allowedTypes,
+        initialVisit: initialVisit,
+        title: title,
+        submitLabel: submitLabel,
+        showHeader: false,
+      ),
+    );
   }
 }
 
@@ -814,19 +853,18 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
     VetVisit visit,
   ) async {
     final state = ref.read(petVetVisitsControllerProvider(petId)).asData?.value;
-    final input = await showModalBottomSheet<UpsertVetVisitInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _VetVisitComposerSheet(
-        petId: petId,
-        allowedStatuses: state?.bootstrap.enums.vetVisitStatuses ??
-            const <String>['PLANNED', 'COMPLETED', 'CANCELLED'],
-        allowedTypes:
-            state?.bootstrap.enums.vetVisitTypes ?? const <String>['CHECKUP'],
-        initialVisit: visit,
-        title: 'Редактировать визит',
-        submitLabel: 'Сохранить изменения',
+    final input = await Navigator.of(context).push<UpsertVetVisitInput>(
+      MaterialPageRoute<UpsertVetVisitInput>(
+        builder: (context) => _VetVisitComposerPage(
+          petId: petId,
+          allowedStatuses: state?.bootstrap.enums.vetVisitStatuses ??
+              const <String>['PLANNED', 'COMPLETED', 'CANCELLED'],
+          allowedTypes:
+              state?.bootstrap.enums.vetVisitTypes ?? const <String>['CHECKUP'],
+          initialVisit: visit,
+          title: 'Редактировать визит',
+          submitLabel: 'Сохранить изменения',
+        ),
       ),
     );
     if (input == null || !context.mounted) return;
@@ -1064,7 +1102,8 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                     .toList(growable: false);
                 final imageItems = viewerItems
                     .where(
-                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                      (item) =>
+                          item.kind == AttachmentKind.image && item.url != null,
                     )
                     .toList(growable: false);
 
@@ -1074,12 +1113,14 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   child: Column(
-                    children: List<Widget>.generate(visit.attachments.length, (index) {
+                    children: List<Widget>.generate(visit.attachments.length,
+                        (index) {
                       final attachment = visit.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
                         (item) =>
-                            item.url == viewerItem.url && item.title == viewerItem.title,
+                            item.url == viewerItem.url &&
+                            item.title == viewerItem.title,
                       );
 
                       return ListTile(
@@ -1104,7 +1145,8 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                           previewUrl: attachment.previewUrl,
                           downloadUrl: attachment.downloadUrl,
                           imageGalleryItems: imageItems,
-                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                          initialImageIndex:
+                              imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
                     }),

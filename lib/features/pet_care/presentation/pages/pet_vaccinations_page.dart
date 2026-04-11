@@ -79,13 +79,12 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
       return;
     }
 
-    final input = await showModalBottomSheet<UpsertVaccinationInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _VaccinationComposerSheet(
-        petId: widget.petId,
-        allowedStatuses: state.bootstrap.enums.vaccinationStatuses,
+    final input = await Navigator.of(context).push<UpsertVaccinationInput>(
+      MaterialPageRoute<UpsertVaccinationInput>(
+        builder: (context) => _VaccinationComposerPage(
+          petId: widget.petId,
+          allowedStatuses: state.bootstrap.enums.vaccinationStatuses,
+        ),
       ),
     );
     if (input == null || !mounted) {
@@ -203,6 +202,37 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
     }
 
     return 'Не удалось выполнить действие с вакцинацией.';
+  }
+}
+
+class _VaccinationComposerPage extends StatelessWidget {
+  const _VaccinationComposerPage({
+    required this.petId,
+    required this.allowedStatuses,
+    this.initialVaccination,
+    this.title = 'Новая вакцинация',
+    this.submitLabel = 'Сохранить вакцинацию',
+  });
+
+  final String petId;
+  final List<String> allowedStatuses;
+  final Vaccination? initialVaccination;
+  final String title;
+  final String submitLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: _VaccinationComposerSheet(
+        petId: petId,
+        allowedStatuses: allowedStatuses,
+        initialVaccination: initialVaccination,
+        title: title,
+        submitLabel: submitLabel,
+        showHeader: false,
+      ),
+    );
   }
 }
 
@@ -540,6 +570,7 @@ class _VaccinationComposerSheet extends ConsumerStatefulWidget {
     this.initialVaccination,
     this.title = 'Новая вакцинация',
     this.submitLabel = 'Сохранить вакцинацию',
+    this.showHeader = true,
   });
 
   final String petId;
@@ -547,6 +578,7 @@ class _VaccinationComposerSheet extends ConsumerStatefulWidget {
   final Vaccination? initialVaccination;
   final String title;
   final String submitLabel;
+  final bool showHeader;
 
   @override
   ConsumerState<_VaccinationComposerSheet> createState() =>
@@ -617,20 +649,24 @@ class _VaccinationComposerSheetState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.xs),
-                Text(
-                  'Запланируйте прививку или сразу внесите выполненную вакцинацию.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.lg),
+                if (widget.showHeader) ...<Widget>[
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: PawlySpacing.xs),
+                  Text(
+                    'Запланируйте прививку или сразу внесите выполненную вакцинацию.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: PawlySpacing.lg),
+                ] else ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                ],
                 Wrap(
                   spacing: PawlySpacing.xs,
                   runSpacing: PawlySpacing.xs,
@@ -831,7 +867,8 @@ class _VaccinationComposerSheetState
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files =
+        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -1139,16 +1176,15 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
             .vaccinationStatuses ??
         const <String>['PLANNED', 'DONE', 'CANCELLED'];
 
-    final input = await showModalBottomSheet<UpsertVaccinationInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _VaccinationComposerSheet(
-        petId: petId,
-        allowedStatuses: statuses,
-        initialVaccination: vaccination,
-        title: 'Редактировать вакцинацию',
-        submitLabel: 'Сохранить изменения',
+    final input = await Navigator.of(context).push<UpsertVaccinationInput>(
+      MaterialPageRoute<UpsertVaccinationInput>(
+        builder: (context) => _VaccinationComposerPage(
+          petId: petId,
+          allowedStatuses: statuses,
+          initialVaccination: vaccination,
+          title: 'Редактировать вакцинацию',
+          submitLabel: 'Сохранить изменения',
+        ),
       ),
     );
     if (input == null || !context.mounted) {
@@ -1361,7 +1397,8 @@ class _VaccinationDetailsView extends StatelessWidget {
                     .toList(growable: false);
                 final imageItems = viewerItems
                     .where(
-                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                      (item) =>
+                          item.kind == AttachmentKind.image && item.url != null,
                     )
                     .toList(growable: false);
 
@@ -1387,7 +1424,8 @@ class _VaccinationDetailsView extends StatelessWidget {
                           leading: Icon(
                             switch (viewerItem.kind) {
                               AttachmentKind.image => Icons.photo_rounded,
-                              AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                              AttachmentKind.pdf =>
+                                Icons.picture_as_pdf_rounded,
                               AttachmentKind.other => Icons.description_rounded,
                             },
                           ),
@@ -1404,7 +1442,8 @@ class _VaccinationDetailsView extends StatelessWidget {
                             previewUrl: attachment.previewUrl,
                             downloadUrl: attachment.downloadUrl,
                             imageGalleryItems: imageItems,
-                            initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                            initialImageIndex:
+                                imageIndex >= 0 ? imageIndex : null,
                           ),
                         );
                       },

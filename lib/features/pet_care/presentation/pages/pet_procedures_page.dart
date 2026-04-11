@@ -75,14 +75,13 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
       return;
     }
 
-    final input = await showModalBottomSheet<UpsertProcedureInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _ProcedureComposerSheet(
-        petId: widget.petId,
-        allowedStatuses: state.bootstrap.enums.procedureStatuses,
-        allowedTypes: state.bootstrap.enums.procedureTypes,
+    final input = await Navigator.of(context).push<UpsertProcedureInput>(
+      MaterialPageRoute<UpsertProcedureInput>(
+        builder: (context) => _ProcedureComposerPage(
+          petId: widget.petId,
+          allowedStatuses: state.bootstrap.enums.procedureStatuses,
+          allowedTypes: state.bootstrap.enums.procedureTypes,
+        ),
       ),
     );
     if (input == null || !mounted) {
@@ -113,6 +112,40 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
         ),
       );
     }
+  }
+}
+
+class _ProcedureComposerPage extends StatelessWidget {
+  const _ProcedureComposerPage({
+    required this.petId,
+    required this.allowedStatuses,
+    required this.allowedTypes,
+    this.initialProcedure,
+    this.title = 'Новая процедура',
+    this.submitLabel = 'Сохранить процедуру',
+  });
+
+  final String petId;
+  final List<String> allowedStatuses;
+  final List<String> allowedTypes;
+  final Procedure? initialProcedure;
+  final String title;
+  final String submitLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: _ProcedureComposerSheet(
+        petId: petId,
+        allowedStatuses: allowedStatuses,
+        allowedTypes: allowedTypes,
+        initialProcedure: initialProcedure,
+        title: title,
+        submitLabel: submitLabel,
+        showHeader: false,
+      ),
+    );
   }
 }
 
@@ -397,6 +430,7 @@ class _ProcedureComposerSheet extends ConsumerStatefulWidget {
     this.initialProcedure,
     this.title = 'Новая процедура',
     this.submitLabel = 'Сохранить процедуру',
+    this.showHeader = true,
   });
 
   final String petId;
@@ -405,6 +439,7 @@ class _ProcedureComposerSheet extends ConsumerStatefulWidget {
   final Procedure? initialProcedure;
   final String title;
   final String submitLabel;
+  final bool showHeader;
 
   @override
   ConsumerState<_ProcedureComposerSheet> createState() =>
@@ -480,13 +515,17 @@ class _ProcedureComposerSheetState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.lg),
+                if (widget.showHeader) ...<Widget>[
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: PawlySpacing.lg),
+                ] else ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                ],
                 Wrap(
                   spacing: PawlySpacing.xs,
                   runSpacing: PawlySpacing.xs,
@@ -704,7 +743,8 @@ class _ProcedureComposerSheetState
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files =
+        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -855,19 +895,18 @@ class PetProcedureDetailsPage extends ConsumerWidget {
   ) async {
     final state =
         ref.read(petProceduresControllerProvider(petId)).asData?.value;
-    final input = await showModalBottomSheet<UpsertProcedureInput>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _ProcedureComposerSheet(
-        petId: petId,
-        allowedStatuses: state?.bootstrap.enums.procedureStatuses ??
-            const <String>['PLANNED', 'DONE', 'CANCELLED'],
-        allowedTypes:
-            state?.bootstrap.enums.procedureTypes ?? const <String>['OTHER'],
-        initialProcedure: procedure,
-        title: 'Редактировать процедуру',
-        submitLabel: 'Сохранить изменения',
+    final input = await Navigator.of(context).push<UpsertProcedureInput>(
+      MaterialPageRoute<UpsertProcedureInput>(
+        builder: (context) => _ProcedureComposerPage(
+          petId: petId,
+          allowedStatuses: state?.bootstrap.enums.procedureStatuses ??
+              const <String>['PLANNED', 'DONE', 'CANCELLED'],
+          allowedTypes:
+              state?.bootstrap.enums.procedureTypes ?? const <String>['OTHER'],
+          initialProcedure: procedure,
+          title: 'Редактировать процедуру',
+          submitLabel: 'Сохранить изменения',
+        ),
       ),
     );
     if (input == null || !context.mounted) return;
@@ -1056,7 +1095,8 @@ class _ProcedureDetailsView extends StatelessWidget {
                     .toList(growable: false);
                 final imageItems = viewerItems
                     .where(
-                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                      (item) =>
+                          item.kind == AttachmentKind.image && item.url != null,
                     )
                     .toList(growable: false);
 
@@ -1066,12 +1106,14 @@ class _ProcedureDetailsView extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   child: Column(
-                    children: List<Widget>.generate(procedure.attachments.length, (index) {
+                    children: List<Widget>.generate(
+                        procedure.attachments.length, (index) {
                       final attachment = procedure.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
                         (item) =>
-                            item.url == viewerItem.url && item.title == viewerItem.title,
+                            item.url == viewerItem.url &&
+                            item.title == viewerItem.title,
                       );
 
                       return ListTile(
@@ -1096,7 +1138,8 @@ class _ProcedureDetailsView extends StatelessWidget {
                           previewUrl: attachment.previewUrl,
                           downloadUrl: attachment.downloadUrl,
                           imageGalleryItems: imageItems,
-                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                          initialImageIndex:
+                              imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
                     }),
