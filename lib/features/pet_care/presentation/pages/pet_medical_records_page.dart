@@ -1031,6 +1031,7 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                 final viewerItems = record.attachments
                     .map(
                       (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileId: attachment.fileId,
                         fileType: attachment.fileType,
                         fileName: attachment.fileName,
                         previewUrl: attachment.previewUrl,
@@ -1078,6 +1079,7 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                         ),
                         onTap: () => openAttachmentUrl(
                           context,
+                          fileId: attachment.fileId,
                           fileType: attachment.fileType,
                           fileName: viewerItem.title,
                           previewUrl: attachment.previewUrl,

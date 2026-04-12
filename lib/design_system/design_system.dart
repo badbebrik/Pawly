@@ -1,6 +1,7 @@
 export 'components/pawly_badge.dart';
 export 'components/pawly_button.dart';
 export 'components/pawly_card.dart';
+export 'components/pawly_cached_image.dart';
 export 'components/pawly_text_field.dart';
 export 'pawly_theme.dart';
 export 'tokens/pawly_colors.dart';

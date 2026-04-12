@@ -2,12 +2,14 @@ import 'attachment_kind.dart';
 
 class AttachmentViewerItem {
   const AttachmentViewerItem({
+    this.fileId,
     required this.title,
     required this.url,
     required this.kind,
   });
 
   factory AttachmentViewerItem.fromAttachment({
+    String? fileId,
     required String fileType,
     String? fileName,
     String? previewUrl,
@@ -19,7 +21,10 @@ class AttachmentViewerItem {
     );
 
     return AttachmentViewerItem(
-      title: (fileName == null || fileName.trim().isEmpty) ? 'Файл' : fileName.trim(),
+      fileId: fileId,
+      title: (fileName == null || fileName.trim().isEmpty)
+          ? 'Файл'
+          : fileName.trim(),
       url: resolvedUrl,
       kind: detectAttachmentKind(
         fileType: fileType,
@@ -29,6 +34,7 @@ class AttachmentViewerItem {
     );
   }
 
+  final String? fileId;
   final String title;
   final String? url;
   final AttachmentKind kind;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/acl_models.dart';
@@ -186,6 +185,7 @@ class _AclMemberTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           _AclAvatar(
+            userId: member.userId,
             photoUrl: profile?.avatarDownloadUrl,
             fallbackLabel: fullName,
             showCrown: member.isPrimaryOwner,
@@ -366,11 +366,13 @@ class _AclInviteTile extends StatelessWidget {
 
 class _AclAvatar extends StatelessWidget {
   const _AclAvatar({
+    required this.userId,
     required this.photoUrl,
     required this.fallbackLabel,
     required this.showCrown,
   });
 
+  final String userId;
   final String? photoUrl;
   final String fallbackLabel;
   final bool showCrown;
@@ -396,10 +398,16 @@ class _AclAvatar extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: hasPhoto
-                ? CachedNetworkImage(
+                ? PawlyCachedImage(
                     imageUrl: resolvedPhotoUrl!,
+                    cacheKey: pawlyStableImageCacheKey(
+                      scope: 'acl-avatar',
+                      entityId: userId,
+                      imageUrl: resolvedPhotoUrl,
+                    ),
+                    targetLogicalSize: 72,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) =>
+                    errorWidget: (_) =>
                         _AclAvatarFallback(label: fallbackLabel),
                   )
                 : _AclAvatarFallback(label: fallbackLabel),

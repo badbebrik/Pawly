@@ -757,9 +757,8 @@ class _ProcedureComposerSheetState
         reminder: _status == 'PLANNED' && _shouldSendReminder
             ? HealthEntityReminderInput(
                 pushEnabled: _pushEnabled,
-                remindOffsetMinutes: _pushEnabled
-                    ? (_remindOffsetMinutes ?? 0)
-                    : null,
+                remindOffsetMinutes:
+                    _pushEnabled ? (_remindOffsetMinutes ?? 0) : null,
               )
             : null,
         rowVersion: widget.initialProcedure?.rowVersion,
@@ -1150,6 +1149,7 @@ class _ProcedureDetailsView extends StatelessWidget {
                 final viewerItems = procedure.attachments
                     .map(
                       (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileId: attachment.fileId,
                         fileType: attachment.fileType,
                         fileName: attachment.fileName,
                         previewUrl: attachment.previewUrl,
@@ -1197,6 +1197,7 @@ class _ProcedureDetailsView extends StatelessWidget {
                         ),
                         onTap: () => openAttachmentUrl(
                           context,
+                          fileId: attachment.fileId,
                           fileType: attachment.fileType,
                           fileName: viewerItem.title,
                           previewUrl: attachment.previewUrl,

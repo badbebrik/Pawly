@@ -269,6 +269,7 @@ class _PetLogDetailsView extends StatelessWidget {
                 final viewerItems = log.attachments
                     .map(
                       (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileId: attachment.fileId,
                         fileType: attachment.fileType,
                         fileName: attachment.fileName,
                         previewUrl: attachment.previewUrl,
@@ -278,7 +279,8 @@ class _PetLogDetailsView extends StatelessWidget {
                     .toList(growable: false);
                 final imageItems = viewerItems
                     .where(
-                      (item) => item.kind == AttachmentKind.image && item.url != null,
+                      (item) =>
+                          item.kind == AttachmentKind.image && item.url != null,
                     )
                     .toList(growable: false);
 
@@ -288,12 +290,14 @@ class _PetLogDetailsView extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   child: Column(
-                    children: List<Widget>.generate(log.attachments.length, (index) {
+                    children:
+                        List<Widget>.generate(log.attachments.length, (index) {
                       final attachment = log.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
                         (item) =>
-                            item.url == viewerItem.url && item.title == viewerItem.title,
+                            item.url == viewerItem.url &&
+                            item.title == viewerItem.title,
                       );
 
                       return ListTile(
@@ -309,12 +313,14 @@ class _PetLogDetailsView extends StatelessWidget {
                         subtitle: Text(_attachmentSubtitle(attachment)),
                         onTap: () => openAttachmentUrl(
                           context,
+                          fileId: attachment.fileId,
                           fileType: attachment.fileType,
                           fileName: viewerItem.title,
                           previewUrl: attachment.previewUrl,
                           downloadUrl: attachment.downloadUrl,
                           imageGalleryItems: imageItems,
-                          initialImageIndex: imageIndex >= 0 ? imageIndex : null,
+                          initialImageIndex:
+                              imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
                     }),

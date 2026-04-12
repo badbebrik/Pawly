@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,9 +20,7 @@ import '../providers/settings_profile_controller.dart';
 
 final notificationSettingsProvider =
     FutureProvider.autoDispose<NotificationSettings?>((ref) {
-  return ref
-      .read(pushNotificationsServiceProvider)
-      .getNotificationSettings();
+  return ref.read(pushNotificationsServiceProvider).getNotificationSettings();
 });
 
 class SettingsPage extends ConsumerWidget {
@@ -409,15 +406,17 @@ class _NotificationSettingsSheetState
             const SizedBox(height: PawlySpacing.lg),
             if (canRequest)
               PawlyButton(
-                label: _isRequesting ? 'Запрашиваем...' : 'Разрешить уведомления',
-                onPressed: _isRequesting
-                    ? null
-                    : () => _requestNotifications(context),
+                label:
+                    _isRequesting ? 'Запрашиваем...' : 'Разрешить уведомления',
+                onPressed:
+                    _isRequesting ? null : () => _requestNotifications(context),
                 icon: Icons.notifications_active_rounded,
               ),
             if (!canRequest)
               PawlyButton(
-                label: _isOpeningSettings ? 'Открываем...' : 'Открыть настройки устройства',
+                label: _isOpeningSettings
+                    ? 'Открываем...'
+                    : 'Открыть настройки устройства',
                 onPressed: _isOpeningSettings
                     ? null
                     : () => _openDeviceSettings(context),
@@ -572,6 +571,7 @@ class _ProfileHeader extends StatelessWidget {
               GestureDetector(
                 onTap: onAvatarTap,
                 child: _ProfileAvatar(
+                  userId: resolvedProfile?.userId,
                   photoUrl: resolvedProfile?.avatarDownloadUrl,
                   initials: initials,
                 ),
@@ -647,10 +647,12 @@ class _ProfileHeader extends StatelessWidget {
 
 class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({
+    required this.userId,
     required this.photoUrl,
     required this.initials,
   }) : size = 76;
 
+  final String? userId;
   final String? photoUrl;
   final String initials;
   final double size;
@@ -660,6 +662,7 @@ class _ProfileAvatar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
     final resolvedPhotoUrl = hasPhoto ? _normalizeStorageUrl(photoUrl!) : null;
+    final resolvedUserId = userId;
 
     return Container(
       width: size,
@@ -671,10 +674,18 @@ class _ProfileAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
-          ? CachedNetworkImage(
+          ? PawlyCachedImage(
               imageUrl: resolvedPhotoUrl!,
+              cacheKey: resolvedUserId == null
+                  ? null
+                  : pawlyStableImageCacheKey(
+                      scope: 'profile-avatar',
+                      entityId: resolvedUserId,
+                      imageUrl: resolvedPhotoUrl,
+                    ),
+              targetLogicalSize: size,
               fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => _ProfileAvatarFallback(
+              errorWidget: (_) => _ProfileAvatarFallback(
                 initials: initials,
               ),
             )
@@ -919,7 +930,8 @@ class _LanguageSettingsSheet extends ConsumerStatefulWidget {
       _LanguageSettingsSheetState();
 }
 
-class _LanguageSettingsSheetState extends ConsumerState<_LanguageSettingsSheet> {
+class _LanguageSettingsSheetState
+    extends ConsumerState<_LanguageSettingsSheet> {
   bool _isSaving = false;
 
   @override

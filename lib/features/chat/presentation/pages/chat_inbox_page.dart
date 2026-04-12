@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,7 +63,8 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
                   itemBuilder: (context, index) {
                     if (index >= state.items.length) {
                       return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: PawlySpacing.md),
+                        padding:
+                            EdgeInsets.symmetric(vertical: PawlySpacing.md),
                         child: Center(child: CircularProgressIndicator()),
                       );
                     }
@@ -137,10 +137,10 @@ class _InboxConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final resolvedAvatarUrl = item.peer.avatarUrl == null ||
-            item.peer.avatarUrl!.isEmpty
-        ? null
-        : _normalizeStorageUrl(item.peer.avatarUrl!);
+    final resolvedAvatarUrl =
+        item.peer.avatarUrl == null || item.peer.avatarUrl!.isEmpty
+            ? null
+            : _normalizeStorageUrl(item.peer.avatarUrl!);
     final preview = item.lastMessagePreview?.trim();
     final timeLabel = _formatTimestamp(item.lastMessageAt?.toLocal());
 
@@ -162,6 +162,7 @@ class _InboxConversationTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 _InboxAvatar(
+                  userId: item.peer.userId,
                   displayName: item.peer.displayName,
                   avatarUrl: resolvedAvatarUrl,
                 ),
@@ -246,10 +247,13 @@ class _InboxConversationTile extends StatelessWidget {
     }
 
     final now = DateTime.now();
-    final sameDay =
-        now.year == value.year && now.month == value.month && now.day == value.day;
+    final sameDay = now.year == value.year &&
+        now.month == value.month &&
+        now.day == value.day;
 
-    return sameDay ? _ChatInboxPageState._timeFormat.format(value) : _ChatInboxPageState._dateFormat.format(value);
+    return sameDay
+        ? _ChatInboxPageState._timeFormat.format(value)
+        : _ChatInboxPageState._dateFormat.format(value);
   }
 }
 
@@ -287,10 +291,12 @@ class _PetPill extends StatelessWidget {
 
 class _InboxAvatar extends StatelessWidget {
   const _InboxAvatar({
+    required this.userId,
     required this.displayName,
     required this.avatarUrl,
   });
 
+  final String userId;
   final String displayName;
   final String? avatarUrl;
 
@@ -307,10 +313,16 @@ class _InboxAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasAvatar
-          ? CachedNetworkImage(
+          ? PawlyCachedImage(
               imageUrl: avatarUrl!,
+              cacheKey: pawlyStableImageCacheKey(
+                scope: 'chat-avatar',
+                entityId: userId,
+                imageUrl: avatarUrl!,
+              ),
+              targetLogicalSize: 56,
               fit: BoxFit.cover,
-              errorWidget: (_, __, ___) =>
+              errorWidget: (_) =>
                   _InboxAvatarFallback(displayName: displayName),
             )
           : _InboxAvatarFallback(displayName: displayName),

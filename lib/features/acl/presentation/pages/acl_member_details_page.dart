@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -613,6 +612,7 @@ class _MemberSummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           _AclAvatar(
+            userId: member.userId,
             photoUrl: profile?.avatarDownloadUrl,
             fallbackLabel: name,
             showCrown: member.isPrimaryOwner,
@@ -720,11 +720,13 @@ class _PermissionEditorRow extends StatelessWidget {
 
 class _AclAvatar extends StatelessWidget {
   const _AclAvatar({
+    required this.userId,
     required this.photoUrl,
     required this.fallbackLabel,
     required this.showCrown,
   });
 
+  final String userId;
   final String? photoUrl;
   final String fallbackLabel;
   final bool showCrown;
@@ -750,10 +752,16 @@ class _AclAvatar extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: hasPhoto
-                ? CachedNetworkImage(
+                ? PawlyCachedImage(
                     imageUrl: resolvedPhotoUrl!,
+                    cacheKey: pawlyStableImageCacheKey(
+                      scope: 'acl-avatar',
+                      entityId: userId,
+                      imageUrl: resolvedPhotoUrl,
+                    ),
+                    targetLogicalSize: 72,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) =>
+                    errorWidget: (_) =>
                         _AclAvatarFallback(label: fallbackLabel),
                   )
                 : _AclAvatarFallback(label: fallbackLabel),

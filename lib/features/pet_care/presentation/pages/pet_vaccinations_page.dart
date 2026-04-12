@@ -868,7 +868,7 @@ class _VaccinationComposerSheetState
       return;
     }
 
-                if (_status == 'DONE' && _administeredAt == null) {
+    if (_status == 'DONE' && _administeredAt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Укажите дату и время выполнения вакцинации.'),
@@ -900,9 +900,8 @@ class _VaccinationComposerSheetState
         reminder: _status == 'PLANNED' && _shouldSendReminder
             ? HealthEntityReminderInput(
                 pushEnabled: _pushEnabled,
-                remindOffsetMinutes: _pushEnabled
-                    ? (_remindOffsetMinutes ?? 0)
-                    : null,
+                remindOffsetMinutes:
+                    _pushEnabled ? (_remindOffsetMinutes ?? 0) : null,
               )
             : null,
         rowVersion: widget.initialVaccination?.rowVersion,
@@ -1469,6 +1468,7 @@ class _VaccinationDetailsView extends StatelessWidget {
                 final viewerItems = vaccination.attachments
                     .map(
                       (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileId: attachment.fileId,
                         fileType: attachment.fileType,
                         fileName: attachment.fileName,
                         previewUrl: attachment.previewUrl,
@@ -1518,6 +1518,7 @@ class _VaccinationDetailsView extends StatelessWidget {
                           ),
                           onTap: () => openAttachmentUrl(
                             context,
+                            fileId: attachment.fileId,
                             fileType: attachment.fileType,
                             fileName: viewerItem.title,
                             previewUrl: attachment.previewUrl,

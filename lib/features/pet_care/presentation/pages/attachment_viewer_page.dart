@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../../../design_system/design_system.dart';
@@ -7,12 +11,14 @@ import '../models/attachment_viewer_item.dart';
 
 class AttachmentViewerPage extends StatelessWidget {
   const AttachmentViewerPage({
+    this.fileId,
     required this.title,
     required this.url,
     required this.kind,
     super.key,
   });
 
+  final String? fileId;
   final String title;
   final String url;
   final AttachmentKind kind;
@@ -35,8 +41,55 @@ class AttachmentViewerPage extends StatelessWidget {
       appBar: AppBar(title: Text(title)),
       body: switch (kind) {
         AttachmentKind.image => const SizedBox.shrink(),
-        AttachmentKind.pdf => SfPdfViewer.network(url),
+        AttachmentKind.pdf => _CachedPdfViewer(fileId: fileId, url: url),
         AttachmentKind.other => const _AttachmentViewerError(),
+      },
+    );
+  }
+}
+
+class _CachedPdfViewer extends StatefulWidget {
+  const _CachedPdfViewer({
+    required this.fileId,
+    required this.url,
+  });
+
+  final String? fileId;
+  final String url;
+
+  @override
+  State<_CachedPdfViewer> createState() => _CachedPdfViewerState();
+}
+
+class _CachedPdfViewerState extends State<_CachedPdfViewer> {
+  late final Future<File> _fileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _fileFuture = DefaultCacheManager().getSingleFile(
+      widget.url,
+      key: widget.fileId == null ? widget.url : 'pdf:${widget.fileId}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File>(
+      future: _fileFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          if (kDebugMode && snapshot.hasError) {
+            debugPrint('Failed to cache PDF: ${snapshot.error}');
+          }
+          return const _AttachmentViewerError();
+        }
+
+        return SfPdfViewer.file(snapshot.data!);
       },
     );
   }
@@ -79,7 +132,8 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
     final currentItem = widget.items[_currentIndex];
     final isDark = theme.brightness == Brightness.dark;
     final pageBackground = isDark ? PawlyColors.gray900 : PawlyColors.gray100;
-    final frameBackground = isDark ? const Color(0xFF17232C) : PawlyColors.white;
+    final frameBackground =
+        isDark ? const Color(0xFF17232C) : PawlyColors.white;
 
     return Scaffold(
       backgroundColor: pageBackground,
@@ -144,18 +198,14 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
                           minScale: 0.9,
                           maxScale: 4,
                           child: Center(
-                            child: Image.network(
-                              item.url ?? '',
+                            child: PawlyCachedImage(
+                              imageUrl: item.url ?? '',
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const _AttachmentViewerError(),
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) {
-                                  return child;
-                                }
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              },
+                              errorWidget: (_) =>
+                                  const _AttachmentViewerError(),
+                              placeholder: (_) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
                             ),
                           ),
                         ),
@@ -199,11 +249,12 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
                           color: frameBackground,
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(PawlyRadius.lg - 1),
-                          child: Image.network(
-                            item.url ?? '',
+                          borderRadius:
+                              BorderRadius.circular(PawlyRadius.lg - 1),
+                          child: PawlyCachedImage(
+                            imageUrl: item.url ?? '',
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
+                            errorWidget: (_) => Icon(
                               Icons.broken_image_outlined,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -212,7 +263,8 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
                       ),
                     );
                   },
-                  separatorBuilder: (_, __) => const SizedBox(width: PawlySpacing.sm),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: PawlySpacing.sm),
                   itemCount: widget.items.length,
                 ),
               ),

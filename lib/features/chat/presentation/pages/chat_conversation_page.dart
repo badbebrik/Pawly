@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../design_system/design_system.dart';
@@ -139,7 +138,8 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
     }
 
     ref
-        .read(chatConversationControllerProvider(widget.conversationId).notifier)
+        .read(
+            chatConversationControllerProvider(widget.conversationId).notifier)
         .sendMessage(text);
     _messageController.clear();
   }
@@ -182,7 +182,8 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Не удалось отправить сообщение. Проверьте соединение.'),
+          content:
+              Text('Не удалось отправить сообщение. Проверьте соединение.'),
         ),
       );
     });
@@ -253,6 +254,7 @@ class _ConversationAppBarTitle extends StatelessWidget {
     return Row(
       children: <Widget>[
         _ConversationAvatar(
+          userId: state.conversation.peer.userId,
           name: state.conversation.peer.displayName,
           avatarUrl: resolvedAvatarUrl,
         ),
@@ -288,10 +290,12 @@ class _ConversationAppBarTitle extends StatelessWidget {
 
 class _ConversationAvatar extends StatelessWidget {
   const _ConversationAvatar({
+    required this.userId,
     required this.name,
     required this.avatarUrl,
   });
 
+  final String userId;
   final String name;
   final String? avatarUrl;
 
@@ -308,10 +312,16 @@ class _ConversationAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasAvatar
-          ? CachedNetworkImage(
+          ? PawlyCachedImage(
               imageUrl: avatarUrl!,
+              cacheKey: pawlyStableImageCacheKey(
+                scope: 'chat-avatar',
+                entityId: userId,
+                imageUrl: avatarUrl!,
+              ),
+              targetLogicalSize: 40,
               fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => _ConversationAvatarFallback(
+              errorWidget: (_) => _ConversationAvatarFallback(
                 name: name,
               ),
             )
@@ -401,9 +411,8 @@ class _ConversationComposer extends StatelessWidget {
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: canSend
-                      ? 'Напишите сообщение'
-                      : 'Отправка недоступна',
+                  hintText:
+                      canSend ? 'Напишите сообщение' : 'Отправка недоступна',
                 ),
                 onSubmitted: canSend && !isSending ? (_) => onSend() : null,
               ),

@@ -121,6 +121,7 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
     final viewerItems = _documents
         .map(
           (document) => AttachmentViewerItem.fromAttachment(
+            fileId: document.fileId,
             fileType: document.fileType,
             fileName: document.fileName,
             previewUrl: document.previewUrl,
@@ -161,9 +162,10 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
 
                   return Padding(
                     padding: EdgeInsets.only(
-                      bottom: index == _documents.length - 1 && _nextCursor == null
-                          ? 0
-                          : PawlySpacing.sm,
+                      bottom:
+                          index == _documents.length - 1 && _nextCursor == null
+                              ? 0
+                              : PawlySpacing.sm,
                     ),
                     child: Material(
                       color: Colors.transparent,
@@ -171,6 +173,7 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
                         borderRadius: BorderRadius.circular(PawlyRadius.lg),
                         onTap: () => openAttachmentUrl(
                           context,
+                          fileId: document.fileId,
                           fileType: document.fileType,
                           fileName: viewerItem.title,
                           previewUrl: document.previewUrl,
@@ -180,7 +183,8 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             borderRadius: BorderRadius.circular(PawlyRadius.lg),
-                            border: Border.all(color: theme.colorScheme.outlineVariant),
+                            border: Border.all(
+                                color: theme.colorScheme.outlineVariant),
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -210,11 +214,13 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
                                 ),
                                 const SizedBox(height: PawlySpacing.xs),
                                 TextButton.icon(
-                                  onPressed: () => _openRelatedEntity(context, document),
+                                  onPressed: () =>
+                                      _openRelatedEntity(context, document),
                                   style: TextButton.styleFrom(
                                     padding: EdgeInsets.zero,
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     alignment: Alignment.centerLeft,
                                     foregroundColor: theme.colorScheme.primary,
                                   ),
@@ -222,7 +228,8 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
                                     Icons.subdirectory_arrow_right_rounded,
                                     size: 18,
                                   ),
-                                  label: Text(_openEntityLabel(document.entityType)),
+                                  label: Text(
+                                      _openEntityLabel(document.entityType)),
                                 ),
                               ],
                             ),
@@ -348,7 +355,8 @@ class _PetDocumentsPageState extends ConsumerState<PetDocumentsPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Для этого документа переход к сущности недоступен.')),
+      const SnackBar(
+          content: Text('Для этого документа переход к сущности недоступен.')),
     );
   }
 }
@@ -371,10 +379,10 @@ class _DocumentPreview extends StatelessWidget {
         child: SizedBox(
           width: 56,
           height: 56,
-          child: Image.network(
-            item.url!,
+          child: PawlyCachedImage(
+            imageUrl: item.url!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _fallbackIcon(colorScheme),
+            errorWidget: (_) => _fallbackIcon(colorScheme),
           ),
         ),
       );
@@ -385,8 +393,14 @@ class _DocumentPreview extends StatelessWidget {
 
   Widget _fallbackIcon(ColorScheme colorScheme) {
     final (icon, accent) = switch (kind) {
-      AttachmentKind.image => (Icons.photo_library_rounded, const Color(0xFF2B7A78)),
-      AttachmentKind.pdf => (Icons.picture_as_pdf_rounded, const Color(0xFFC84B31)),
+      AttachmentKind.image => (
+          Icons.photo_library_rounded,
+          const Color(0xFF2B7A78)
+        ),
+      AttachmentKind.pdf => (
+          Icons.picture_as_pdf_rounded,
+          const Color(0xFFC84B31)
+        ),
       AttachmentKind.other => (Icons.description_rounded, colorScheme.primary),
     };
 

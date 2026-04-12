@@ -725,9 +725,8 @@ class _VetVisitComposerSheetState
         reminder: _status == 'PLANNED' && _shouldSendReminder
             ? HealthEntityReminderInput(
                 pushEnabled: _pushEnabled,
-                remindOffsetMinutes: _pushEnabled
-                    ? (_remindOffsetMinutes ?? 0)
-                    : null,
+                remindOffsetMinutes:
+                    _pushEnabled ? (_remindOffsetMinutes ?? 0) : null,
               )
             : null,
         rowVersion: widget.initialVisit?.rowVersion,
@@ -1222,6 +1221,7 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                 final viewerItems = visit.attachments
                     .map(
                       (attachment) => AttachmentViewerItem.fromAttachment(
+                        fileId: attachment.fileId,
                         fileType: attachment.fileType,
                         fileName: attachment.fileName,
                         previewUrl: attachment.previewUrl,
@@ -1269,6 +1269,7 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                         ),
                         onTap: () => openAttachmentUrl(
                           context,
+                          fileId: attachment.fileId,
                           fileType: attachment.fileType,
                           fileName: viewerItem.title,
                           previewUrl: attachment.previewUrl,

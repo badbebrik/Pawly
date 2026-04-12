@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
@@ -227,7 +226,11 @@ class _PetListCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                _PetAvatar(photoUrl: entry.photoUrl),
+                _PetAvatar(
+                  petId: entry.pet.id,
+                  photoFileId: entry.pet.profilePhotoFileId,
+                  photoUrl: entry.photoUrl,
+                ),
                 const SizedBox(width: PawlySpacing.md),
                 Expanded(
                   child: Column(
@@ -306,9 +309,13 @@ class _PetListCard extends StatelessWidget {
 
 class _PetAvatar extends StatelessWidget {
   const _PetAvatar({
+    required this.petId,
+    required this.photoFileId,
     required this.photoUrl,
   });
 
+  final String petId;
+  final String? photoFileId;
   final String? photoUrl;
 
   @override
@@ -328,10 +335,16 @@ class _PetAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
-          ? CachedNetworkImage(
+          ? PawlyCachedImage(
               imageUrl: resolvedPhotoUrl!,
+              cacheKey: pawlyStableImageCacheKey(
+                scope: 'pet-avatar',
+                entityId: photoFileId ?? petId,
+                imageUrl: resolvedPhotoUrl,
+              ),
+              targetLogicalSize: 110,
               fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => _PetAvatarFallback(
+              errorWidget: (_) => _PetAvatarFallback(
                 colorScheme: colorScheme,
               ),
             )
@@ -690,6 +703,8 @@ class _ActivePetHeroCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _HeroPetAvatar(
+              petId: pet.id,
+              photoFileId: pet.profilePhotoFileId,
               photoUrl: pet.profilePhotoDownloadUrl,
               isUploadingPhoto: isUploadingPhoto,
               onTap: onPhotoTap,
@@ -699,7 +714,7 @@ class _ActivePetHeroCard extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(top: PawlySpacing.xs),
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
                       pet.name,
@@ -749,11 +764,15 @@ class _ActivePetHeroCard extends StatelessWidget {
 
 class _HeroPetAvatar extends StatelessWidget {
   const _HeroPetAvatar({
+    required this.petId,
+    required this.photoFileId,
     required this.photoUrl,
     required this.isUploadingPhoto,
     this.onTap,
   });
 
+  final String petId;
+  final String? photoFileId;
   final String? photoUrl;
   final bool isUploadingPhoto;
   final VoidCallback? onTap;
@@ -779,10 +798,16 @@ class _HeroPetAvatar extends StatelessWidget {
             fit: StackFit.expand,
             children: <Widget>[
               if (hasPhoto)
-                CachedNetworkImage(
+                PawlyCachedImage(
                   imageUrl: resolvedPhotoUrl!,
+                  cacheKey: pawlyStableImageCacheKey(
+                    scope: 'pet-avatar',
+                    entityId: photoFileId ?? petId,
+                    imageUrl: resolvedPhotoUrl,
+                  ),
+                  targetLogicalSize: 108,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) =>
+                  errorWidget: (_) =>
                       _PetAvatarFallback(colorScheme: colorScheme),
                 )
               else

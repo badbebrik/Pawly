@@ -6,6 +6,7 @@ import '../../features/pet_care/presentation/pages/attachment_viewer_page.dart';
 
 Future<void> openAttachmentUrl(
   BuildContext context, {
+  String? fileId,
   required String fileType,
   required String fileName,
   String? previewUrl,
@@ -14,6 +15,7 @@ Future<void> openAttachmentUrl(
   int? initialImageIndex,
 }) async {
   final item = AttachmentViewerItem.fromAttachment(
+    fileId: fileId,
     fileType: fileType,
     fileName: fileName,
     previewUrl: previewUrl,
@@ -23,7 +25,8 @@ Future<void> openAttachmentUrl(
 
   if (candidate == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Для этого вложения нет ссылки на просмотр.')),
+      const SnackBar(
+          content: Text('Для этого вложения нет ссылки на просмотр.')),
     );
     return;
   }
@@ -42,18 +45,22 @@ Future<void> openAttachmentUrl(
         : imageGalleryItems
             .where(
               (galleryItem) =>
-                  galleryItem.kind == AttachmentKind.image && galleryItem.url != null,
+                  galleryItem.kind == AttachmentKind.image &&
+                  galleryItem.url != null,
             )
             .toList(growable: false);
     final fallbackIndex = galleryItems.indexWhere(
-      (galleryItem) => galleryItem.url == item.url && galleryItem.title == item.title,
+      (galleryItem) =>
+          galleryItem.url == item.url && galleryItem.title == item.title,
     );
     final resolvedIndex = initialImageIndex ?? fallbackIndex;
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AttachmentGalleryPage(
-          items: galleryItems.isEmpty ? <AttachmentViewerItem>[item] : galleryItems,
+          items: galleryItems.isEmpty
+              ? <AttachmentViewerItem>[item]
+              : galleryItems,
           initialIndex: resolvedIndex >= 0 ? resolvedIndex : 0,
         ),
       ),
@@ -65,6 +72,7 @@ Future<void> openAttachmentUrl(
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AttachmentViewerPage(
+          fileId: item.fileId,
           title: item.title,
           url: candidate,
           kind: item.kind,
@@ -77,7 +85,8 @@ Future<void> openAttachmentUrl(
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Этот тип вложения пока нельзя открыть внутри приложения.'),
+        content:
+            Text('Этот тип вложения пока нельзя открыть внутри приложения.'),
       ),
     );
   }
