@@ -116,52 +116,50 @@ class _PetMetricCreatePageState extends ConsumerState<PetMetricCreatePage> {
               : null,
           decoration: const InputDecoration(labelText: 'Тип ввода'),
         ),
-        const SizedBox(height: PawlySpacing.md),
-        PawlyTextField(
-          controller: _unitController,
-          label: 'Единица измерения',
-          hintText:
-              _inputKind == _booleanKind ? 'Не используется' : 'кг, мл, баллы',
-          enabled: canSubmit && _inputKind != _booleanKind,
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: PawlyTextField(
-                controller: _minController,
-                label: 'Минимум',
-                enabled: canSubmit && _inputKind != _booleanKind,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+        if (_inputKind != _booleanKind) ...<Widget>[
+          const SizedBox(height: PawlySpacing.md),
+          PawlyTextField(
+            controller: _unitController,
+            label: 'Единица измерения',
+            hintText: 'кг, мл, баллы',
+            enabled: canSubmit,
+          ),
+          const SizedBox(height: PawlySpacing.md),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: PawlyTextField(
+                  controller: _minController,
+                  label: 'Минимум',
+                  enabled: canSubmit,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: PawlySpacing.md),
-            Expanded(
-              child: PawlyTextField(
-                controller: _maxController,
-                label: 'Максимум',
-                enabled: canSubmit && _inputKind != _booleanKind,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: PawlyTextField(
+                  controller: _maxController,
+                  label: 'Максимум',
+                  enabled: canSubmit,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.xs),
-        Text(
-          switch (_inputKind) {
-            _scaleKind => 'Для шкалы нужно задать оба значения диапазона.',
-            _booleanKind =>
-              'Для boolean единица измерения и диапазон недоступны.',
-            _ => 'Диапазон можно оставить пустым.',
-          },
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
+            ],
+          ),
+          const SizedBox(height: PawlySpacing.xs),
+          Text(
+            _inputKind == _scaleKind
+                ? 'Для шкалы нужно задать оба значения диапазона.'
+                : 'Диапазон можно оставить пустым.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
         if (!canWrite) ...<Widget>[
           const SizedBox(height: PawlySpacing.lg),
           const PawlyCard(

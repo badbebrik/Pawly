@@ -126,6 +126,23 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
           ),
         ),
         const SizedBox(height: PawlySpacing.md),
+        if (selectedType != null &&
+            selectedType.metricRequirements.isNotEmpty) ...<Widget>[
+          Text(
+            'Метрики',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          ...selectedType.metricRequirements.map(
+            (requirement) => Padding(
+              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
+              child: _buildMetricField(requirement, canCreate),
+            ),
+          ),
+          const SizedBox(height: PawlySpacing.md),
+        ],
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.event_rounded),
@@ -155,23 +172,6 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
           onAddFromCamera: _pickAndUploadFromCamera,
           onRemove: _removeAttachment,
         ),
-        if (selectedType != null &&
-            selectedType.metricRequirements.isNotEmpty) ...<Widget>[
-          const SizedBox(height: PawlySpacing.lg),
-          Text(
-            'Метрики',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: PawlySpacing.sm),
-          ...selectedType.metricRequirements.map(
-            (requirement) => Padding(
-              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-              child: _buildMetricField(requirement, canCreate),
-            ),
-          ),
-        ],
         if (!bootstrap.permissions.logWrite) ...<Widget>[
           const SizedBox(height: PawlySpacing.lg),
           const PawlyCard(
@@ -225,32 +225,83 @@ class _PetLogCreatePageState extends ConsumerState<PetLogCreatePage> {
   ) {
     final label = _metricLabel(requirement);
     if (requirement.inputKind == 'BOOLEAN') {
-      return DropdownButtonFormField<bool>(
-        initialValue: _booleanMetricValues[requirement.metricId],
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: _metricHint(requirement),
+      final selectedValue = _booleanMetricValues[requirement.metricId];
+      return PawlyCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              _metricHint(requirement),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            Wrap(
+              spacing: PawlySpacing.xs,
+              runSpacing: PawlySpacing.xs,
+              children: <Widget>[
+                ChoiceChip(
+                  label: const Text('Да'),
+                  selected: selectedValue == true,
+                  onSelected: enabled
+                      ? (_) {
+                          setState(() {
+                            _booleanMetricValues[requirement.metricId] = true;
+                          });
+                        }
+                      : null,
+                ),
+                ChoiceChip(
+                  label: const Text('Нет'),
+                  selected: selectedValue == false,
+                  onSelected: enabled
+                      ? (_) {
+                          setState(() {
+                            _booleanMetricValues[requirement.metricId] = false;
+                          });
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ],
         ),
-        items: const <DropdownMenuItem<bool>>[
-          DropdownMenuItem<bool>(value: true, child: Text('Да')),
-          DropdownMenuItem<bool>(value: false, child: Text('Нет')),
-        ],
-        onChanged: enabled
-            ? (value) {
-                setState(() {
-                  _booleanMetricValues[requirement.metricId] = value;
-                });
-              }
-            : null,
       );
     }
 
-    return PawlyTextField(
+    return TextFormField(
       controller: _controllerForMetric(requirement.metricId),
-      label: label,
-      hintText: _metricHint(requirement),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       enabled: enabled,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: _metricPlaceholder(requirement),
+        helperText: _metricHint(requirement),
+        suffixIcon: (requirement.unitCode ?? '').trim().isEmpty
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    requirement.unitCode!.trim(),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ),
+      ),
     );
   }
 
@@ -533,16 +584,15 @@ String _metricHint(LogTypeMetricRequirement requirement) {
   if (requirement.inputKind == 'BOOLEAN') {
     return 'Выбери Да или Нет';
   }
-  final parts = <String>[];
-  if (requirement.unitCode != null && requirement.unitCode!.isNotEmpty) {
-    parts.add(requirement.unitCode!);
-  }
   if (requirement.minValue != null || requirement.maxValue != null) {
-    final min = requirement.minValue?.toStringAsFixed(0) ?? '...';
-    final max = requirement.maxValue?.toStringAsFixed(0) ?? '...';
-    parts.add('$min-$max');
+    final min = _formatMetricBound(requirement.minValue) ?? '...';
+    final max = _formatMetricBound(requirement.maxValue) ?? '...';
+    return 'Допустимый диапазон: $min–$max';
   }
-  return parts.isEmpty ? 'Введите значение' : parts.join(' · ');
+  if ((requirement.unitCode ?? '').trim().isNotEmpty) {
+    return 'Введите значение в ${requirement.unitCode!.trim()}';
+  }
+  return 'Введите значение';
 }
 
 String _formatOccurredAt(DateTime value) {
@@ -574,6 +624,21 @@ String _metricKindLabel(String inputKind) {
     'BOOLEAN' => 'Да / Нет',
     _ => inputKind,
   };
+}
+
+String _metricPlaceholder(LogTypeMetricRequirement requirement) {
+  return switch (requirement.inputKind) {
+    'SCALE' => 'Например, 4',
+    'NUMERIC' => 'Например, 4.2',
+    _ => 'Введите значение',
+  };
+}
+
+String? _formatMetricBound(double? value) {
+  if (value == null) {
+    return null;
+  }
+  return value % 1 == 0 ? value.toStringAsFixed(0) : value.toString();
 }
 
 String _typeMetricSummary(LogTypeMetricRequirement requirement) {

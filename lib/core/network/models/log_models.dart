@@ -265,16 +265,24 @@ class LogTypeMetricRequirement {
   final double? maxValue;
   final bool isRequired;
 
-  factory LogTypeMetricRequirement.fromJson(Object? data) {
+  factory LogTypeMetricRequirement.fromJson(
+    Object? data, {
+    Map<String, Metric> metricsById = const <String, Metric>{},
+  }) {
     final json = asJsonMap(data);
+    final metricId = asString(json['metric_id']);
+    final metric = metricsById[metricId];
     return LogTypeMetricRequirement(
-      metricId: asString(json['metric_id']),
-      metricName: asNullableString(json['metric_name']) ?? '',
-      metricScope: asNullableString(json['metric_scope']) ?? '',
-      inputKind: asNullableString(json['input_kind']) ?? '',
-      unitCode: _readNullableString(json, 'unit', fallbackKey: 'unit_code'),
-      minValue: (json['min_value'] as num?)?.toDouble(),
-      maxValue: (json['max_value'] as num?)?.toDouble(),
+      metricId: metricId,
+      metricName: asNullableString(json['metric_name']) ?? metric?.name ?? '',
+      metricScope:
+          asNullableString(json['metric_scope']) ?? metric?.scope ?? '',
+      inputKind:
+          asNullableString(json['input_kind']) ?? metric?.inputKind ?? '',
+      unitCode: _readNullableString(json, 'unit', fallbackKey: 'unit_code') ??
+          metric?.unitCode,
+      minValue: (json['min_value'] as num?)?.toDouble() ?? metric?.minValue,
+      maxValue: (json['max_value'] as num?)?.toDouble() ?? metric?.maxValue,
       isRequired: asBool(json['is_required']),
     );
   }
@@ -309,7 +317,10 @@ class LogType {
   final int? rowVersion;
   final bool isArchived;
 
-  factory LogType.fromJson(Object? data) {
+  factory LogType.fromJson(
+    Object? data, {
+    Map<String, Metric> metricsById = const <String, Metric>{},
+  }) {
     final json = asJsonMap(data);
     final rawRequirements = json['metric_requirements'];
     return LogType(
@@ -320,7 +331,12 @@ class LogType {
       name: asString(json['name']),
       metricRequirements: rawRequirements is List
           ? rawRequirements
-              .map(LogTypeMetricRequirement.fromJson)
+              .map(
+                (item) => LogTypeMetricRequirement.fromJson(
+                  item,
+                  metricsById: metricsById,
+                ),
+              )
               .toList(growable: false)
           : const <LogTypeMetricRequirement>[],
       createdAt: asDateTime(json['created_at']),
@@ -546,13 +562,22 @@ class LogComposerBootstrapResponse {
 
   factory LogComposerBootstrapResponse.fromJson(Object? data) {
     final json = asJsonMap(data);
+    final systemMetrics = _decodeMetricList(json['system_metrics']);
+    final customMetrics = _decodeMetricList(json['custom_metrics']);
+    final metricsById = <String, Metric>{
+      for (final metric in <Metric>[...systemMetrics, ...customMetrics])
+        metric.id: metric,
+    };
     return LogComposerBootstrapResponse(
       permissions: LogPermissionSet.fromJson(json['permissions']),
-      recentLogTypes: _decodeLogTypeList(json['recent_log_types']),
-      systemLogTypes: _decodeLogTypeList(json['system_log_types']),
-      customLogTypes: _decodeLogTypeList(json['custom_log_types']),
-      systemMetrics: _decodeMetricList(json['system_metrics']),
-      customMetrics: _decodeMetricList(json['custom_metrics']),
+      recentLogTypes:
+          _decodeLogTypeList(json['recent_log_types'], metricsById: metricsById),
+      systemLogTypes:
+          _decodeLogTypeList(json['system_log_types'], metricsById: metricsById),
+      customLogTypes:
+          _decodeLogTypeList(json['custom_log_types'], metricsById: metricsById),
+      systemMetrics: systemMetrics,
+      customMetrics: customMetrics,
     );
   }
 }
@@ -889,11 +914,16 @@ class MetricSeriesResponse {
   }
 }
 
-List<LogType> _decodeLogTypeList(Object? data) {
+List<LogType> _decodeLogTypeList(
+  Object? data, {
+  Map<String, Metric> metricsById = const <String, Metric>{},
+}) {
   if (data is! List) {
     return const <LogType>[];
   }
-  return data.map(LogType.fromJson).toList(growable: false);
+  return data
+      .map((item) => LogType.fromJson(item, metricsById: metricsById))
+      .toList(growable: false);
 }
 
 List<Metric> _decodeMetricList(Object? data) {
