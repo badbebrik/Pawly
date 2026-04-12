@@ -130,7 +130,6 @@ class AuthRefreshInterceptor extends Interceptor {
     }
 
     final authorization = requestOptions.headers['Authorization']?.toString();
-    final userId = requestOptions.headers['X-User-ID']?.toString();
     debugPrint(
       '[HealthBootstrap][onError] status=${err.response?.statusCode} '
       'path=${requestOptions.path} '
@@ -139,7 +138,6 @@ class AuthRefreshInterceptor extends Interceptor {
       'authHeader=${authorization != null} '
       'authBearer=${authorization?.startsWith('Bearer ') == true} '
       'authPreview=${_maskAuthorization(authorization)} '
-      'xUserIdHeader=${userId != null && userId.isNotEmpty} '
       'error=${err.response?.data ?? err.error}',
     );
   }

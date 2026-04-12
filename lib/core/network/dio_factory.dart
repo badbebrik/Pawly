@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../constants/api_constants.dart';
-import 'interceptors/api_context_interceptor.dart';
+import 'interceptors/auth_context_interceptor.dart';
 import 'interceptors/auth_refresh_interceptor.dart';
 import 'session/auth_session_store.dart';
 
@@ -29,7 +29,7 @@ class DioFactory {
     final dio = Dio(baseOptions);
     final refreshDio = Dio(baseOptions);
 
-    dio.interceptors.add(ApiContextInterceptor(sessionStore));
+    dio.interceptors.add(AuthContextInterceptor(sessionStore));
     dio.interceptors.add(
       AuthRefreshInterceptor(
         dio: dio,
@@ -45,7 +45,7 @@ class DioFactory {
       ),
     );
 
-    refreshDio.interceptors.add(ApiContextInterceptor(sessionStore));
+    refreshDio.interceptors.add(AuthContextInterceptor(sessionStore));
 
     return DioBundle(dio: dio, refreshDio: refreshDio);
   }

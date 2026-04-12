@@ -8,10 +8,7 @@ class ChatApiClient {
 
   final ApiClient _apiClient;
 
-  static const _withUserAndToken = ApiRequestOptions(
-    requiresUserId: true,
-    requiresAccessToken: true,
-  );
+  static const _withToken = ApiRequestOptions(requiresAccessToken: true);
 
   Future<ChatConversation> openConversation(
     OpenChatConversationPayload payload,
@@ -19,7 +16,7 @@ class ChatApiClient {
     return _apiClient.post<ChatConversation>(
       ApiEndpoints.chatConversationsOpen,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ChatConversation.fromJson,
     );
   }
@@ -36,7 +33,7 @@ class ChatApiClient {
         if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
         if (limit != null) 'limit': limit,
       },
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ChatConversationListResponse.fromJson,
     );
   }
@@ -44,7 +41,7 @@ class ChatApiClient {
   Future<ChatUnreadSummary> getUnreadSummary() {
     return _apiClient.get<ChatUnreadSummary>(
       ApiEndpoints.chatUnreadSummary,
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ChatUnreadSummary.fromJson,
     );
   }
@@ -52,7 +49,7 @@ class ChatApiClient {
   Future<ChatConversation> getConversation(String conversationId) {
     return _apiClient.get<ChatConversation>(
       ApiEndpoints.chatConversationById(conversationId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ChatConversation.fromJson,
     );
   }
@@ -69,7 +66,7 @@ class ChatApiClient {
           'before_message_id': beforeMessageId,
         if (limit != null) 'limit': limit,
       },
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ChatMessagesResponse.fromJson,
     );
   }
@@ -81,7 +78,7 @@ class ChatApiClient {
     return _apiClient.post<MarkChatConversationReadResponse>(
       ApiEndpoints.chatConversationRead(conversationId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: MarkChatConversationReadResponse.fromJson,
     );
   }

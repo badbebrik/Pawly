@@ -9,17 +9,14 @@ class AclApiClient {
 
   final ApiClient _apiClient;
 
-  static const _withUserAndToken = ApiRequestOptions(
-    requiresUserId: true,
-    requiresAccessToken: true,
-  );
+  static const _withToken = ApiRequestOptions(requiresAccessToken: true);
 
   static const _public = ApiRequestOptions();
 
   Future<AclBootstrapResponse> getBootstrap(String petId) {
     return _apiClient.get<AclBootstrapResponse>(
       ApiEndpoints.aclBootstrap(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclBootstrapResponse.fromJson,
     );
   }
@@ -27,7 +24,7 @@ class AclApiClient {
   Future<AclPresetListResponse> listPresets() {
     return _apiClient.get<AclPresetListResponse>(
       ApiEndpoints.aclPresets,
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclPresetListResponse.fromJson,
     );
   }
@@ -35,7 +32,7 @@ class AclApiClient {
   Future<AclAccessResponse> getMyAccess(String petId) {
     return _apiClient.get<AclAccessResponse>(
       ApiEndpoints.aclMe(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclAccessResponse.fromJson,
     );
   }
@@ -43,7 +40,7 @@ class AclApiClient {
   Future<AclMemberEnvelope> leaveMyAccess(String petId) {
     return _apiClient.delete<AclMemberEnvelope>(
       ApiEndpoints.aclMe(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclMemberEnvelope.fromJson,
     );
   }
@@ -51,7 +48,7 @@ class AclApiClient {
   Future<AclMemberListResponse> listMembers(String petId) {
     return _apiClient.get<AclMemberListResponse>(
       ApiEndpoints.aclMembers(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclMemberListResponse.fromJson,
     );
   }
@@ -64,7 +61,7 @@ class AclApiClient {
     return _apiClient.patch<AclMemberEnvelope>(
       ApiEndpoints.aclMemberById(petId, memberId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclMemberEnvelope.fromJson,
     );
   }
@@ -72,7 +69,7 @@ class AclApiClient {
   Future<AclMemberEnvelope> removeMember(String petId, String memberId) {
     return _apiClient.delete<AclMemberEnvelope>(
       ApiEndpoints.aclMemberById(petId, memberId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclMemberEnvelope.fromJson,
     );
   }
@@ -80,7 +77,7 @@ class AclApiClient {
   Future<AclRoleListResponse> listRoles(String petId) {
     return _apiClient.get<AclRoleListResponse>(
       ApiEndpoints.aclRoles(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclRoleListResponse.fromJson,
     );
   }
@@ -89,7 +86,7 @@ class AclApiClient {
     return _apiClient.post<AclRoleEnvelope>(
       ApiEndpoints.aclRoles(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclRoleEnvelope.fromJson,
     );
   }
@@ -97,7 +94,7 @@ class AclApiClient {
   Future<EmptyResponse> deleteRole(String petId, String roleId) {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.aclRoleById(petId, roleId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -105,7 +102,7 @@ class AclApiClient {
   Future<AclInviteListResponse> listInvites(String petId) {
     return _apiClient.get<AclInviteListResponse>(
       ApiEndpoints.aclInvites(petId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclInviteListResponse.fromJson,
     );
   }
@@ -117,7 +114,7 @@ class AclApiClient {
     return _apiClient.post<AclInviteEnvelope>(
       ApiEndpoints.aclInvites(petId),
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AclInviteEnvelope.fromJson,
     );
   }
@@ -125,7 +122,7 @@ class AclApiClient {
   Future<EmptyResponse> revokeInvite(String petId, String inviteId) {
     return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.aclInviteById(petId, inviteId),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: EmptyResponse.fromJson,
     );
   }
@@ -147,7 +144,7 @@ class AclApiClient {
     return _apiClient.post<AcceptInviteResponse>(
       ApiEndpoints.aclAcceptInviteByCode,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AcceptInviteResponse.fromJson,
     );
   }
@@ -158,7 +155,7 @@ class AclApiClient {
     return _apiClient.post<AcceptInviteResponse>(
       ApiEndpoints.aclAcceptInviteByToken,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: AcceptInviteResponse.fromJson,
     );
   }

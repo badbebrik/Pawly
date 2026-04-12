@@ -8,15 +8,12 @@ class ProfileApiClient {
   ProfileApiClient(this._apiClient);
 
   final ApiClient _apiClient;
-  static const _withUserAndToken = ApiRequestOptions(
-    requiresUserId: true,
-    requiresAccessToken: true,
-  );
+  static const _withToken = ApiRequestOptions(requiresAccessToken: true);
 
   Future<ProfileResponse> getMe() {
     return _apiClient.get<ProfileResponse>(
       ApiEndpoints.profileMe,
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ProfileResponse.fromJson,
     );
   }
@@ -25,7 +22,7 @@ class ProfileApiClient {
     return _apiClient.patch<ProfileResponse>(
       ApiEndpoints.profileMe,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ProfileResponse.fromJson,
     );
   }
@@ -36,7 +33,7 @@ class ProfileApiClient {
     return _apiClient.patch<ProfileResponse>(
       ApiEndpoints.profilePreferences,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ProfileResponse.fromJson,
     );
   }
@@ -45,7 +42,7 @@ class ProfileApiClient {
     return _apiClient.post<InitUploadResponse>(
       ApiEndpoints.profileAvatarInitUpload,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: InitUploadResponse.fromJson,
     );
   }
@@ -56,7 +53,7 @@ class ProfileApiClient {
     return _apiClient.post<ConfirmAvatarUploadResponse>(
       ApiEndpoints.profileAvatarConfirmUpload,
       data: payload.toJson(),
-      requestOptions: _withUserAndToken,
+      requestOptions: _withToken,
       decoder: ConfirmAvatarUploadResponse.fromJson,
     );
   }
