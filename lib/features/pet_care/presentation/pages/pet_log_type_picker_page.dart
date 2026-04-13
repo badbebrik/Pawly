@@ -88,7 +88,10 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
         _TypeChoiceCard(
           title: 'Без типа',
           subtitle: 'Обычная запись без привязки к конкретному типу',
-          trailingLabel: 'Опционально',
+          trailing: const _LogTypeEmoji(
+            emoji: '📝',
+            semanticLabel: 'Без типа',
+          ),
           onTap: () => Navigator.of(context).pop(noLogTypeSelectionId),
         ),
         if (filteredRecent.isNotEmpty) ...<Widget>[
@@ -132,16 +135,24 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
   }
 
   Widget _buildTypeCard(LogType type) {
-    final metrics = type.metricRequirements
-        .map((item) => item.metricName)
-        .join(', ');
+    final metrics =
+        type.metricRequirements.map((item) => item.metricName).join(', ');
+    final sticker = _logTypeSticker(
+      code: type.code,
+      scope: type.scope,
+      name: type.name,
+      metricNames: type.metricRequirements.map((item) => item.metricName),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: PawlySpacing.md),
       child: _TypeChoiceCard(
         title: type.name,
         subtitle: metrics.isEmpty ? 'Метрики не заданы' : 'Метрики: $metrics',
-        trailingLabel: type.scope == 'SYSTEM' ? 'Системный' : 'Мой',
+        trailing: _LogTypeEmoji(
+          emoji: sticker.emoji,
+          semanticLabel: sticker.label,
+        ),
         onTap: () => Navigator.of(context).pop(type.id),
       ),
     );
@@ -185,13 +196,13 @@ class _TypeChoiceCard extends StatelessWidget {
   const _TypeChoiceCard({
     required this.title,
     required this.subtitle,
-    required this.trailingLabel,
+    required this.trailing,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
-  final String trailingLabel;
+  final Widget trailing;
   final VoidCallback onTap;
 
   @override
@@ -199,7 +210,7 @@ class _TypeChoiceCard extends StatelessWidget {
     return PawlyCard(
       onTap: onTap,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           Expanded(
             child: Column(
@@ -222,13 +233,187 @@ class _TypeChoiceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: PawlySpacing.md),
-          Text(
-            trailingLabel,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+          SizedBox(
+            width: 44,
+            child: Center(child: trailing),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LogTypeSticker {
+  const _LogTypeSticker({
+    required this.emoji,
+    required this.label,
+  });
+
+  final String emoji;
+  final String label;
+}
+
+_LogTypeSticker _logTypeSticker({
+  required String? code,
+  required String scope,
+  required String name,
+  required Iterable<String> metricNames,
+}) {
+  final normalizedCode =
+      code?.trim().toUpperCase() ?? _inferLogTypeCode(name, metricNames);
+
+  return switch (normalizedCode) {
+    'WEIGHING' => const _LogTypeSticker(
+        emoji: '⚖️',
+        label: 'Вес',
+      ),
+    'WEIGHT' => const _LogTypeSticker(
+        emoji: '⚖️',
+        label: 'Вес',
+      ),
+    'TEMPERATURE' => const _LogTypeSticker(
+        emoji: '🌡️',
+        label: 'Температура',
+      ),
+    'APPETITE' => const _LogTypeSticker(
+        emoji: '🍽️',
+        label: 'Аппетит',
+      ),
+    'WATER_INTAKE' => const _LogTypeSticker(
+        emoji: '💧',
+        label: 'Питье',
+      ),
+    'ACTIVITY' => const _LogTypeSticker(
+        emoji: '🏃',
+        label: 'Активность',
+      ),
+    'SLEEP' => const _LogTypeSticker(
+        emoji: '😴',
+        label: 'Сон',
+      ),
+    'STOOL' => const _LogTypeSticker(
+        emoji: '💩',
+        label: 'Стул',
+      ),
+    'URINATION' => const _LogTypeSticker(
+        emoji: '🚽',
+        label: 'Мочеиспускание',
+      ),
+    'VOMITING' => const _LogTypeSticker(
+        emoji: '🤮',
+        label: 'Рвота',
+      ),
+    'COUGHING' => const _LogTypeSticker(
+        emoji: '😮‍💨',
+        label: 'Кашель',
+      ),
+    'ITCHING' => const _LogTypeSticker(
+        emoji: '🐾',
+        label: 'Зуд',
+      ),
+    'PAIN_EPISODE' => const _LogTypeSticker(
+        emoji: '⚠️',
+        label: 'Боль',
+      ),
+    'MOOD_BEHAVIOR' => const _LogTypeSticker(
+        emoji: '🙂',
+        label: 'Поведение',
+      ),
+    'SEIZURE_EPISODE' => const _LogTypeSticker(
+        emoji: '⚡',
+        label: 'Судороги',
+      ),
+    'MEDICATION_TAKEN' => const _LogTypeSticker(
+        emoji: '💊',
+        label: 'Лекарство',
+      ),
+    'MEDICATION_MISSED' => const _LogTypeSticker(
+        emoji: '⏭️',
+        label: 'Пропуск',
+      ),
+    _ => scope == 'SYSTEM'
+        ? const _LogTypeSticker(
+            emoji: '🏷️',
+            label: 'Системный',
+          )
+        : const _LogTypeSticker(
+            emoji: '✨',
+            label: 'Мой',
+          ),
+  };
+}
+
+String _inferLogTypeCode(String name, Iterable<String> metricNames) {
+  final haystack = <String>[
+    name,
+    ...metricNames,
+  ].join(' ').toLowerCase();
+
+  if (haystack.contains('вес')) {
+    return 'WEIGHT';
+  }
+  if (haystack.contains('температур')) {
+    return 'TEMPERATURE';
+  }
+  if (haystack.contains('аппетит')) {
+    return 'APPETITE';
+  }
+  if (haystack.contains('пить') || haystack.contains('вода')) {
+    return 'WATER_INTAKE';
+  }
+  if (haystack.contains('активност')) {
+    return 'ACTIVITY';
+  }
+  if (haystack.contains('сон')) {
+    return 'SLEEP';
+  }
+  if (haystack.contains('стул')) {
+    return 'STOOL';
+  }
+  if (haystack.contains('моч')) {
+    return 'URINATION';
+  }
+  if (haystack.contains('рвот')) {
+    return 'VOMITING';
+  }
+  if (haystack.contains('каш')) {
+    return 'COUGHING';
+  }
+  if (haystack.contains('зуд')) {
+    return 'ITCHING';
+  }
+  if (haystack.contains('бол')) {
+    return 'PAIN_EPISODE';
+  }
+  if (haystack.contains('поведени') || haystack.contains('настроени')) {
+    return 'MOOD_BEHAVIOR';
+  }
+  if (haystack.contains('судорог')) {
+    return 'SEIZURE_EPISODE';
+  }
+  if (haystack.contains('лекар')) {
+    return 'MEDICATION_TAKEN';
+  }
+
+  return '';
+}
+
+class _LogTypeEmoji extends StatelessWidget {
+  const _LogTypeEmoji({
+    required this.emoji,
+    required this.semanticLabel,
+  });
+
+  final String emoji;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: semanticLabel,
+      child: Text(
+        emoji,
+        style: Theme.of(context).textTheme.headlineLarge,
       ),
     );
   }

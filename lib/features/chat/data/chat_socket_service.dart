@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/session/auth_session_store.dart';
@@ -39,17 +41,21 @@ class ChatSocketService {
   Future<void> ensureConnected() {
     final pending = _connectFuture;
     if (pending != null) {
+      _log('ensureConnected: reuse pending connect future');
       return pending;
     }
     if (isConnected) {
+      _log('ensureConnected: socket already connected');
       return Future<void>.value();
     }
 
+    _log('ensureConnected: open new socket connection');
     _connectFuture = _connectInternal();
     return _connectFuture!;
   }
 
   Future<void> disconnect() async {
+    _log('disconnect: requested');
     _disconnectRequested = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -76,14 +82,18 @@ class ChatSocketService {
 
     final socket = _socket;
     if (socket == null || socket.readyState != WebSocket.open) {
+      _log('send: socket is not connected for event=${event.type}');
       throw StateError('Chat socket is not connected.');
     }
 
-    socket.add(jsonEncode(event.toEnvelope().toJson()));
+    final envelope = event.toEnvelope().toJson();
+    _log('send: type=${event.type} payload=${jsonEncode(envelope['payload'])}');
+    socket.add(jsonEncode(envelope));
   }
 
   Future<void> subscribeInbox() async {
     _inboxSubscribed = true;
+    _log('subscribeInbox');
     await send(const SubscribeInboxEvent());
   }
 
@@ -93,6 +103,7 @@ class ChatSocketService {
     }
 
     _conversationSubscriptions.add(conversationId);
+    _log('subscribeConversation: conversationId=$conversationId');
     await send(
       SubscribeConversationEvent(conversationId: conversationId),
     );
@@ -105,9 +116,14 @@ class ChatSocketService {
 
     _conversationSubscriptions.remove(conversationId);
     if (!isConnected) {
+      _log(
+        'unsubscribeConversation: skip send because socket disconnected '
+        'conversationId=$conversationId',
+      );
       return;
     }
 
+    _log('unsubscribeConversation: conversationId=$conversationId');
     await send(
       UnsubscribeConversationEvent(conversationId: conversationId),
     );
@@ -147,6 +163,7 @@ class ChatSocketService {
 
   Future<void> _connectInternal() async {
     _disconnectRequested = false;
+    _log('connect: start attempt=${_reconnectAttempt + 1}');
     _emitLifecycle(
       ChatSocketLifecycleEvent(
         status: _reconnectAttempt == 0
@@ -159,11 +176,16 @@ class ChatSocketService {
     try {
       final session = await _authSessionStore.read();
       if (session == null || session.accessToken.isEmpty) {
+        _log('connect: no authenticated session');
         throw StateError('Chat socket requires an authenticated session.');
       }
 
       final wsUrl = _buildWsUrl();
       final token = session.accessToken;
+      _log(
+        'connect: url=$wsUrl tokenLength=${token.length} '
+        'subscriptions=${_conversationSubscriptions.length} inbox=$_inboxSubscribed',
+      );
 
       final socket = await WebSocket.connect(
         wsUrl,
@@ -172,6 +194,7 @@ class ChatSocketService {
         },
       );
       socket.pingInterval = const Duration(seconds: 20);
+      _log('connect: socket connected, pingInterval=20s');
 
       _socket = socket;
       _socketSubscription = socket.listen(
@@ -187,9 +210,13 @@ class ChatSocketService {
           status: ChatSocketLifecycleStatus.connected,
         ),
       );
+      _log('connect: connected, restoring subscriptions');
       await _restoreSubscriptions();
     } catch (error) {
       final isUnauthorized = error.toString().contains('401');
+      _log(
+        'connect: failed unauthorized=$isUnauthorized error=$error',
+      );
       _emitLifecycle(
         ChatSocketLifecycleEvent(
           status: ChatSocketLifecycleStatus.error,
@@ -207,13 +234,17 @@ class ChatSocketService {
 
   void _handleIncomingData(dynamic data) {
     if (data is! String) {
+      _log('incoming: non-string payload type=${data.runtimeType}');
       return;
     }
 
     try {
       final decoded = jsonDecode(data);
-      _eventsController.add(ChatServerEvent.fromJson(decoded));
-    } catch (_) {
+      final event = ChatServerEvent.fromJson(decoded);
+      _log('incoming: type=${event.type} raw=$data');
+      _eventsController.add(event);
+    } catch (error) {
+      _log('incoming: failed to decode raw=$data error=$error');
       _eventsController.add(
         const UnknownChatServerEvent(
           type: 'invalid_event',
@@ -224,6 +255,7 @@ class ChatSocketService {
   }
 
   void _handleSocketDone() {
+    _log('socket done: disconnectRequested=$_disconnectRequested');
     _socketSubscription = null;
     _socket = null;
 
@@ -240,6 +272,7 @@ class ChatSocketService {
   }
 
   void _handleSocketError(Object error) {
+    _log('socket error: $error');
     _socketSubscription = null;
     _socket = null;
     _emitLifecycle(
@@ -259,15 +292,23 @@ class ChatSocketService {
 
   void _scheduleReconnect() {
     if (_disconnectRequested || _reconnectTimer != null) {
+      _log(
+        'scheduleReconnect: skip disconnectRequested=$_disconnectRequested '
+        'hasTimer=${_reconnectTimer != null}',
+      );
       return;
     }
 
     _reconnectAttempt += 1;
     final delaySeconds = _reconnectAttempt.clamp(1, 5);
+    _log(
+      'scheduleReconnect: attempt=$_reconnectAttempt delay=${delaySeconds}s',
+    );
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       _reconnectTimer = null;
       Future<void>(() async {
         try {
+          _log('scheduleReconnect: firing attempt=$_reconnectAttempt');
           await ensureConnected();
         } catch (_) {
           // lifecycleEvents already contain error details
@@ -277,6 +318,10 @@ class ChatSocketService {
   }
 
   Future<void> _restoreSubscriptions() async {
+    _log(
+      'restoreSubscriptions: inbox=$_inboxSubscribed '
+      'conversations=${_conversationSubscriptions.length}',
+    );
     if (_inboxSubscribed) {
       await send(const SubscribeInboxEvent());
     }
@@ -305,8 +350,16 @@ class ChatSocketService {
   }
 
   void _emitLifecycle(ChatSocketLifecycleEvent event) {
+    _log(
+      'lifecycle: status=${event.status.name} '
+      'attempt=${event.reconnectAttempt} error=${event.errorMessage}',
+    );
     if (!_lifecycleController.isClosed) {
       _lifecycleController.add(event);
     }
+  }
+
+  void _log(String message) {
+    debugPrint('[chat/ws] $message');
   }
 }

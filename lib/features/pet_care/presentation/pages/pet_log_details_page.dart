@@ -8,6 +8,7 @@ import '../../../../design_system/design_system.dart';
 import '../models/attachment_kind.dart';
 import '../models/attachment_viewer_item.dart';
 import '../providers/health_controllers.dart';
+import '../utils/metric_unit_formatter.dart';
 
 class PetLogDetailsPage extends ConsumerWidget {
   const PetLogDetailsPage({
@@ -338,12 +339,10 @@ class _PetLogDetailsView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _MetaRow(label: 'Создал', value: log.createdByDisplayName),
                 _MetaRow(
                   label: 'Создано',
                   value: _formatOccurredAt(log.createdAt),
                 ),
-                _MetaRow(label: 'Обновил', value: log.updatedByDisplayName),
                 _MetaRow(
                   label: 'Обновлено',
                   value: _formatOccurredAt(log.updatedAt),
@@ -442,9 +441,10 @@ String _formatMetricValue(LogMetricValue value) {
   final number = value.valueNum % 1 == 0
       ? value.valueNum.toStringAsFixed(0)
       : value.valueNum.toStringAsFixed(1);
-  return value.unitCode == null || value.unitCode!.isEmpty
+  final unit = formatDisplayUnitCode(value.unitCode);
+  return unit.isEmpty
       ? number
-      : '$number ${value.unitCode}';
+      : '$number $unit';
 }
 
 String? _relatedEntityLabel(LogEntry log) {

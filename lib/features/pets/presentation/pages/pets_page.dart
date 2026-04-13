@@ -257,7 +257,7 @@ class _PetListCard extends StatelessWidget {
                       ),
                       const SizedBox(height: PawlySpacing.xs),
                       Text(
-                        'Роль: ${entry.roleTitle}',
+                        'Роль: ${_localizedPetRoleTitle(entry.roleTitle)}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurface,
                         ),
@@ -1068,6 +1068,21 @@ String _formatShortDate(DateTime value) {
   final month = value.month.toString().padLeft(2, '0');
   final year = value.year.toString();
   return '$day.$month.$year';
+}
+
+String _localizedPetRoleTitle(String rawTitle) {
+  final normalized = rawTitle.trim();
+  final upper = normalized.toUpperCase();
+  return switch (normalized) {
+    _ => switch (upper) {
+        'OWNER' => 'Владелец',
+        'CO_OWNER' || 'CO-OWNER' => 'Совладелец',
+        'VET' || 'VETERINARY' => 'Ветеринар',
+        'PETSITTER' || 'PETSITTER ' => 'Петситтер',
+        'WALKER' => 'Выгульщик',
+        _ => normalized,
+      },
+  };
 }
 
 Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {

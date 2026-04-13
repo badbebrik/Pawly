@@ -69,7 +69,7 @@ class PushNotificationPayload {
 
 class PushNotificationsService {
   PushNotificationsService({
-    required FirebaseMessaging messaging,
+    FirebaseMessaging? messaging,
     required HealthApiClient healthApiClient,
     required SharedPreferencesService sharedPreferencesService,
     required AuthSessionStore authSessionStore,
@@ -80,7 +80,7 @@ class PushNotificationsService {
 
   static const String _deviceIdKey = 'push_device_id';
 
-  final FirebaseMessaging _messaging;
+  final FirebaseMessaging? _messaging;
   final HealthApiClient _healthApiClient;
   final SharedPreferencesService _sharedPreferencesService;
   final AuthSessionStore _authSessionStore;
@@ -102,7 +102,8 @@ class PushNotificationsService {
     }
 
     await initialize();
-    return _messaging.getNotificationSettings();
+    final messaging = _messaging!;
+    return messaging.getNotificationSettings();
   }
 
   Future<void> initialize() async {
@@ -116,6 +117,8 @@ class PushNotificationsService {
       debugPrint('[push] initialize skipped: already initialized');
       return;
     }
+
+    final messaging = _messaging!;
 
     debugPrint('[push] initialize: ensure firebase');
     await ensureFirebaseInitialized();
@@ -132,13 +135,13 @@ class PushNotificationsService {
     debugPrint('[push] initialize: onMessageOpenedApp subscribed');
 
     debugPrint('[push] initialize: subscribe onTokenRefresh');
-    _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((token) async {
+    _tokenRefreshSubscription = messaging.onTokenRefresh.listen((token) async {
       await _registerTokenIfPossible(token: token, force: true);
     });
     debugPrint('[push] initialize: onTokenRefresh subscribed');
 
     debugPrint('[push] initialize: getInitialMessage');
-    final initialMessage = await _messaging
+    final initialMessage = await messaging
         .getInitialMessage()
         .timeout(const Duration(seconds: 5), onTimeout: () => null);
     if (initialMessage != null) {
@@ -156,12 +159,13 @@ class PushNotificationsService {
       return false;
     }
 
-    final currentSettings = await _messaging.getNotificationSettings();
+    final messaging = _messaging!;
+    final currentSettings = await messaging.getNotificationSettings();
     debugPrint(
       '[push] current authorization status: ${currentSettings.authorizationStatus.name}',
     );
 
-    final settings = await _messaging.requestPermission(
+    final settings = await messaging.requestPermission(
       alert: true,
       announcement: false,
       badge: true,
@@ -188,6 +192,7 @@ class PushNotificationsService {
       return;
     }
 
+    final messaging = _messaging!;
     debugPrint('[push] start token sync');
     await initialize();
     final authorized = await requestPermissionsIfNeeded();
@@ -197,7 +202,7 @@ class PushNotificationsService {
     }
 
     await _waitForApnsTokenIfNeeded();
-    final token = await _messaging.getToken();
+    final token = await messaging.getToken();
     if (token == null || token.isEmpty) {
       debugPrint('[push] FCM token is empty, skip backend registration');
       return;
@@ -292,7 +297,7 @@ class PushNotificationsService {
     }
 
     for (var attempt = 0; attempt < 10; attempt++) {
-      final apnsToken = await _messaging.getAPNSToken();
+      final apnsToken = await _messaging!.getAPNSToken();
       if (apnsToken != null && apnsToken.isNotEmpty) {
         debugPrint('[push] APNs token is available');
         return;
@@ -312,7 +317,7 @@ bool _supportsPushPlatform() {
 
   return switch (defaultTargetPlatform) {
     TargetPlatform.android => true,
-    TargetPlatform.iOS => true,
+    TargetPlatform.iOS => false,
     _ => false,
   };
 }

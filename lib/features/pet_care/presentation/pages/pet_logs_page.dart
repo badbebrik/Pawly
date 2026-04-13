@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../core/network/models/log_models.dart';
 import '../providers/health_controllers.dart';
+import '../utils/metric_unit_formatter.dart';
 
 class PetLogsPage extends ConsumerWidget {
   const PetLogsPage({
@@ -98,6 +99,14 @@ class _PetLogsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final facets = state.facets;
     final allTypes = _allFilterTypes(state);
+    final logTypeCodesById = <String, String?>{
+      for (final type in <LogType>[
+        ...state.bootstrap.systemLogTypes,
+        ...state.bootstrap.recentLogTypes,
+        ...state.bootstrap.customLogTypes,
+      ])
+        type.id: type.code,
+    };
     final selectedTypes = allTypes
         .where((type) => state.selectedTypeIds.contains(type.id))
         .toList(growable: false);
@@ -174,6 +183,9 @@ class _PetLogsView extends StatelessWidget {
             ...state.logs.map(
               (log) => _LogCardItem(
                 log: log,
+                logTypeCode: log.logTypeId == null
+                    ? null
+                    : logTypeCodesById[log.logTypeId!],
                 onTap: () async {
                   final changed = await context.pushNamed<bool>(
                     'petLogDetails',
@@ -252,10 +264,12 @@ class _PetLogsView extends StatelessWidget {
 class _LogCardItem extends StatelessWidget {
   const _LogCardItem({
     required this.log,
+    required this.logTypeCode,
     required this.onTap,
   });
 
   final LogCard log;
+  final String? logTypeCode;
   final VoidCallback onTap;
 
   @override
@@ -266,74 +280,79 @@ class _LogCardItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: PawlySpacing.md),
       child: PawlyCard(
         onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    log.logTypeName ?? 'Запись без типа',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    _formatOccurredAt(log.occurredAt),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (log.descriptionPreview.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: PawlySpacing.sm),
+                    Text(
+                      log.descriptionPreview,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (_relatedEntityLabel(log)
+                      case final relatedLabel?) ...<Widget>[
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      relatedLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: PawlySpacing.sm),
+                  Wrap(
+                    spacing: PawlySpacing.xs,
+                    runSpacing: PawlySpacing.xs,
                     children: <Widget>[
-                      Text(
-                        log.logTypeName ?? 'Запись без типа',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                      if (log.metricValuesPreview.isNotEmpty)
+                        for (final metric in log.metricValuesPreview.take(3))
+                          PawlyBadge(
+                            label:
+                                '${metric.metricName} ${_formatMetricValue(metric)}',
+                          ),
+                      if (log.hasAttachments)
+                        PawlyBadge(
+                          label: 'Вложений: ${log.attachmentsCount}',
+                          tone: PawlyBadgeTone.warning,
                         ),
-                      ),
-                      const SizedBox(height: PawlySpacing.xxs),
-                      Text(
-                        _formatOccurredAt(log.occurredAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
                     ],
                   ),
-                ),
-                PawlyBadge(
-                  label: _sourceLabel(log.source),
-                  tone: log.source == 'HEALTH'
-                      ? PawlyBadgeTone.info
-                      : PawlyBadgeTone.neutral,
-                ),
-              ],
+                ],
+              ),
             ),
-            if (log.descriptionPreview.isNotEmpty) ...<Widget>[
-              const SizedBox(height: PawlySpacing.sm),
-              Text(
-                log.descriptionPreview,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            if (_relatedEntityLabel(log) case final relatedLabel?) ...<Widget>[
-              const SizedBox(height: PawlySpacing.xs),
-              Text(
-                relatedLabel,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(width: PawlySpacing.md),
+            SizedBox(
+              width: 44,
+              child: Center(
+                child: Text(
+                  _logTypeEmoji(
+                    code: logTypeCode,
+                    name: log.logTypeName,
+                    metricNames:
+                        log.metricValuesPreview.map((item) => item.metricName),
+                  ),
+                  style: theme.textTheme.headlineLarge,
                 ),
               ),
-            ],
-            const SizedBox(height: PawlySpacing.sm),
-            Wrap(
-              spacing: PawlySpacing.xs,
-              runSpacing: PawlySpacing.xs,
-              children: <Widget>[
-                if (log.metricValuesPreview.isNotEmpty)
-                  for (final metric in log.metricValuesPreview.take(3))
-                    PawlyBadge(
-                      label:
-                          '${metric.metricName} ${_formatMetricValue(metric)}',
-                    ),
-                if (log.hasAttachments)
-                  PawlyBadge(
-                    label: 'Вложений: ${log.attachmentsCount}',
-                    tone: PawlyBadgeTone.warning,
-                  ),
-              ],
             ),
           ],
         ),
@@ -549,9 +568,10 @@ String _formatMetricValue(LogMetricValue value) {
   final number = value.valueNum % 1 == 0
       ? value.valueNum.toStringAsFixed(0)
       : value.valueNum.toStringAsFixed(1);
-  return value.unitCode == null || value.unitCode!.isEmpty
+  final unit = formatDisplayUnitCode(value.unitCode);
+  return unit.isEmpty
       ? number
-      : '$number ${value.unitCode}';
+      : '$number $unit';
 }
 
 String? _relatedEntityLabel(LogCard log) {
@@ -566,4 +586,89 @@ String? _relatedEntityLabel(LogCard log) {
     'VET_VISIT' => 'Связано с визитом',
     _ => 'Связано: $relatedType',
   };
+}
+
+String _logTypeEmoji({
+  required String? code,
+  required String? name,
+  required Iterable<String> metricNames,
+}) {
+  final normalizedCode =
+      code?.trim().toUpperCase() ?? _inferLogTypeCode(name, metricNames);
+
+  return switch (normalizedCode) {
+    'WEIGHING' => '⚖️',
+    'WEIGHT' => '⚖️',
+    'TEMPERATURE' => '🌡️',
+    'APPETITE' => '🍽️',
+    'WATER_INTAKE' => '💧',
+    'ACTIVITY' => '🏃',
+    'SLEEP' => '😴',
+    'STOOL' => '💩',
+    'URINATION' => '🚽',
+    'VOMITING' => '🤮',
+    'COUGHING' => '😮‍💨',
+    'ITCHING' => '🐾',
+    'PAIN_EPISODE' => '⚠️',
+    'MOOD_BEHAVIOR' => '🙂',
+    'SEIZURE_EPISODE' => '⚡',
+    'MEDICATION_TAKEN' => '💊',
+    'MEDICATION_MISSED' => '⏭️',
+    _ => '📝',
+  };
+}
+
+String _inferLogTypeCode(String? name, Iterable<String> metricNames) {
+  final haystack = <String>[
+    if (name != null) name,
+    ...metricNames,
+  ].join(' ').toLowerCase();
+
+  if (haystack.contains('вес')) {
+    return 'WEIGHT';
+  }
+  if (haystack.contains('температур')) {
+    return 'TEMPERATURE';
+  }
+  if (haystack.contains('аппетит')) {
+    return 'APPETITE';
+  }
+  if (haystack.contains('пить') || haystack.contains('вода')) {
+    return 'WATER_INTAKE';
+  }
+  if (haystack.contains('активност')) {
+    return 'ACTIVITY';
+  }
+  if (haystack.contains('сон')) {
+    return 'SLEEP';
+  }
+  if (haystack.contains('стул')) {
+    return 'STOOL';
+  }
+  if (haystack.contains('моч')) {
+    return 'URINATION';
+  }
+  if (haystack.contains('рвот')) {
+    return 'VOMITING';
+  }
+  if (haystack.contains('каш')) {
+    return 'COUGHING';
+  }
+  if (haystack.contains('зуд')) {
+    return 'ITCHING';
+  }
+  if (haystack.contains('бол')) {
+    return 'PAIN_EPISODE';
+  }
+  if (haystack.contains('поведени') || haystack.contains('настроени')) {
+    return 'MOOD_BEHAVIOR';
+  }
+  if (haystack.contains('судорог')) {
+    return 'SEIZURE_EPISODE';
+  }
+  if (haystack.contains('лекар')) {
+    return 'MEDICATION_TAKEN';
+  }
+
+  return '';
 }

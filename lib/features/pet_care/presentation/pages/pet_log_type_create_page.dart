@@ -6,6 +6,7 @@ import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/health_repository_models.dart';
 import '../providers/health_controllers.dart';
+import '../utils/metric_unit_formatter.dart';
 
 class PetLogTypeCreatePage extends ConsumerStatefulWidget {
   const PetLogTypeCreatePage({
@@ -319,9 +320,9 @@ class _SelectedMetricCard extends StatelessWidget {
 
 String _metricSubtitle(Metric metric) {
   final kind = _metricKindLabel(metric.inputKind);
-  final unit = metric.unitCode == null || metric.unitCode!.isEmpty
+  final unit = formatDisplayUnitCode(metric.unitCode).isEmpty
       ? 'без единиц'
-      : metric.unitCode!;
+      : formatDisplayUnitCode(metric.unitCode);
   final hasRange = metric.minValue != null || metric.maxValue != null;
   final range =
       hasRange ? ' · ${_formatRange(metric.minValue, metric.maxValue)}' : '';

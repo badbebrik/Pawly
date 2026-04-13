@@ -24,11 +24,15 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
   static final DateFormat _timeFormat = DateFormat('HH:mm');
   static final DateFormat _dateFormat = DateFormat('d MMMM', 'ru');
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   bool _sendErrorShown = false;
+  String? _lastTailMessageKey;
+  bool _initialScrollDone = false;
 
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -49,6 +53,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
         data: (state) {
           _scheduleSendErrorToast(state);
           _scheduleMarkRead(state);
+          _scheduleAutoScroll(state);
           return Column(
             children: <Widget>[
               Expanded(
@@ -59,6 +64,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
                           .notifier)
                       .reload(),
                   child: ListView(
+                    controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(
                       PawlySpacing.lg,
                       PawlySpacing.md,
@@ -185,6 +191,44 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
           content:
               Text('Не удалось отправить сообщение. Проверьте соединение.'),
         ),
+      );
+    });
+  }
+
+  void _scheduleAutoScroll(ChatConversationState state) {
+    if (state.messages.isEmpty) {
+      _lastTailMessageKey = null;
+      return;
+    }
+
+    final tail = state.messages.last;
+    final tailKey = '${tail.messageId}|${tail.clientMessageId}|'
+        '${tail.deliveryStatus.name}|${state.messages.length}';
+    final shouldInitialScroll = !_initialScrollDone;
+    final shouldScrollToNewTail = _lastTailMessageKey != tailKey;
+
+    _lastTailMessageKey = tailKey;
+
+    if (!shouldInitialScroll && !shouldScrollToNewTail) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+
+      final targetOffset = _scrollController.position.maxScrollExtent;
+      if (shouldInitialScroll) {
+        _initialScrollDone = true;
+        _scrollController.jumpTo(targetOffset);
+        return;
+      }
+
+      await _scrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
       );
     });
   }

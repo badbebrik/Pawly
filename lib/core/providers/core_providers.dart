@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -118,7 +119,9 @@ final healthApiClientProvider = Provider<HealthApiClient>((ref) {
 final pushNotificationsServiceProvider = Provider<PushNotificationsService>((
   ref,
 ) {
-  final messaging = ref.watch(firebaseMessagingProvider);
+  final messaging = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+      ? ref.watch(firebaseMessagingProvider)
+      : null;
   final healthApiClient = ref.watch(healthApiClientProvider);
   final sharedPreferencesService = ref.watch(sharedPreferencesServiceProvider);
   final authSessionStore = ref.watch(authSessionStoreProvider);

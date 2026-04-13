@@ -9,9 +9,10 @@ import '../../../../design_system/design_system.dart';
 import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository_models.dart';
 import '../models/attachment_draft_item.dart';
-import 'pet_log_type_picker_page.dart';
 import '../providers/health_controllers.dart';
+import '../utils/metric_unit_formatter.dart';
 import '../widgets/health_attachments_field.dart';
+import 'pet_log_type_picker_page.dart';
 
 class PetLogEditPage extends ConsumerStatefulWidget {
   const PetLogEditPage({
@@ -332,7 +333,7 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
                 child: Center(
                   widthFactor: 1,
                   child: Text(
-                    requirement.unitCode!.trim(),
+                    formatDisplayUnitCode(requirement.unitCode),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color:
                               Theme.of(context).colorScheme.onSurfaceVariant,
@@ -631,8 +632,9 @@ String _metricHint(LogTypeMetricRequirement requirement) {
     final max = _formatMetricBound(requirement.maxValue) ?? '...';
     return 'Допустимый диапазон: $min–$max';
   }
-  if ((requirement.unitCode ?? '').trim().isNotEmpty) {
-    return 'Введите значение в ${requirement.unitCode!.trim()}';
+  final unit = formatDisplayUnitCode(requirement.unitCode);
+  if (unit.isNotEmpty) {
+    return 'Введите значение в $unit';
   }
   return 'Введите значение';
 }
