@@ -672,24 +672,25 @@ class _ProfileAvatar extends StatelessWidget {
         border: Border.all(color: colorScheme.onSurface, width: 2),
         color: colorScheme.primaryContainer,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: hasPhoto
-          ? PawlyCachedImage(
-              imageUrl: resolvedPhotoUrl!,
-              cacheKey: resolvedUserId == null
-                  ? null
-                  : pawlyStableImageCacheKey(
-                      scope: 'profile-avatar',
-                      entityId: resolvedUserId,
-                      imageUrl: resolvedPhotoUrl,
-                    ),
-              targetLogicalSize: size,
-              fit: BoxFit.cover,
-              errorWidget: (_) => _ProfileAvatarFallback(
-                initials: initials,
-              ),
-            )
-          : _ProfileAvatarFallback(initials: initials),
+      child: ClipOval(
+        child: hasPhoto
+            ? PawlyCachedImage(
+                imageUrl: resolvedPhotoUrl!,
+                cacheKey: resolvedUserId == null
+                    ? null
+                    : pawlyStableImageCacheKey(
+                        scope: 'profile-avatar',
+                        entityId: resolvedUserId,
+                        imageUrl: resolvedPhotoUrl,
+                      ),
+                targetLogicalSize: size,
+                fit: BoxFit.cover,
+                errorWidget: (_) => _ProfileAvatarFallback(
+                  initials: initials,
+                ),
+              )
+            : _ProfileAvatarFallback(initials: initials),
+      ),
     );
   }
 

@@ -210,7 +210,7 @@ class _TypeChoiceCard extends StatelessWidget {
     return PawlyCard(
       onTap: onTap,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Expanded(
             child: Column(
@@ -233,10 +233,7 @@ class _TypeChoiceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: PawlySpacing.md),
-          SizedBox(
-            width: 44,
-            child: Center(child: trailing),
-          ),
+          trailing,
         ],
       ),
     );
@@ -264,10 +261,6 @@ _LogTypeSticker _logTypeSticker({
 
   return switch (normalizedCode) {
     'WEIGHING' => const _LogTypeSticker(
-        emoji: '⚖️',
-        label: 'Вес',
-      ),
-    'WEIGHT' => const _LogTypeSticker(
         emoji: '⚖️',
         label: 'Вес',
       ),

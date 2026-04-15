@@ -333,22 +333,23 @@ class _PetAvatar extends StatelessWidget {
         border: Border.all(color: colorScheme.onSurface, width: 2.2),
         color: colorScheme.primaryContainer,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: hasPhoto
-          ? PawlyCachedImage(
-              imageUrl: resolvedPhotoUrl!,
-              cacheKey: pawlyStableImageCacheKey(
-                scope: 'pet-avatar',
-                entityId: photoFileId ?? petId,
-                imageUrl: resolvedPhotoUrl,
-              ),
-              targetLogicalSize: 110,
-              fit: BoxFit.cover,
-              errorWidget: (_) => _PetAvatarFallback(
-                colorScheme: colorScheme,
-              ),
-            )
-          : _PetAvatarFallback(colorScheme: colorScheme),
+      child: ClipOval(
+        child: hasPhoto
+            ? PawlyCachedImage(
+                imageUrl: resolvedPhotoUrl!,
+                cacheKey: pawlyStableImageCacheKey(
+                  scope: 'pet-avatar',
+                  entityId: photoFileId ?? petId,
+                  imageUrl: resolvedPhotoUrl,
+                ),
+                targetLogicalSize: 110,
+                fit: BoxFit.cover,
+                errorWidget: (_) => _PetAvatarFallback(
+                  colorScheme: colorScheme,
+                ),
+              )
+            : _PetAvatarFallback(colorScheme: colorScheme),
+      ),
     );
   }
 }
