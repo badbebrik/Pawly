@@ -97,7 +97,8 @@ class Pet {
     required this.ownerUserId,
     required this.rowVersion,
     required this.name,
-    required this.speciesId,
+    this.speciesId,
+    this.customSpeciesName,
     required this.sex,
     this.birthDate,
     required this.breed,
@@ -120,7 +121,8 @@ class Pet {
   final String ownerUserId;
   final int rowVersion;
   final String name;
-  final String speciesId;
+  final String? speciesId;
+  final String? customSpeciesName;
   final String sex;
   final DateTime? birthDate;
   final PetBreed breed;
@@ -171,7 +173,8 @@ class Pet {
       ownerUserId: asString(json['owner_user_id']),
       rowVersion: asInt(json['row_version']),
       name: asString(json['name']),
-      speciesId: asString(json['species_id']),
+      speciesId: asNullableString(json['species_id']),
+      customSpeciesName: asNullableString(json['custom_species_name']),
       sex: asString(json['sex']),
       birthDate: asDateTime(json['birth_date']),
       breed: breed,
@@ -197,7 +200,8 @@ class Pet {
 class CreatePetPayload {
   const CreatePetPayload({
     required this.name,
-    required this.speciesId,
+    this.speciesId,
+    this.customSpeciesName,
     required this.sex,
     this.birthDate,
     this.breedId,
@@ -213,7 +217,8 @@ class CreatePetPayload {
   });
 
   final String name;
-  final String speciesId;
+  final String? speciesId;
+  final String? customSpeciesName;
   final String sex;
   final DateTime? birthDate;
   final String? breedId;
@@ -231,6 +236,7 @@ class CreatePetPayload {
     return <String, dynamic>{
       'name': name,
       'species_id': speciesId,
+      'custom_species_name': customSpeciesName,
       'sex': sex,
       'birth_date': birthDate == null ? null : formatDate(birthDate!),
       'breed_id': breedId,
@@ -278,7 +284,7 @@ class ChangePetStatusPayload {
     return <String, dynamic>{
       'row_version': rowVersion,
       'status': status,
-      'missing_since': missingSince?.toIso8601String(),
+      'missing_since': missingSince == null ? null : formatDate(missingSince!),
     }..removeWhere((_, dynamic value) => value == null);
   }
 }
@@ -338,6 +344,16 @@ class ConfirmPetPhotoUploadPayload {
       'size_bytes': sizeBytes,
     };
   }
+}
+
+class DeletePetPhotoPayload {
+  const DeletePetPhotoPayload({required this.rowVersion});
+
+  final int rowVersion;
+
+  JsonMap toJson() => <String, dynamic>{
+        'row_version': rowVersion,
+      };
 }
 
 class PetEnvelopeResponse {

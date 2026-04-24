@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 class DevicePreferences {
@@ -14,23 +12,12 @@ class DevicePreferences {
 
 class DevicePreferencesService {
   Future<DevicePreferences> read() async {
-    final locale = _currentLocale();
     final timeZone = await _readTimeZone();
 
     return DevicePreferences(
-      locale: locale,
+      locale: 'ru',
       timeZone: timeZone,
     );
-  }
-
-  String _currentLocale() {
-    final locale = PlatformDispatcher.instance.locale;
-    final languageCode = locale.languageCode.trim();
-    if (languageCode.isEmpty) {
-      return 'ru';
-    }
-
-    return languageCode.toLowerCase();
   }
 
   Future<String> _readTimeZone() async {

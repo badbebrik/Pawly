@@ -44,8 +44,8 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
       petLogComposerBootstrapProvider(widget.petId),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Новый тип записи')),
+    return PawlyScreenScaffold(
+      title: 'Новый тип записи',
       body: bootstrapAsync.when(
         data: (bootstrap) => _buildContent(context, bootstrap),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -76,21 +76,21 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
         ),
         const SizedBox(height: PawlySpacing.lg),
         Text(
-          'Метрики',
+          'Показатели',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
         ),
         const SizedBox(height: PawlySpacing.xs),
         Text(
-          'Выбери, какие метрики будут доступны в этом типе записи.',
+          'Выберите, какие показатели будут доступны в этом типе записи.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
         const SizedBox(height: PawlySpacing.sm),
         PawlyButton(
-          label: 'Выбрать метрику',
+          label: 'Выбрать показатель',
           onPressed: canSubmit ? _openMetricPicker : null,
           variant: PawlyButtonVariant.secondary,
           icon: Icons.add_rounded,
@@ -159,7 +159,7 @@ class _PetLogTypeCreatePageState extends ConsumerState<PetLogTypeCreatePage> {
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      _showError('Укажи название типа.');
+      _showError('Укажите название типа.');
       return;
     }
 
@@ -310,7 +310,7 @@ class _SelectedMetricCard extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             value: isRequired,
             onChanged: enabled ? onRequiredChanged : null,
-            title: const Text('Обязательная метрика'),
+            title: const Text('Обязательный показатель'),
           ),
         ],
       ),

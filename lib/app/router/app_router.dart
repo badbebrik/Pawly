@@ -2,11 +2,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/session/auth_session_store.dart';
 import '../../features/acl/presentation/pages/acl_access_page.dart';
-import '../../features/acl/presentation/pages/acl_create_invite_page.dart';
 import '../../features/acl/presentation/pages/acl_invite_details_page.dart';
+import '../../features/acl/presentation/pages/acl_invite_form_page.dart';
 import '../../features/acl/presentation/pages/acl_member_details_page.dart';
 import '../../features/acl/presentation/pages/acl_invite_preview_page.dart';
-import '../../features/acl/presentation/pages/acl_edit_invite_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/password_reset_confirm_page.dart';
 import '../../features/auth/presentation/pages/password_reset_request_page.dart';
@@ -58,7 +57,10 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
       }
 
       if (!isAuthenticated && _isProtectedRoute(location)) {
-        return AppRoutes.login;
+        return Uri(
+          path: AppRoutes.login,
+          queryParameters: <String, String>{'redirect': state.uri.toString()},
+        ).toString();
       }
 
       if (isAuthenticated && _isPublicAuthRoute(location)) {
@@ -371,7 +373,7 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                           GoRoute(
                             path: 'invite',
                             name: 'aclCreateInvite',
-                            builder: (_, state) => AclCreateInvitePage(
+                            builder: (_, state) => AclInviteFormPage(
                               petId: state.pathParameters['petId']!,
                             ),
                           ),
@@ -386,7 +388,7 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                               GoRoute(
                                 path: 'edit',
                                 name: 'aclInviteEdit',
-                                builder: (_, state) => AclEditInvitePage(
+                                builder: (_, state) => AclInviteFormPage(
                                   petId: state.pathParameters['petId']!,
                                   inviteId: state.pathParameters['inviteId']!,
                                 ),
@@ -418,6 +420,19 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
         path: AppRoutes.petCreate,
         name: "petCreate",
         builder: (_, __) => const PetCreateFlowPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.invite,
+        name: 'inviteLink',
+        redirect: (_, state) {
+          final token = state.uri.queryParameters['token'];
+          return Uri(
+            path: AppRoutes.aclInvitePreview,
+            queryParameters: <String, String>{
+              if (token != null && token.isNotEmpty) 'token': token,
+            },
+          ).toString();
+        },
       ),
       GoRoute(
         path: AppRoutes.aclInvitePreview,
@@ -455,5 +470,7 @@ bool _isProtectedRoute(String location) {
       location == AppRoutes.chatConversation ||
       location.startsWith('${AppRoutes.chatConversation}/') ||
       location == AppRoutes.petCreate ||
-      location.startsWith('${AppRoutes.petCreate}/');
+      location.startsWith('${AppRoutes.petCreate}/') ||
+      location == AppRoutes.invite ||
+      location == AppRoutes.aclInvitePreview;
 }

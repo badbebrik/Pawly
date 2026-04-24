@@ -101,4 +101,16 @@ class PetsApiClient {
       decoder: PetEnvelopeResponse.fromJson,
     );
   }
+
+  Future<PetEnvelopeResponse> deletePhoto(
+    String petId,
+    DeletePetPhotoPayload payload,
+  ) {
+    return _apiClient.delete<PetEnvelopeResponse>(
+      ApiEndpoints.petPhoto(petId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: PetEnvelopeResponse.fromJson,
+    );
+  }
 }

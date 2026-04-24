@@ -76,6 +76,10 @@ class ChatConversation {
 
   factory ChatConversation.fromJson(Object? data) {
     final json = asJsonMap(data);
+    final envelope = json['conversation'];
+    if (envelope != null) {
+      return ChatConversation.fromJson(envelope);
+    }
 
     return ChatConversation(
       conversationId: asString(json['conversation_id']),

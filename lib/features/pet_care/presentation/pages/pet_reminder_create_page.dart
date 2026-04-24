@@ -3,15 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../design_system/design_system.dart';
+import '../../../pets/data/pets_repository.dart';
+import '../../../pets/presentation/providers/pets_controller.dart';
 import '../../data/health_repository_models.dart';
 import '../providers/health_controllers.dart';
 import 'pet_log_type_picker_page.dart';
 
 class PetReminderCreatePage extends ConsumerStatefulWidget {
-  const PetReminderCreatePage({
-    required this.petId,
-    super.key,
-  });
+  const PetReminderCreatePage({required this.petId, super.key});
 
   final String petId;
 
@@ -53,142 +52,167 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Новое напоминание')),
+    final accessAsync = ref.watch(petAccessPolicyProvider(widget.petId));
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return accessAsync.when(
+      data: (access) {
+        if (!access.remindersWrite) {
+          return const PawlyScreenScaffold(
+            title: 'Новое напоминание',
+            body: _ReminderFormNoAccessView(),
+          );
+        }
+        return _buildForm(context, theme, colorScheme, access);
+      },
+      loading: () => const PawlyScreenScaffold(
+        title: 'Новое напоминание',
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const PawlyScreenScaffold(
+        title: 'Новое напоминание',
+        body: _ReminderFormNoAccessView(),
+      ),
+    );
+  }
+
+  Widget _buildForm(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    PetAccessPolicy access,
+  ) {
+    final canSubmit =
+        !_isSubmitting && access.canWriteScheduledSource(_sourceType);
+
+    return PawlyScreenScaffold(
+      title: 'Новое напоминание',
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(PawlySpacing.lg),
+          padding: const EdgeInsets.fromLTRB(
+            PawlySpacing.md,
+            PawlySpacing.sm,
+            PawlySpacing.md,
+            PawlySpacing.xl,
+          ),
           children: <Widget>[
-            PawlyCard(
+            _ReminderFormSection(
+              title: 'Тип',
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    'Тип напоминания',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: _ReminderOptionCard(
+                          title: 'Ручное',
+                          subtitle: 'Разовое правило',
+                          icon: Icons.notifications_none_rounded,
+                          isSelected: _sourceType == 'MANUAL',
+                          onTap: _isSubmitting || !access.petWrite
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _sourceType = 'MANUAL';
+                                    _selectedLogTypeId = null;
+                                    _selectedLogTypeLabel = null;
+                                  });
+                                },
                         ),
-                  ),
-                  const SizedBox(height: PawlySpacing.sm),
-                  DropdownButtonFormField<String>(
-                    initialValue: _sourceType,
-                    items: const <DropdownMenuItem<String>>[
-                      DropdownMenuItem<String>(
-                        value: 'MANUAL',
-                        child: Text('Ручное'),
                       ),
-                      DropdownMenuItem<String>(
-                        value: 'LOG_TYPE',
-                        child: Text('По типу записи'),
+                      const SizedBox(width: PawlySpacing.sm),
+                      Expanded(
+                        child: _ReminderOptionCard(
+                          title: 'По записи',
+                          subtitle: 'Для типа записи',
+                          icon: Icons.list_alt_rounded,
+                          isSelected: _sourceType == 'LOG_TYPE',
+                          onTap: _isSubmitting || !access.logWrite
+                              ? null
+                              : () => setState(() {
+                                    _sourceType = 'LOG_TYPE';
+                                  }),
+                        ),
                       ),
                     ],
-                    onChanged: _isSubmitting
-                        ? null
-                        : (value) {
-                            if (value == null) {
-                              return;
-                            }
-                            setState(() {
-                              _sourceType = value;
-                              if (_sourceType != 'LOG_TYPE') {
-                                _selectedLogTypeId = null;
-                                _selectedLogTypeLabel = null;
-                              }
-                            });
-                          },
                   ),
                   if (_sourceType == 'LOG_TYPE') ...<Widget>[
-                    const SizedBox(height: PawlySpacing.md),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.category_rounded),
-                      title: const Text('Тип записи'),
-                      subtitle: Text(
-                        _selectedLogTypeLabel ?? 'Не выбран',
-                      ),
-                      trailing: TextButton(
-                        onPressed: _isSubmitting ? null : _openLogTypePicker,
-                        child: Text(
+                    const SizedBox(height: PawlySpacing.sm),
+                    _ReminderPickerRow(
+                      title: 'Тип записи',
+                      value: _selectedLogTypeLabel ?? 'Не выбран',
+                      actionLabel:
                           _selectedLogTypeId == null ? 'Выбрать' : 'Изменить',
-                        ),
-                      ),
+                      onTap: _isSubmitting ? null : _openLogTypePicker,
                     ),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: PawlySpacing.md),
-            PawlyTextField(
-              controller: _titleController,
-              label: 'Название',
-              hintText: 'Например, Взвесить питомца',
-              textCapitalization: TextCapitalization.sentences,
-              enabled: !_isSubmitting,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Укажи название';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: PawlySpacing.md),
-            PawlyTextField(
-              controller: _noteController,
-              label: 'Заметка',
-              hintText: 'Необязательно',
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              enabled: !_isSubmitting,
-            ),
-            const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
+            _ReminderFormSection(
+              title: 'Описание',
               child: Column(
                 children: <Widget>[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_rounded),
-                    title: const Text('Дата и время'),
-                    subtitle: Text(_formatDateTime(_startsAt)),
-                    trailing: TextButton(
-                      onPressed: _isSubmitting ? null : _pickStartsAt,
-                      child: const Text('Изменить'),
-                    ),
+                  PawlyTextField(
+                    controller: _titleController,
+                    label: 'Название',
+                    hintText: 'Например, Взвесить питомца',
+                    textCapitalization: TextCapitalization.sentences,
+                    enabled: !_isSubmitting,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Укажите название';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: PawlySpacing.sm),
-                  DropdownButtonFormField<String>(
-                    initialValue: _recurrenceRule,
-                    decoration: const InputDecoration(
-                      labelText: 'Повтор',
+                  PawlyTextField(
+                    controller: _noteController,
+                    label: 'Заметка',
+                    hintText: 'Необязательно',
+                    maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences,
+                    enabled: !_isSubmitting,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            _ReminderFormSection(
+              title: 'Расписание',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _ReminderPickerRow(
+                    title: 'Дата и время',
+                    value: _formatDateTime(_startsAt),
+                    actionLabel: 'Изменить',
+                    onTap: _isSubmitting ? null : _pickStartsAt,
+                  ),
+                  const SizedBox(height: PawlySpacing.md),
+                  Text(
+                    'Повтор',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                    items: const <DropdownMenuItem<String>>[
-                      DropdownMenuItem<String>(
-                        value: _noRecurrenceValue,
-                        child: Text('Без повтора'),
-                      ),
-                      DropdownMenuItem<String>(
-                        value: 'DAILY',
-                        child: Text('Каждый день'),
-                      ),
-                      DropdownMenuItem<String>(
-                        value: 'WEEKLY',
-                        child: Text('Каждую неделю'),
-                      ),
-                      DropdownMenuItem<String>(
-                        value: 'MONTHLY',
-                        child: Text('Каждый месяц'),
-                      ),
-                      DropdownMenuItem<String>(
-                        value: 'YEARLY',
-                        child: Text('Каждый год'),
-                      ),
+                  ),
+                  const SizedBox(height: PawlySpacing.xs),
+                  _ReminderChoiceWrap<String>(
+                    values: const <String>[
+                      _noRecurrenceValue,
+                      'DAILY',
+                      'WEEKLY',
+                      'MONTHLY',
+                      'YEARLY',
                     ],
+                    selectedValue: _recurrenceRule,
+                    labelBuilder: _recurrenceLabel,
                     onChanged: _isSubmitting
                         ? null
                         : (value) {
-                            if (value == null) {
-                              return;
-                            }
                             setState(() {
                               _recurrenceRule = value;
                               if (value == _noRecurrenceValue) {
@@ -197,8 +221,8 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
                             });
                           },
                   ),
-                  if (_recurrenceRule != _noRecurrenceValue) ...<Widget>[
-                    const SizedBox(height: PawlySpacing.md),
+                  if (_recurrenceRule != _noRecurrenceValue) ...[
+                    const SizedBox(height: PawlySpacing.sm),
                     PawlyTextField(
                       controller: _intervalController,
                       label: 'Интервал',
@@ -217,92 +241,67 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
                       },
                     ),
                     const SizedBox(height: PawlySpacing.sm),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.event_repeat_rounded),
-                      title: const Text('Повторять до'),
-                      subtitle: Text(
-                        _untilDate == null
-                            ? 'Без даты окончания'
-                            : _formatDate(_untilDate!),
-                      ),
-                      trailing: Wrap(
-                        spacing: PawlySpacing.xs,
-                        children: <Widget>[
-                          if (_untilDate != null)
-                            TextButton(
-                              onPressed: _isSubmitting
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        _untilDate = null;
-                                      });
-                                    },
-                              child: const Text('Сбросить'),
-                            ),
-                          TextButton(
-                            onPressed: _isSubmitting ? null : _pickUntilDate,
-                            child: const Text('Выбрать'),
-                          ),
-                        ],
-                      ),
+                    _ReminderPickerRow(
+                      title: 'Повторять до',
+                      value: _untilDate == null
+                          ? 'Без даты окончания'
+                          : _formatDate(_untilDate!),
+                      actionLabel: _untilDate == null ? 'Выбрать' : 'Изменить',
+                      onTap: _isSubmitting ? null : _pickUntilDate,
+                      secondaryActionLabel:
+                          _untilDate == null ? null : 'Сбросить',
+                      onSecondaryTap: _isSubmitting || _untilDate == null
+                          ? null
+                          : () => setState(() => _untilDate = null),
                     ),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
+            _ReminderFormSection(
+              title: 'Уведомление',
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _pushEnabled,
-                    onChanged: _isSubmitting
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _pushEnabled = value;
-                            });
-                          },
-                    title: const Text('Уведомление включено'),
-                  ),
-                  if (_pushEnabled) ...<Widget>[
-                    const SizedBox(height: PawlySpacing.sm),
-                    DropdownButtonFormField<int>(
-                      initialValue: _remindOffsetMinutes ?? 0,
-                      decoration: const InputDecoration(
-                        labelText: 'Когда напомнить',
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          _pushEnabled ? 'Включено' : 'Выключено',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                      items: const <DropdownMenuItem<int>>[
-                        DropdownMenuItem<int>(
-                          value: 0,
-                          child: Text('В момент события'),
-                        ),
-                        DropdownMenuItem<int>(
-                          value: 15,
-                          child: Text('За 15 минут'),
-                        ),
-                        DropdownMenuItem<int>(
-                          value: 30,
-                          child: Text('За 30 минут'),
-                        ),
-                        DropdownMenuItem<int>(
-                          value: 60,
-                          child: Text('За 1 час'),
-                        ),
-                        DropdownMenuItem<int>(
-                          value: 1440,
-                          child: Text('За 1 день'),
-                        ),
-                      ],
+                      Switch(
+                        value: _pushEnabled,
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) => setState(() {
+                                  _pushEnabled = value;
+                                }),
+                      ),
+                    ],
+                  ),
+                  if (_pushEnabled) ...[
+                    const SizedBox(height: PawlySpacing.sm),
+                    Text(
+                      'Когда напомнить',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    _ReminderChoiceWrap<int>(
+                      values: const <int>[0, 15, 30, 60, 1440],
+                      selectedValue: _remindOffsetMinutes ?? 0,
+                      labelBuilder: _remindOffsetLabel,
                       onChanged: _isSubmitting
                           ? null
-                          : (value) {
-                              setState(() {
+                          : (value) => setState(() {
                                 _remindOffsetMinutes = value;
-                              });
-                            },
+                              }),
                     ),
                   ],
                 ],
@@ -311,8 +310,7 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
             const SizedBox(height: PawlySpacing.lg),
             PawlyButton(
               label: _isSubmitting ? 'Создаём...' : 'Создать напоминание',
-              onPressed: _isSubmitting ? null : _submit,
-              icon: Icons.add_alert_rounded,
+              onPressed: canSubmit ? _submit : null,
             ),
           ],
         ),
@@ -413,7 +411,7 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
       return;
     }
     if (_sourceType == 'LOG_TYPE' && _selectedLogTypeId == null) {
-      _showError('Выбери тип записи для напоминания.');
+      _showError('Выберите тип записи для напоминания.');
       return;
     }
 
@@ -465,13 +463,347 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _ReminderFormNoAccessView extends StatelessWidget {
+  const _ReminderFormNoAccessView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Нет доступа',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'У вас нет права создавать напоминания для этого питомца.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderFormSection extends StatelessWidget {
+  const _ReminderFormSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderOptionCard extends StatelessWidget {
+  const _ReminderOptionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary.withValues(alpha: 0.10)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+          borderRadius: BorderRadius.circular(PawlyRadius.lg),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary.withValues(alpha: 0.72)
+                : colorScheme.outlineVariant.withValues(alpha: 0.64),
+          ),
+        ),
+        padding: const EdgeInsets.all(PawlySpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xxxs),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderPickerRow extends StatelessWidget {
+  const _ReminderPickerRow({
+    required this.title,
+    required this.value,
+    required this.actionLabel,
+    required this.onTap,
+    this.secondaryActionLabel,
+    this.onSecondaryTap,
+  });
+
+  final String title;
+  final String value;
+  final String actionLabel;
+  final VoidCallback? onTap;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.sm),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: PawlySpacing.xxxs),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (secondaryActionLabel != null) ...[
+              TextButton(
+                onPressed: onSecondaryTap,
+                child: Text(secondaryActionLabel!),
+              ),
+              const SizedBox(width: PawlySpacing.xxs),
+            ],
+            TextButton(onPressed: onTap, child: Text(actionLabel)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderChoiceWrap<T> extends StatelessWidget {
+  const _ReminderChoiceWrap({
+    required this.values,
+    required this.selectedValue,
+    required this.labelBuilder,
+    required this.onChanged,
+  });
+
+  final List<T> values;
+  final T selectedValue;
+  final String Function(T value) labelBuilder;
+  final ValueChanged<T>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: PawlySpacing.xs,
+      runSpacing: PawlySpacing.xs,
+      children: values.map((value) {
+        return _ReminderChoicePill(
+          label: labelBuilder(value),
+          isSelected: value == selectedValue,
+          onTap: onChanged == null ? null : () => onChanged!(value),
+        );
+      }).toList(growable: false),
+    );
+  }
+}
+
+class _ReminderChoicePill extends StatelessWidget {
+  const _ReminderChoicePill({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final foregroundColor =
+        isSelected ? colorScheme.onPrimary : colorScheme.onSurface;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+          borderRadius: BorderRadius.circular(PawlyRadius.pill),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.84),
+            width: isSelected ? 1.4 : 1,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: PawlySpacing.md,
+          vertical: PawlySpacing.sm,
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: foregroundColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
 }
 
 const String _noRecurrenceValue = '__none__';
+
+String _recurrenceLabel(String value) {
+  return switch (value) {
+    _noRecurrenceValue => 'Без повтора',
+    'DAILY' => 'Каждый день',
+    'WEEKLY' => 'Неделя',
+    'MONTHLY' => 'Месяц',
+    'YEARLY' => 'Год',
+    _ => value,
+  };
+}
+
+String _remindOffsetLabel(int value) {
+  return switch (value) {
+    0 => 'В момент',
+    15 => '15 мин',
+    30 => '30 мин',
+    60 => '1 час',
+    1440 => '1 день',
+    _ => '$value мин',
+  };
+}
 
 String _formatDateTime(DateTime value) {
   final local = value.toLocal();

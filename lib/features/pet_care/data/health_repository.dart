@@ -35,6 +35,7 @@ class HealthRepository {
         mimeType: input.mimeType,
         originalFilename: input.originalFilename,
         expectedSizeBytes: input.expectedSizeBytes,
+        entityType: input.entityType,
       ),
     );
   }
@@ -62,8 +63,21 @@ class HealthRepository {
       petId,
       cursor: query.cursor,
       limit: query.limit,
+      query: query.searchQuery,
       entityType: query.entityType,
       fileType: query.fileType,
+    );
+  }
+
+  Future<PetDocument> updateDocument(
+    String petId,
+    String documentId, {
+    required String fileName,
+  }) {
+    return _healthApiClient.updateDocument(
+      petId,
+      documentId,
+      UpdatePetDocumentPayload(fileName: fileName),
     );
   }
 
@@ -291,6 +305,7 @@ class HealthRepository {
       petId,
       cursor: query.cursor,
       limit: query.limit,
+      query: query.searchQuery,
       status: query.status,
       bucket: query.bucket,
       dateFrom: query.dateFrom,
@@ -365,6 +380,7 @@ class HealthRepository {
       petId,
       cursor: query.cursor,
       limit: query.limit,
+      query: query.searchQuery,
       status: query.status,
       bucket: query.bucket,
       dateFrom: query.dateFrom,
@@ -419,9 +435,10 @@ class HealthRepository {
       petId,
       cursor: query.cursor,
       limit: query.limit,
+      query: query.searchQuery,
       status: query.status,
       bucket: query.bucket,
-      procedureType: query.procedureType,
+      procedureTypeId: query.procedureTypeId,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
       sort: query.sort,
@@ -474,9 +491,10 @@ class HealthRepository {
       petId,
       cursor: query.cursor,
       limit: query.limit,
+      query: query.searchQuery,
       status: query.status,
       bucket: query.bucket,
-      recordType: query.recordType,
+      recordTypeId: query.recordTypeId,
       sort: query.sort,
     );
   }
@@ -530,6 +548,16 @@ class HealthRepository {
     required String date,
   }) {
     return _healthApiClient.getScheduleDay(date: date);
+  }
+
+  Future<CalendarRangeResponse> getHealthCalendar({
+    required String dateFrom,
+    required String dateTo,
+  }) {
+    return _healthApiClient.getHealthCalendar(
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+    );
   }
 
   Future<ScheduledDayResponse> getPetScheduleDay(
@@ -676,6 +704,7 @@ class HealthRepository {
             ),
           )
           .toList(growable: false),
+      attachments: _toAttachmentPayloads(input.attachments),
       attachmentFileIds: input.attachmentFileIds,
       rowVersion: input.rowVersion,
     );
@@ -707,12 +736,14 @@ class HealthRepository {
     return UpsertVetVisitPayload(
       status: input.status,
       visitType: input.visitType,
+      title: _emptyToNull(input.title),
       scheduledAt: _parseDateTime(input.scheduledAtIso),
       completedAt: _parseDateTime(input.completedAtIso),
       reasonText: input.reasonText,
       resultText: input.resultText,
       clinicName: input.clinicName,
       vetName: input.vetName,
+      attachments: _toAttachmentPayloads(input.attachments),
       attachmentFileIds: input.attachmentFileIds,
       reminder: _toHealthEntityReminderPayload(input.reminder),
       rowVersion: input.rowVersion,
@@ -726,6 +757,7 @@ class HealthRepository {
       status: input.status,
       vaccineName: input.vaccineName,
       catalogMedicationId: input.catalogMedicationId,
+      targets: _toHealthDictionaryRefPayloads(input.targets),
       scheduledAt: _parseDateTime(input.scheduledAtIso),
       administeredAt: _parseDateTime(input.administeredAtIso),
       nextDueAt: _parseDateTime(input.nextDueAtIso),
@@ -733,6 +765,7 @@ class HealthRepository {
       clinicName: input.clinicName,
       vetName: input.vetName,
       notes: input.notes,
+      attachments: _toAttachmentPayloads(input.attachments),
       attachmentFileIds: input.attachmentFileIds,
       reminder: _toHealthEntityReminderPayload(input.reminder),
       rowVersion: input.rowVersion,
@@ -744,7 +777,8 @@ class HealthRepository {
   ) {
     return UpsertProcedurePayload(
       status: input.status,
-      procedureType: input.procedureType,
+      procedureTypeId: input.procedureTypeId,
+      procedureTypeName: _emptyToNull(input.procedureTypeName),
       title: input.title,
       description: input.description,
       catalogMedicationId: input.catalogMedicationId,
@@ -754,6 +788,7 @@ class HealthRepository {
       nextDueAt: _parseDateTime(input.nextDueAtIso),
       vetVisitId: input.vetVisitId,
       notes: input.notes,
+      attachments: _toAttachmentPayloads(input.attachments),
       attachmentFileIds: input.attachmentFileIds,
       reminder: _toHealthEntityReminderPayload(input.reminder),
       rowVersion: input.rowVersion,
@@ -764,15 +799,49 @@ class HealthRepository {
     UpsertMedicalRecordInput input,
   ) {
     return UpsertMedicalRecordPayload(
-      recordType: input.recordType,
+      recordTypeId: input.recordTypeId,
+      recordTypeName: _emptyToNull(input.recordTypeName),
       status: input.status,
       title: input.title,
       description: input.description,
       startedAt: _parseDateTime(input.startedAtIso),
       resolvedAt: _parseDateTime(input.resolvedAtIso),
+      attachments: _toAttachmentPayloads(input.attachments),
       attachmentFileIds: input.attachmentFileIds,
       rowVersion: input.rowVersion,
     );
+  }
+
+  List<AttachmentPayload>? _toAttachmentPayloads(
+    List<AttachmentInput>? attachments,
+  ) {
+    return attachments
+        ?.map(
+          (item) => AttachmentPayload(
+            fileId: item.fileId,
+            fileName: _emptyToNull(item.fileName),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  List<HealthDictionaryRefPayload>? _toHealthDictionaryRefPayloads(
+    List<HealthDictionaryRefInput>? refs,
+  ) {
+    return refs
+        ?.map(
+          (item) => HealthDictionaryRefPayload(
+            id: _emptyToNull(item.id),
+            name: _emptyToNull(item.name),
+          ),
+        )
+        .where((item) => item.id != null || item.name != null)
+        .toList(growable: false);
+  }
+
+  String? _emptyToNull(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   LogTypeMetricRequirementPayload _toLogTypeMetricRequirementPayload(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
@@ -23,13 +22,11 @@ class PetsPage extends ConsumerWidget {
     final petsStateAsync = ref.watch(petsControllerProvider);
     final activePetId = activePetAsync.asData?.value;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Питомцы'),
-        actions: const <Widget>[
-          ChatAppBarAction(),
-        ],
-      ),
+    return PawlyScreenScaffold(
+      title: 'Питомцы',
+      actions: const <Widget>[
+        ChatAppBarAction(),
+      ],
       floatingActionButton: activePetId == null || activePetId.isEmpty
           ? _PetsActionsButton(
               onCreatePet: () => context.push(AppRoutes.petCreate),
@@ -44,7 +41,9 @@ class PetsPage extends ConsumerWidget {
                 return _PetsListView(state: petsState);
               }
 
-              return const _ActivePetView();
+              return _ActivePetView(
+                entry: _petListEntryById(petsState.items, activePetId),
+              );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => _PetsErrorView(
@@ -71,108 +70,87 @@ class _PetsListView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final items = state.filteredItems;
+    final bucketCount = state.items.where((item) {
+      return switch (state.statusBucket) {
+        PetsStatusBucket.active => item.pet.status != 'ARCHIVED',
+        PetsStatusBucket.archive => item.pet.status == 'ARCHIVED',
+      };
+    }).length;
 
-    return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
-      children: <Widget>[
-        TextField(
-          onChanged: (value) {
-            ref.read(petsControllerProvider.notifier).setSearchQuery(value);
-          },
-          decoration: const InputDecoration(
-            hintText: 'Поиск питомца по имени',
-            prefixIcon: Icon(Icons.search_rounded),
+    return ColoredBox(
+      color: pawlyGroupedBackground(context),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.md,
+          PawlySpacing.md,
+          112,
+        ),
+        children: <Widget>[
+          _PetsSearchField(
+            initialValue: state.searchQuery,
+            onChanged: (value) {
+              ref.read(petsControllerProvider.notifier).setSearchQuery(value);
+            },
           ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        Text(
-          state.statusBucket == PetsStatusBucket.archive
-              ? 'Архив питомцев'
-              : 'Доступные питомцы',
-          style: theme.textTheme.titleLarge,
-        ),
-        const SizedBox(height: PawlySpacing.sm),
-        Wrap(
-          spacing: PawlySpacing.xs,
-          runSpacing: PawlySpacing.xs,
-          children: <Widget>[
-            ChoiceChip(
-              label: const Text('Активные'),
-              selected: state.statusBucket == PetsStatusBucket.active,
-              onSelected: (_) {
-                ref
-                    .read(petsControllerProvider.notifier)
-                    .setStatusBucket(PetsStatusBucket.active);
-              },
-            ),
-            ChoiceChip(
-              label: const Text('Архив'),
-              selected: state.statusBucket == PetsStatusBucket.archive,
-              onSelected: (_) {
-                ref
-                    .read(petsControllerProvider.notifier)
-                    .setStatusBucket(PetsStatusBucket.archive);
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.sm),
-        Wrap(
-          spacing: PawlySpacing.xs,
-          runSpacing: PawlySpacing.xs,
-          children: <Widget>[
-            ChoiceChip(
-              label: const Text('Все'),
-              selected: state.ownershipFilter == PetsOwnershipFilter.all,
-              onSelected: (_) {
-                ref
-                    .read(petsControllerProvider.notifier)
-                    .setOwnershipFilter(PetsOwnershipFilter.all);
-              },
-            ),
-            ChoiceChip(
-              label: const Text('Мои'),
-              selected: state.ownershipFilter == PetsOwnershipFilter.owned,
-              onSelected: (_) {
-                ref
-                    .read(petsControllerProvider.notifier)
-                    .setOwnershipFilter(PetsOwnershipFilter.owned);
-              },
-            ),
-            ChoiceChip(
-              label: const Text('Не мои'),
-              selected: state.ownershipFilter == PetsOwnershipFilter.shared,
-              onSelected: (_) {
-                ref
-                    .read(petsControllerProvider.notifier)
-                    .setOwnershipFilter(PetsOwnershipFilter.shared);
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.lg),
-        if (items.isEmpty)
-          PawlyCard(
-            title: Text(
-              state.statusBucket == PetsStatusBucket.archive
-                  ? 'Архив пуст'
-                  : 'Питомцев пока нет',
-              style: theme.textTheme.titleLarge,
-            ),
-            child: Text(
-              state.statusBucket == PetsStatusBucket.archive
-                  ? 'Заархивированные питомцы будут показаны здесь. Их можно вернуть в активные.'
-                  : 'Когда появятся питомцы, здесь будет список карточек. Добавить питомца можно через кнопку внизу.',
-              style: theme.textTheme.bodyMedium,
-            ),
-          )
-        else
-          ...items.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-              child: _PetListCard(
+          const SizedBox(height: PawlySpacing.md),
+          _PetsSegmentedControl<PetsStatusBucket>(
+            value: state.statusBucket,
+            options: const <_PetsSegmentOption<PetsStatusBucket>>[
+              _PetsSegmentOption<PetsStatusBucket>(
+                value: PetsStatusBucket.active,
+                label: 'Активные',
+              ),
+              _PetsSegmentOption<PetsStatusBucket>(
+                value: PetsStatusBucket.archive,
+                label: 'Архив',
+              ),
+            ],
+            onChanged: (value) {
+              ref.read(petsControllerProvider.notifier).setStatusBucket(value);
+            },
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          _PetsSegmentedControl<PetsOwnershipFilter>(
+            value: state.ownershipFilter,
+            compact: true,
+            options: const <_PetsSegmentOption<PetsOwnershipFilter>>[
+              _PetsSegmentOption<PetsOwnershipFilter>(
+                value: PetsOwnershipFilter.all,
+                label: 'Все',
+              ),
+              _PetsSegmentOption<PetsOwnershipFilter>(
+                value: PetsOwnershipFilter.owned,
+                label: 'Мои',
+              ),
+              _PetsSegmentOption<PetsOwnershipFilter>(
+                value: PetsOwnershipFilter.shared,
+                label: 'Не мои',
+              ),
+            ],
+            onChanged: (value) {
+              ref
+                  .read(petsControllerProvider.notifier)
+                  .setOwnershipFilter(value);
+            },
+          ),
+          const SizedBox(height: PawlySpacing.md),
+          _PetsSectionHeader(
+            title: state.statusBucket == PetsStatusBucket.archive
+                ? 'Архив'
+                : 'Питомцы',
+            count: bucketCount == items.length
+                ? _petsCountLabel(items.length)
+                : '${_petsCountLabel(items.length)} из $bucketCount',
+          ),
+          const SizedBox(height: PawlySpacing.xs),
+          if (items.isEmpty)
+            _PetsEmptyState(statusBucket: state.statusBucket)
+          else
+            _PetsCardsLayout(
+              items: items,
+              itemBuilder: (item) => _PetListCard(
                 entry: item,
                 onTap: state.statusBucket == PetsStatusBucket.archive
                     ? null
@@ -185,10 +163,292 @@ class _PetsListView extends ConsumerWidget {
                     ? () => _restorePetFromArchive(context, ref, item.pet)
                     : null,
               ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PetsSectionHeader extends StatelessWidget {
+  const _PetsSectionHeader({
+    required this.title,
+    required this.count,
+  });
+
+  final String title;
+  final String count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: PawlySpacing.xs),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            count,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PetsSearchField extends StatelessWidget {
+  const _PetsSearchField({
+    required this.initialValue,
+    required this.onChanged,
+  });
+
+  final String initialValue;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+      ),
+      child: TextFormField(
+        initialValue: initialValue,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: 'Поиск по имени',
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: PawlySpacing.md,
+            vertical: PawlySpacing.md,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PetsSegmentOption<T> {
+  const _PetsSegmentOption({
+    required this.value,
+    required this.label,
+  });
+
+  final T value;
+  final String label;
+}
+
+class _PetsSegmentedControl<T> extends StatelessWidget {
+  const _PetsSegmentedControl({
+    required this.options,
+    required this.value,
+    required this.onChanged,
+    this.compact = false,
+  });
+
+  final List<_PetsSegmentOption<T>> options;
+  final T value;
+  final ValueChanged<T> onChanged;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(PawlySpacing.xxs),
+      decoration: BoxDecoration(
+        color: colorScheme.onSurface.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+      ),
+      child: Row(
+        children: options.map((option) {
+          final selected = option.value == value;
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(PawlySpacing.xxxs),
+              child: _PetsSegmentButton(
+                label: option.label,
+                selected: selected,
+                compact: compact,
+                onTap: () => onChanged(option.value),
+              ),
+            ),
+          );
+        }).toList(growable: false),
+      ),
+    );
+  }
+}
+
+class _PetsSegmentButton extends StatelessWidget {
+  const _PetsSegmentButton({
+    required this.label,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final foreground =
+        selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.md),
+        child: AnimatedContainer(
+          duration: PawlyMotion.quick,
+          height: compact ? 34 : 38,
+          padding: const EdgeInsets.symmetric(horizontal: PawlySpacing.xs),
+          decoration: BoxDecoration(
+            color: selected ? colorScheme.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(PawlyRadius.md),
+            boxShadow: selected
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: colorScheme.shadow.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: foreground,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PetsEmptyState extends StatelessWidget {
+  const _PetsEmptyState({required this.statusBucket});
+
+  final PetsStatusBucket statusBucket;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isArchive = statusBucket == PetsStatusBucket.archive;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.lg,
+        PawlySpacing.xl,
+        PawlySpacing.lg,
+        PawlySpacing.xl,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+      ),
+      child: Column(
+        children: <Widget>[
+          Icon(
+            isArchive ? Icons.archive_outlined : Icons.pets_rounded,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            size: 34,
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          Text(
+            isArchive ? 'Архив пуст' : 'Питомцев пока нет',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: PawlySpacing.xs),
+          Text(
+            isArchive
+                ? 'Заархивированные карточки появятся здесь. Их можно вернуть в активные.'
+                : 'Добавьте питомца или примите приглашение по коду, чтобы увидеть карточки.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PetsCardsLayout extends StatelessWidget {
+  const _PetsCardsLayout({
+    required this.items,
+    required this.itemBuilder,
+  });
+
+  final List<PetListEntry> items;
+  final Widget Function(PetListEntry item) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useGrid = constraints.maxWidth >= 680;
+        final spacing = useGrid ? PawlySpacing.md : PawlySpacing.md;
+        final cardWidth = useGrid
+            ? (constraints.maxWidth - spacing) / 2
+            : constraints.maxWidth;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: items.map((item) {
+            return SizedBox(
+              width: cardWidth,
+              child: itemBuilder(item),
             );
-          }),
-        const SizedBox(height: 96),
-      ],
+          }).toList(growable: false),
+        );
+      },
     );
   }
 }
@@ -208,6 +468,7 @@ class _PetListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final restore = onRestore;
 
     return Material(
       color: Colors.transparent,
@@ -217,12 +478,23 @@ class _PetListCard extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(PawlyRadius.lg),
-            border: Border.all(color: colorScheme.outline),
-            boxShadow: PawlyElevation.soft(colorScheme.shadow),
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.82),
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(PawlySpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: PawlySpacing.md,
+              vertical: PawlySpacing.md,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
@@ -242,7 +514,8 @@ class _PetListCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
                         ),
                       ),
                       const SizedBox(height: PawlySpacing.xxs),
@@ -252,16 +525,11 @@ class _PetListCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w300,
+                          height: 1.25,
                         ),
                       ),
-                      const SizedBox(height: PawlySpacing.xs),
-                      Text(
-                        'Роль: ${_localizedPetRoleTitle(entry.roleTitle)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
+                      const SizedBox(height: PawlySpacing.xxs),
+                      _PetRoleCaption(entry: entry),
                       if (entry.pet.status == 'ARCHIVED') ...<Widget>[
                         const SizedBox(height: PawlySpacing.xs),
                         Wrap(
@@ -286,21 +554,80 @@ class _PetListCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: PawlySpacing.sm),
-                if (onRestore != null)
-                  IconButton.outlined(
-                    onPressed: onRestore,
+                if (restore != null)
+                  _PetRoundActionButton(
+                    icon: Icons.unarchive_rounded,
                     tooltip: 'Вернуть в активные',
-                    icon: const Icon(Icons.unarchive_rounded),
+                    onPressed: restore,
                   )
                 else
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: colorScheme.onSurfaceVariant,
-                    size: 28,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
+                    size: 26,
                   ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PetRoleCaption extends StatelessWidget {
+  const _PetRoleCaption({required this.entry});
+
+  final PetListEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Text(
+      _petRoleCaption(entry),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: colorScheme.onSurfaceVariant,
+        height: 1.2,
+      ),
+    );
+  }
+}
+
+class _PetRoundActionButton extends StatelessWidget {
+  const _PetRoundActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: IconButton(
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          style: IconButton.styleFrom(
+            backgroundColor: colorScheme.onSurface.withValues(alpha: 0.06),
+            foregroundColor: colorScheme.onSurfaceVariant,
+            side: BorderSide(
+              color: colorScheme.outlineVariant,
+            ),
+          ),
+          icon: Icon(icon, size: 20),
         ),
       ),
     );
@@ -326,12 +653,22 @@ class _PetAvatar extends StatelessWidget {
         hasPhoto ? _normalizePetStorageUrl(photoUrl!) : null;
 
     return Container(
-      width: 110,
-      height: 110,
+      width: 78,
+      height: 78,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: colorScheme.onSurface, width: 2.2),
-        color: colorScheme.primaryContainer,
+        border: Border.all(
+          color: colorScheme.surface,
+          width: 2,
+        ),
+        color: colorScheme.onSurface.withValues(alpha: 0.06),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: ClipOval(
         child: hasPhoto
@@ -342,13 +679,14 @@ class _PetAvatar extends StatelessWidget {
                   entityId: photoFileId ?? petId,
                   imageUrl: resolvedPhotoUrl,
                 ),
-                targetLogicalSize: 110,
+                targetLogicalSize: 78,
                 fit: BoxFit.cover,
                 errorWidget: (_) => _PetAvatarFallback(
                   colorScheme: colorScheme,
+                  iconSize: 34,
                 ),
               )
-            : _PetAvatarFallback(colorScheme: colorScheme),
+            : _PetAvatarFallback(colorScheme: colorScheme, iconSize: 34),
       ),
     );
   }
@@ -357,16 +695,18 @@ class _PetAvatar extends StatelessWidget {
 class _PetAvatarFallback extends StatelessWidget {
   const _PetAvatarFallback({
     required this.colorScheme,
+    this.iconSize = 46,
   });
 
   final ColorScheme colorScheme;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Icon(
         Icons.pets_rounded,
-        size: 46,
+        size: iconSize,
         color: colorScheme.primary,
       ),
     );
@@ -379,18 +719,21 @@ class _PetFeatureCard extends StatelessWidget {
     required this.icon,
     this.tint,
     this.onTap,
+    this.statusLabel,
   });
 
   final String title;
   final IconData icon;
   final Color? tint;
   final VoidCallback? onTap;
+  final String? statusLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final accent = tint ?? colorScheme.primary;
+    final isEnabled = onTap != null;
 
     return Material(
       color: Colors.transparent,
@@ -418,13 +761,25 @@ class _PetFeatureCard extends StatelessWidget {
                       color: accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(PawlyRadius.md),
                     ),
-                    child: Icon(icon, size: 24, color: accent),
+                    child: Icon(
+                      icon,
+                      size: 24,
+                      color: isEnabled
+                          ? accent
+                          : colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.54,
+                            ),
+                    ),
                   ),
                   const Spacer(),
                   Icon(
-                    Icons.arrow_outward_rounded,
+                    isEnabled
+                        ? Icons.arrow_outward_rounded
+                        : Icons.lock_outline_rounded,
                     size: 20,
-                    color: colorScheme.onSurfaceVariant,
+                    color: colorScheme.onSurfaceVariant.withValues(
+                      alpha: isEnabled ? 1 : 0.54,
+                    ),
                   ),
                 ],
               ),
@@ -435,8 +790,23 @@ class _PetFeatureCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
+                  color: isEnabled
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (statusLabel != null && statusLabel!.isNotEmpty) ...<Widget>[
+                const SizedBox(height: PawlySpacing.xxxs),
+                Text(
+                  statusLabel!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -465,6 +835,7 @@ class _PetWideFeatureCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final accent = tint ?? colorScheme.primary;
+    final isEnabled = onTap != null;
 
     return Material(
       color: Colors.transparent,
@@ -489,7 +860,13 @@ class _PetWideFeatureCard extends StatelessWidget {
                   color: accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(PawlyRadius.md),
                 ),
-                child: Icon(icon, size: 26, color: accent),
+                child: Icon(
+                  icon,
+                  size: 26,
+                  color: isEnabled
+                      ? accent
+                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.54),
+                ),
               ),
               const SizedBox(width: PawlySpacing.md),
               Expanded(
@@ -502,6 +879,9 @@ class _PetWideFeatureCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: isEnabled
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: PawlySpacing.xxxs),
@@ -518,9 +898,13 @@ class _PetWideFeatureCard extends StatelessWidget {
               ),
               const SizedBox(width: PawlySpacing.sm),
               Icon(
-                Icons.arrow_outward_rounded,
+                isEnabled
+                    ? Icons.arrow_outward_rounded
+                    : Icons.lock_outline_rounded,
                 size: 20,
-                color: colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant.withValues(
+                  alpha: isEnabled ? 1 : 0.54,
+                ),
               ),
             ],
           ),
@@ -531,7 +915,9 @@ class _PetWideFeatureCard extends StatelessWidget {
 }
 
 class _ActivePetView extends ConsumerWidget {
-  const _ActivePetView();
+  const _ActivePetView({required this.entry});
+
+  final PetListEntry? entry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -548,9 +934,12 @@ class _ActivePetView extends ConsumerWidget {
         }
 
         final pet = details.pet;
+        final access = entry?.accessPolicy ??
+            const PetAccessPolicy(permissions: <String, bool>{});
         final ageLabel = _petAgeLabel(pet.birthDate);
-        final documentsCountAsync =
-            ref.watch(petDocumentsSummaryProvider(pet.id));
+        final documentsCountAsync = access.documentsRead
+            ? ref.watch(petDocumentsSummaryProvider(pet.id))
+            : const AsyncValue<String>.data('Нет доступа');
 
         return ListView(
           padding: const EdgeInsets.all(PawlySpacing.lg),
@@ -560,19 +949,26 @@ class _ActivePetView extends ConsumerWidget {
               speciesName: details.speciesName,
               ageLabel: ageLabel,
               isUploadingPhoto: details.isUploadingPhoto,
-              onPhotoTap: details.isUploadingPhoto
+              onPhotoTap: details.isUploadingPhoto || !access.petWrite
                   ? null
-                  : () => _showPhotoActionsSheet(context, ref),
-              onEdit: () => context.pushNamed(
-                'petEdit',
-                pathParameters: {'petId': pet.id},
-              ),
+                  : () => _showPhotoActionsSheet(context, ref, pet),
+              onEdit: access.petWrite
+                  ? () => context.pushNamed(
+                        'petEdit',
+                        pathParameters: {'petId': pet.id},
+                      )
+                  : null,
               onMore: () => _showActivePetActionsSheet(
                 context,
                 ref,
                 petName: pet.name,
+                canArchive: access.petWrite,
               ),
             ),
+            if (!access.petWrite) ...<Widget>[
+              const SizedBox(height: PawlySpacing.md),
+              const _ReadOnlyNotice(),
+            ],
             const SizedBox(height: PawlySpacing.xl),
             GridView.count(
               crossAxisCount: 2,
@@ -586,37 +982,49 @@ class _ActivePetView extends ConsumerWidget {
                   title: 'Записи',
                   icon: Icons.edit_note_rounded,
                   tint: Theme.of(context).colorScheme.primary,
-                  onTap: () => context.pushNamed(
-                    'petLogs',
-                    pathParameters: <String, String>{'petId': pet.id},
-                  ),
+                  statusLabel: access.logRead ? null : 'Нет доступа',
+                  onTap: access.logRead
+                      ? () => context.pushNamed(
+                            'petLogs',
+                            pathParameters: <String, String>{'petId': pet.id},
+                          )
+                      : null,
                 ),
                 _PetFeatureCard(
                   title: 'Здоровье',
                   icon: Icons.health_and_safety_rounded,
                   tint: const Color(0xFF2C9C8C),
-                  onTap: () => context.pushNamed(
-                    'petHealthHome',
-                    pathParameters: <String, String>{'petId': pet.id},
-                  ),
+                  statusLabel: access.healthRead ? null : 'Нет доступа',
+                  onTap: access.healthRead
+                      ? () => context.pushNamed(
+                            'petHealthHome',
+                            pathParameters: <String, String>{'petId': pet.id},
+                          )
+                      : null,
                 ),
                 _PetFeatureCard(
                   title: 'Совместный доступ',
                   icon: Icons.group_rounded,
                   tint: const Color(0xFFB67A2D),
-                  onTap: () => context.pushNamed(
-                    'aclAccess',
-                    pathParameters: <String, String>{'petId': pet.id},
-                  ),
+                  statusLabel: access.membersRead ? null : 'Нет доступа',
+                  onTap: access.membersRead
+                      ? () => context.pushNamed(
+                            'aclAccess',
+                            pathParameters: <String, String>{'petId': pet.id},
+                          )
+                      : null,
                 ),
                 _PetFeatureCard(
-                  title: 'Аналитика',
+                  title: 'Динамика',
                   icon: Icons.bar_chart_rounded,
                   tint: const Color(0xFF5972D9),
-                  onTap: () => context.pushNamed(
-                    'petAnalytics',
-                    pathParameters: <String, String>{'petId': pet.id},
-                  ),
+                  statusLabel: access.logRead ? null : 'Нет доступа',
+                  onTap: access.logRead
+                      ? () => context.pushNamed(
+                            'petAnalytics',
+                            pathParameters: <String, String>{'petId': pet.id},
+                          )
+                      : null,
                 ),
               ],
             ),
@@ -626,24 +1034,30 @@ class _ActivePetView extends ConsumerWidget {
               subtitle: '',
               icon: Icons.notifications_active_rounded,
               tint: const Color(0xFFEAA05D),
-              onTap: () => context.pushNamed(
-                'petReminders',
-                pathParameters: <String, String>{'petId': pet.id},
-              ),
+              onTap: access.remindersRead
+                  ? () => context.pushNamed(
+                        'petReminders',
+                        pathParameters: <String, String>{'petId': pet.id},
+                      )
+                  : null,
             ),
             const SizedBox(height: PawlySpacing.md),
             _PetWideFeatureCard(
               title: 'Документы',
               subtitle: documentsCountAsync.maybeWhen(
                 data: (value) => value,
-                orElse: () => 'Все файлы питомца в одном месте',
+                orElse: () => access.documentsRead
+                    ? 'Все файлы питомца в одном месте'
+                    : 'Нет доступа',
               ),
               icon: Icons.folder_copy_rounded,
               tint: const Color(0xFF6D5BD0),
-              onTap: () => context.pushNamed(
-                'petDocuments',
-                pathParameters: <String, String>{'petId': pet.id},
-              ),
+              onTap: access.documentsRead
+                  ? () => context.pushNamed(
+                        'petDocuments',
+                        pathParameters: <String, String>{'petId': pet.id},
+                      )
+                  : null,
             ),
             const SizedBox(height: PawlySpacing.xl),
           ],
@@ -666,7 +1080,7 @@ class _ActivePetHeroCard extends StatelessWidget {
     required this.ageLabel,
     required this.isUploadingPhoto,
     this.onPhotoTap,
-    required this.onEdit,
+    this.onEdit,
     required this.onMore,
   });
 
@@ -675,7 +1089,7 @@ class _ActivePetHeroCard extends StatelessWidget {
   final String ageLabel;
   final bool isUploadingPhoto;
   final VoidCallback? onPhotoTap;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
   final VoidCallback onMore;
 
   @override
@@ -690,13 +1104,6 @@ class _ActivePetHeroCard extends StatelessWidget {
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.72),
         ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.045),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(PawlySpacing.md),
@@ -834,12 +1241,12 @@ class _HeroPetAvatar extends StatelessWidget {
 
 class _HeroCompactActionButton extends StatelessWidget {
   const _HeroCompactActionButton({
-    required this.onPressed,
+    this.onPressed,
     required this.icon,
     required this.tooltip,
   });
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData icon;
   final String tooltip;
 
@@ -870,6 +1277,49 @@ class _HeroCompactActionButton extends StatelessWidget {
   }
 }
 
+class _ReadOnlyNotice extends StatelessWidget {
+  const _ReadOnlyNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: PawlySpacing.md,
+        vertical: PawlySpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 18,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: PawlySpacing.sm),
+          Expanded(
+            child: Text(
+              'Редактирование недоступно',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _normalizePetStorageUrl(String url) {
   final uri = Uri.tryParse(url);
   final apiUri = Uri.tryParse(ApiConstants.baseUrl);
@@ -878,6 +1328,15 @@ String _normalizePetStorageUrl(String url) {
   }
 
   return uri.replace(host: apiUri.host).toString();
+}
+
+PetListEntry? _petListEntryById(List<PetListEntry> items, String petId) {
+  for (final item in items) {
+    if (item.id == petId) {
+      return item;
+    }
+  }
+  return null;
 }
 
 Future<void> _archiveActivePet(
@@ -937,6 +1396,7 @@ Future<void> _showActivePetActionsSheet(
   BuildContext context,
   WidgetRef ref, {
   required String petName,
+  required bool canArchive,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -968,10 +1428,15 @@ Future<void> _showActivePetActionsSheet(
                 iconColor: Theme.of(context).colorScheme.error,
                 textColor: Theme.of(context).colorScheme.error,
                 title: const Text('Архивировать питомца'),
-                onTap: () async {
-                  Navigator.of(sheetContext).pop();
-                  await _archiveActivePet(context, ref, petName);
-                },
+                enabled: canArchive,
+                subtitle:
+                    canArchive ? null : const Text('Редактирование недоступно'),
+                onTap: canArchive
+                    ? () async {
+                        Navigator.of(sheetContext).pop();
+                        await _archiveActivePet(context, ref, petName);
+                      }
+                    : null,
               ),
             ],
           ),
@@ -1071,6 +1536,22 @@ String _formatShortDate(DateTime value) {
   return '$day.$month.$year';
 }
 
+String _petsCountLabel(int value) {
+  final mod10 = value % 10;
+  final mod100 = value % 100;
+  final word = mod10 == 1 && mod100 != 11
+      ? 'карточка'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+          ? 'карточки'
+          : 'карточек';
+  return '$value $word';
+}
+
+String _petRoleCaption(PetListEntry entry) {
+  final roleTitle = _localizedPetRoleTitle(entry.roleTitle);
+  return 'Роль: $roleTitle';
+}
+
 String _localizedPetRoleTitle(String rawTitle) {
   final normalized = rawTitle.trim();
   final upper = normalized.toUpperCase();
@@ -1086,7 +1567,15 @@ String _localizedPetRoleTitle(String rawTitle) {
   };
 }
 
-Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {
+Future<void> _showPhotoActionsSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Pet pet,
+) async {
+  final hasPhoto = (pet.profilePhotoFileId ?? '').isNotEmpty ||
+      (pet.profilePhotoDownloadUrl ?? '').isNotEmpty;
+  final pageContext = context;
+
   await showModalBottomSheet<void>(
     context: context,
     shape: const RoundedRectangleBorder(
@@ -1109,7 +1598,7 @@ Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {
                 title: const Text('Выбрать из галереи'),
                 onTap: () async {
                   Navigator.of(context).pop();
-                  await _uploadPetPhoto(context, ref, ImageSource.gallery);
+                  await _uploadPetPhotoFromGallery(pageContext, ref);
                 },
               ),
               ListTile(
@@ -1117,9 +1606,28 @@ Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {
                 title: const Text('Сделать фото'),
                 onTap: () async {
                   Navigator.of(context).pop();
-                  await _uploadPetPhoto(context, ref, ImageSource.camera);
+                  await _uploadPetPhotoFromCamera(pageContext, ref);
                 },
               ),
+              if (hasPhoto) ...<Widget>[
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  title: Text(
+                    'Удалить фото',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await _deletePetPhoto(pageContext, ref);
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -1128,15 +1636,14 @@ Future<void> _showPhotoActionsSheet(BuildContext context, WidgetRef ref) async {
   );
 }
 
-Future<void> _uploadPetPhoto(
+Future<void> _uploadPetPhotoFromGallery(
   BuildContext context,
   WidgetRef ref,
-  ImageSource source,
 ) async {
   try {
     await ref
         .read(activePetDetailsControllerProvider.notifier)
-        .uploadPhoto(source);
+        .uploadPhotoFromGallery();
   } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1145,6 +1652,50 @@ Future<void> _uploadPetPhoto(
             error is StateError
                 ? error.message.toString()
                 : 'Не удалось установить фото питомца.',
+          ),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> _uploadPetPhotoFromCamera(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  try {
+    await ref
+        .read(activePetDetailsControllerProvider.notifier)
+        .uploadPhotoFromCamera();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось установить фото питомца.',
+          ),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> _deletePetPhoto(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  try {
+    await ref.read(activePetDetailsControllerProvider.notifier).deletePhoto();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : 'Не удалось удалить фото питомца.',
           ),
         ),
       );
@@ -1163,9 +1714,10 @@ class _PetsActionsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
-      onPressed: () => _showPetsActionsSheet(context),
-      child: const Icon(Icons.add_rounded),
+    return PawlyAddActionButton(
+      label: 'Добавить',
+      tooltip: 'Добавить питомца',
+      onTap: () => _showPetsActionsSheet(context),
     );
   }
 

@@ -65,17 +65,16 @@ class AclAccessController extends AsyncNotifier<AclAccessScreenState> {
     return member;
   }
 
-  Future<AclMember> removeMember(String memberId) async {
-    final member = await ref.read(aclRepositoryProvider).removeMember(
+  Future<void> removeMember(String memberId) async {
+    await ref.read(aclRepositoryProvider).removeMember(
           petId: _petId,
           memberId: memberId,
         );
     await reload();
-    return member;
   }
 
-  Future<AclMember> leaveMyAccess() async {
-    return ref.read(aclRepositoryProvider).leaveMyAccess(
+  Future<void> leaveMyAccess() async {
+    await ref.read(aclRepositoryProvider).leaveMyAccess(
           petId: _petId,
         );
   }
@@ -144,9 +143,9 @@ class AclCreateInviteController extends AsyncNotifier<AclCreateInviteState> {
         selectedRoleId: roleId,
         customRoleTitle: '',
         selectedPresetId: preset?.id,
-        permissions: preset == null
+        permissions: role == null
             ? current.permissions
-            : AclPermissionDraft.fromPolicy(preset.policy),
+            : AclPermissionDraft.fromPolicy(role.policy),
       ),
     );
   }
@@ -328,10 +327,13 @@ class AclInvitePreviewController extends AsyncNotifier<AclInvitePreviewState> {
 
   @override
   Future<AclInvitePreviewState> build() async {
-    final invite = await ref.read(aclRepositoryProvider).previewInviteByToken(
+    final preview = await ref.read(aclRepositoryProvider).previewInviteByToken(
           _token,
         );
-    return AclInvitePreviewState.initial(invite: invite);
+    return AclInvitePreviewState.initial(
+      invite: preview.invite,
+      pet: preview.pet,
+    );
   }
 
   Future<void> reload() async {
@@ -361,10 +363,13 @@ class AclInvitePreviewController extends AsyncNotifier<AclInvitePreviewState> {
   }
 
   Future<AclInvitePreviewState> _load() async {
-    final invite = await ref.read(aclRepositoryProvider).previewInviteByToken(
+    final preview = await ref.read(aclRepositoryProvider).previewInviteByToken(
           _token,
         );
-    return AclInvitePreviewState.initial(invite: invite);
+    return AclInvitePreviewState.initial(
+      invite: preview.invite,
+      pet: preview.pet,
+    );
   }
 }
 

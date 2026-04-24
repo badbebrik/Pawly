@@ -1,3 +1,4 @@
+import 'common_models.dart';
 import 'json_map.dart';
 import 'json_parsers.dart';
 
@@ -22,23 +23,73 @@ class HealthPermissionSet {
   }
 }
 
+class HealthDictionaryItem {
+  const HealthDictionaryItem({
+    required this.id,
+    required this.kind,
+    this.petId,
+    this.code,
+    required this.name,
+    required this.isSystem,
+    required this.isArchived,
+  });
+
+  final String id;
+  final String kind;
+  final String? petId;
+  final String? code;
+  final String name;
+  final bool isSystem;
+  final bool isArchived;
+
+  factory HealthDictionaryItem.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return HealthDictionaryItem(
+      id: asString(json['id']),
+      kind: asString(json['kind']),
+      petId: asNullableString(json['pet_id']),
+      code: asNullableString(json['code']),
+      name: asString(json['name']),
+      isSystem: asBool(json['is_system']),
+      isArchived: asBool(json['is_archived']),
+    );
+  }
+}
+
+class HealthDictionaryRefPayload {
+  const HealthDictionaryRefPayload({
+    this.id,
+    this.name,
+  });
+
+  final String? id;
+  final String? name;
+
+  JsonMap toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+      }..removeWhere((_, dynamic value) => value == null);
+}
+
 class HealthBootstrapEnums {
   const HealthBootstrapEnums({
     required this.vetVisitStatuses,
     required this.vetVisitTypes,
     required this.vaccinationStatuses,
+    required this.vaccinationTargets,
     required this.procedureStatuses,
-    required this.procedureTypes,
-    required this.medicalRecordTypes,
+    required this.procedureTypeItems,
+    required this.medicalRecordTypeItems,
     required this.medicalRecordStatuses,
   });
 
   final List<String> vetVisitStatuses;
   final List<String> vetVisitTypes;
   final List<String> vaccinationStatuses;
+  final List<HealthDictionaryItem> vaccinationTargets;
   final List<String> procedureStatuses;
-  final List<String> procedureTypes;
-  final List<String> medicalRecordTypes;
+  final List<HealthDictionaryItem> procedureTypeItems;
+  final List<HealthDictionaryItem> medicalRecordTypeItems;
   final List<String> medicalRecordStatuses;
 
   factory HealthBootstrapEnums.fromJson(Object? data) {
@@ -47,9 +98,19 @@ class HealthBootstrapEnums {
       vetVisitStatuses: _decodeStringList(json['vet_visit_statuses']),
       vetVisitTypes: _decodeStringList(json['vet_visit_types']),
       vaccinationStatuses: _decodeStringList(json['vaccination_statuses']),
+      vaccinationTargets: _decodeList(
+        json['vaccination_targets'],
+        HealthDictionaryItem.fromJson,
+      ),
       procedureStatuses: _decodeStringList(json['procedure_statuses']),
-      procedureTypes: _decodeStringList(json['procedure_types']),
-      medicalRecordTypes: _decodeStringList(json['medical_record_types']),
+      procedureTypeItems: _decodeList(
+        json['procedure_type_items'],
+        HealthDictionaryItem.fromJson,
+      ),
+      medicalRecordTypeItems: _decodeList(
+        json['medical_record_type_items'],
+        HealthDictionaryItem.fromJson,
+      ),
       medicalRecordStatuses: _decodeStringList(json['medical_record_statuses']),
     );
   }
@@ -114,16 +175,19 @@ class InitHealthAttachmentUploadPayload {
     required this.mimeType,
     required this.originalFilename,
     required this.expectedSizeBytes,
+    required this.entityType,
   });
 
   final String mimeType;
   final String originalFilename;
   final int expectedSizeBytes;
+  final String entityType;
 
   JsonMap toJson() => <String, dynamic>{
         'mime_type': mimeType,
         'original_filename': originalFilename,
         'expected_size_bytes': expectedSizeBytes,
+        'entity_type': entityType,
       };
 }
 
@@ -183,6 +247,7 @@ class ConfirmHealthAttachmentUploadResponse {
 
 class PetDocument {
   const PetDocument({
+    this.id,
     required this.fileId,
     this.fileName,
     required this.fileType,
@@ -194,6 +259,7 @@ class PetDocument {
     required this.entityId,
   });
 
+  final String? id;
   final String fileId;
   final String? fileName;
   final String fileType;
@@ -206,7 +272,13 @@ class PetDocument {
 
   factory PetDocument.fromJson(Object? data) {
     final json = asJsonMap(data);
+    final envelope = json['document'];
+    if (envelope != null) {
+      return PetDocument.fromJson(envelope);
+    }
+
     return PetDocument(
+      id: asNullableString(json['id']) ?? asNullableString(json['document_id']),
       fileId: asString(json['file_id']),
       fileName: asNullableString(json['file_name']),
       fileType: asString(json['file_type']),
@@ -218,6 +290,21 @@ class PetDocument {
       entityId: asString(json['entity_id']),
     );
   }
+}
+
+class UpdatePetDocumentPayload {
+  const UpdatePetDocumentPayload({
+    required this.fileName,
+    this.rowVersion,
+  });
+
+  final String fileName;
+  final int? rowVersion;
+
+  JsonMap toJson() => <String, dynamic>{
+        'file_name': fileName,
+        'row_version': rowVersion,
+      }..removeWhere((_, dynamic value) => value == null);
 }
 
 class PetDocumentsListResponse {
@@ -407,7 +494,8 @@ class ScheduledItem {
       sourceType: asString(json['source_type']),
       sourceId: asNullableString(json['source_id']),
       title: asString(json['title']),
-      note: asNullableString(json['note']),
+      note: asNullableString(json['note']) ??
+          asNullableString(json['note_preview']),
       startsAt: asDateTime(json['starts_at']),
       pushEnabled: asBool(json['push_enabled']),
       remindOffsetMinutes: json['remind_offset_minutes'] == null
@@ -505,6 +593,39 @@ class ScheduledItemOccurrence {
 
   factory ScheduledItemOccurrence.fromJson(Object? data) {
     final json = asJsonMap(data);
+    final ruleJson = json['rule'];
+    if (ruleJson == null) {
+      final itemType = asString(json['item_type']);
+      final scheduledItemId = asNullableString(json['scheduled_item_id']) ??
+          asString(json['entity_id']);
+      final sourceId = asNullableString(json['visit_id']) ??
+          asNullableString(json['vaccination_id']) ??
+          asNullableString(json['procedure_id']) ??
+          asString(json['entity_id']);
+
+      return ScheduledItemOccurrence(
+        id: asNullableString(json['scheduled_occurrence_id']) ??
+            asString(json['entity_id']),
+        scheduledItemId: scheduledItemId,
+        petId: asString(json['pet_id']),
+        scheduledFor: asDateTime(json['scheduled_for']),
+        createdAt: asDateTime(json['created_at']),
+        rule: ScheduledItem(
+          id: scheduledItemId,
+          petId: asString(json['pet_id']),
+          sourceType: itemType,
+          sourceId: sourceId.isEmpty ? null : sourceId,
+          title: asString(json['title']),
+          note: asNullableString(json['subtitle']),
+          startsAt: asDateTime(json['scheduled_for']),
+          pushEnabled: false,
+          rowVersion: asInt(json['row_version']),
+          createdByUserId: asString(json['created_by_user_id']),
+          updatedByUserId: asString(json['updated_by_user_id']),
+        ),
+      );
+    }
+
     return ScheduledItemOccurrence(
       id: asString(json['id']),
       scheduledItemId: asString(json['scheduled_item_id']),
@@ -566,6 +687,58 @@ class ScheduledDayResponse {
     return ScheduledDayResponse(
       date: asString(json['date']),
       items: _decodeList(json['items'], ScheduledItemOccurrence.fromJson),
+    );
+  }
+}
+
+class CalendarDateMarker {
+  const CalendarDateMarker({
+    required this.date,
+    required this.plannedCount,
+    required this.completedCount,
+    required this.totalCount,
+  });
+
+  final String date;
+  final int plannedCount;
+  final int completedCount;
+  final int totalCount;
+
+  bool get hasEvents => totalCount > 0;
+
+  factory CalendarDateMarker.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return CalendarDateMarker(
+      date: asString(json['date']),
+      plannedCount: asInt(json['planned_count']),
+      completedCount: asInt(json['completed_count']),
+      totalCount: asInt(json['total_count']),
+    );
+  }
+}
+
+class CalendarRangeResponse {
+  const CalendarRangeResponse({
+    required this.dateFrom,
+    required this.dateTo,
+    required this.items,
+  });
+
+  final String dateFrom;
+  final String dateTo;
+  final List<CalendarDateMarker> items;
+
+  Map<String, CalendarDateMarker> get markersByDate =>
+      <String, CalendarDateMarker>{
+        for (final item in items) item.date: item,
+      };
+
+  factory CalendarRangeResponse.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return CalendarRangeResponse(
+      dateFrom: asString(json['date_from']),
+      dateTo: asString(json['date_to']),
+      items: _decodeList(json['items'], CalendarDateMarker.fromJson),
     );
   }
 }
@@ -663,6 +836,11 @@ class DeviceToken {
 
   factory DeviceToken.fromJson(Object? data) {
     final json = asJsonMap(data);
+    final item = json['item'];
+    if (item != null) {
+      return DeviceToken.fromJson(item);
+    }
+
     return DeviceToken(
       id: asString(json['id']),
       userId: asString(json['user_id']),
@@ -690,6 +868,11 @@ class PetPushSettings {
 
   factory PetPushSettings.fromJson(Object? data) {
     final json = asJsonMap(data);
+    final item = json['item'];
+    if (item != null) {
+      return PetPushSettings.fromJson(item);
+    }
+
     return PetPushSettings(
       petId: asString(json['pet_id']),
       scheduledItemsEnabled: asBool(json['scheduled_items_enabled']),
@@ -717,6 +900,7 @@ class VetVisitCard {
     required this.petId,
     required this.status,
     required this.visitType,
+    this.title,
     this.scheduledAt,
     this.completedAt,
     this.reasonText,
@@ -736,6 +920,7 @@ class VetVisitCard {
   final String petId;
   final String status;
   final String visitType;
+  final String? title;
   final DateTime? scheduledAt;
   final DateTime? completedAt;
   final String? reasonText;
@@ -757,6 +942,7 @@ class VetVisitCard {
       petId: asString(json['pet_id']),
       status: asString(json['status']),
       visitType: asString(json['visit_type']),
+      title: asNullableString(json['title']),
       scheduledAt: asDateTime(json['scheduled_at']),
       completedAt: asDateTime(json['completed_at']),
       reasonText: asNullableString(json['reason_text']),
@@ -780,6 +966,7 @@ class VetVisit {
     required this.petId,
     required this.status,
     required this.visitType,
+    this.title,
     this.scheduledAt,
     this.completedAt,
     this.reasonText,
@@ -801,6 +988,7 @@ class VetVisit {
   final String petId;
   final String status;
   final String visitType;
+  final String? title;
   final DateTime? scheduledAt;
   final DateTime? completedAt;
   final String? reasonText;
@@ -824,6 +1012,7 @@ class VetVisit {
       petId: asString(json['pet_id']),
       status: asString(json['status']),
       visitType: asString(json['visit_type']),
+      title: asNullableString(json['title']),
       scheduledAt: asDateTime(json['scheduled_at']),
       completedAt: asDateTime(json['completed_at']),
       reasonText: asNullableString(json['reason_text']),
@@ -865,12 +1054,14 @@ class UpsertVetVisitPayload {
   const UpsertVetVisitPayload({
     required this.status,
     required this.visitType,
+    this.title,
     this.scheduledAt,
     this.completedAt,
     this.reasonText,
     this.resultText,
     this.clinicName,
     this.vetName,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.reminder,
     this.rowVersion,
@@ -878,12 +1069,14 @@ class UpsertVetVisitPayload {
 
   final String status;
   final String visitType;
+  final String? title;
   final DateTime? scheduledAt;
   final DateTime? completedAt;
   final String? reasonText;
   final String? resultText;
   final String? clinicName;
   final String? vetName;
+  final List<AttachmentPayload>? attachments;
   final List<String> attachmentFileIds;
   final HealthEntityReminderPayload? reminder;
   final int? rowVersion;
@@ -891,13 +1084,17 @@ class UpsertVetVisitPayload {
   JsonMap toJson() => <String, dynamic>{
         'status': status,
         'visit_type': visitType,
+        'title': title,
         'scheduled_at': _toIso8601String(scheduledAt),
         'completed_at': _toIso8601String(completedAt),
         'reason_text': reasonText,
         'result_text': resultText,
         'clinic_name': clinicName,
         'vet_name': vetName,
-        'attachment_file_ids': attachmentFileIds,
+        'attachments': _attachmentPayloadsForJson(
+          attachments,
+          attachmentFileIds,
+        )?.map((item) => item.toJson()).toList(growable: false),
         'reminder': reminder?.toJson(),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
@@ -935,6 +1132,7 @@ class VaccinationCard {
     required this.status,
     required this.vaccineName,
     this.catalogMedicationId,
+    this.targets = const <HealthDictionaryItem>[],
     this.scheduledAt,
     this.administeredAt,
     this.nextDueAt,
@@ -955,6 +1153,7 @@ class VaccinationCard {
   final String status;
   final String vaccineName;
   final String? catalogMedicationId;
+  final List<HealthDictionaryItem> targets;
   final DateTime? scheduledAt;
   final DateTime? administeredAt;
   final DateTime? nextDueAt;
@@ -977,6 +1176,7 @@ class VaccinationCard {
       status: asString(json['status']),
       vaccineName: asString(json['vaccine_name']),
       catalogMedicationId: asNullableString(json['catalog_medication_id']),
+      targets: _decodeList(json['targets'], HealthDictionaryItem.fromJson),
       scheduledAt: asDateTime(json['scheduled_at']),
       administeredAt: asDateTime(json['administered_at']),
       nextDueAt: asDateTime(json['next_due_at']),
@@ -1001,6 +1201,7 @@ class Vaccination {
     required this.status,
     required this.vaccineName,
     this.catalogMedicationId,
+    this.targets = const <HealthDictionaryItem>[],
     this.scheduledAt,
     this.administeredAt,
     this.nextDueAt,
@@ -1023,6 +1224,7 @@ class Vaccination {
   final String status;
   final String vaccineName;
   final String? catalogMedicationId;
+  final List<HealthDictionaryItem> targets;
   final DateTime? scheduledAt;
   final DateTime? administeredAt;
   final DateTime? nextDueAt;
@@ -1047,6 +1249,7 @@ class Vaccination {
       status: asString(json['status']),
       vaccineName: asString(json['vaccine_name']),
       catalogMedicationId: asNullableString(json['catalog_medication_id']),
+      targets: _decodeList(json['targets'], HealthDictionaryItem.fromJson),
       scheduledAt: asDateTime(json['scheduled_at']),
       administeredAt: asDateTime(json['administered_at']),
       nextDueAt: asDateTime(json['next_due_at']),
@@ -1089,6 +1292,7 @@ class UpsertVaccinationPayload {
     required this.status,
     required this.vaccineName,
     this.catalogMedicationId,
+    this.targets,
     this.scheduledAt,
     this.administeredAt,
     this.nextDueAt,
@@ -1096,6 +1300,7 @@ class UpsertVaccinationPayload {
     this.clinicName,
     this.vetName,
     this.notes,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.reminder,
     this.rowVersion,
@@ -1104,6 +1309,7 @@ class UpsertVaccinationPayload {
   final String status;
   final String vaccineName;
   final String? catalogMedicationId;
+  final List<HealthDictionaryRefPayload>? targets;
   final DateTime? scheduledAt;
   final DateTime? administeredAt;
   final DateTime? nextDueAt;
@@ -1111,6 +1317,7 @@ class UpsertVaccinationPayload {
   final String? clinicName;
   final String? vetName;
   final String? notes;
+  final List<AttachmentPayload>? attachments;
   final List<String> attachmentFileIds;
   final HealthEntityReminderPayload? reminder;
   final int? rowVersion;
@@ -1119,6 +1326,8 @@ class UpsertVaccinationPayload {
         'status': status,
         'vaccine_name': vaccineName,
         'catalog_medication_id': catalogMedicationId,
+        'targets':
+            targets?.map((item) => item.toJson()).toList(growable: false),
         'scheduled_at': _toIso8601String(scheduledAt),
         'administered_at': _toIso8601String(administeredAt),
         'next_due_at': _toIso8601String(nextDueAt),
@@ -1126,7 +1335,10 @@ class UpsertVaccinationPayload {
         'clinic_name': clinicName,
         'vet_name': vetName,
         'notes': notes,
-        'attachment_file_ids': attachmentFileIds,
+        'attachments': _attachmentPayloadsForJson(
+          attachments,
+          attachmentFileIds,
+        )?.map((item) => item.toJson()).toList(growable: false),
         'reminder': reminder?.toJson(),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
@@ -1137,7 +1349,7 @@ class ProcedureCard {
     required this.id,
     required this.petId,
     required this.status,
-    required this.procedureType,
+    this.procedureTypeItem,
     required this.title,
     this.descriptionPreview,
     this.catalogMedicationId,
@@ -1158,7 +1370,7 @@ class ProcedureCard {
   final String id;
   final String petId;
   final String status;
-  final String procedureType;
+  final HealthDictionaryItem? procedureTypeItem;
   final String title;
   final String? descriptionPreview;
   final String? catalogMedicationId;
@@ -1181,7 +1393,9 @@ class ProcedureCard {
       id: asString(json['id']),
       petId: asString(json['pet_id']),
       status: asString(json['status']),
-      procedureType: asString(json['procedure_type']),
+      procedureTypeItem: json['procedure_type_item'] == null
+          ? null
+          : HealthDictionaryItem.fromJson(json['procedure_type_item']),
       title: asString(json['title']),
       descriptionPreview: asNullableString(json['description_preview']),
       catalogMedicationId: asNullableString(json['catalog_medication_id']),
@@ -1206,7 +1420,7 @@ class Procedure {
     required this.id,
     required this.petId,
     required this.status,
-    required this.procedureType,
+    this.procedureTypeItem,
     required this.title,
     this.description,
     this.catalogMedicationId,
@@ -1229,7 +1443,7 @@ class Procedure {
   final String id;
   final String petId;
   final String status;
-  final String procedureType;
+  final HealthDictionaryItem? procedureTypeItem;
   final String title;
   final String? description;
   final String? catalogMedicationId;
@@ -1254,7 +1468,9 @@ class Procedure {
       id: asString(json['id']),
       petId: asString(json['pet_id']),
       status: asString(json['status']),
-      procedureType: asString(json['procedure_type']),
+      procedureTypeItem: json['procedure_type_item'] == null
+          ? null
+          : HealthDictionaryItem.fromJson(json['procedure_type_item']),
       title: asString(json['title']),
       description: asNullableString(json['description']),
       catalogMedicationId: asNullableString(json['catalog_medication_id']),
@@ -1297,7 +1513,8 @@ class ProcedureListResponse {
 class UpsertProcedurePayload {
   const UpsertProcedurePayload({
     required this.status,
-    required this.procedureType,
+    this.procedureTypeId,
+    this.procedureTypeName,
     required this.title,
     this.description,
     this.catalogMedicationId,
@@ -1307,13 +1524,15 @@ class UpsertProcedurePayload {
     this.nextDueAt,
     this.vetVisitId,
     this.notes,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.reminder,
     this.rowVersion,
   });
 
   final String status;
-  final String procedureType;
+  final String? procedureTypeId;
+  final String? procedureTypeName;
   final String title;
   final String? description;
   final String? catalogMedicationId;
@@ -1323,13 +1542,15 @@ class UpsertProcedurePayload {
   final DateTime? nextDueAt;
   final String? vetVisitId;
   final String? notes;
+  final List<AttachmentPayload>? attachments;
   final List<String> attachmentFileIds;
   final HealthEntityReminderPayload? reminder;
   final int? rowVersion;
 
   JsonMap toJson() => <String, dynamic>{
         'status': status,
-        'procedure_type': procedureType,
+        'procedure_type_id': procedureTypeId,
+        'procedure_type_name': procedureTypeName,
         'title': title,
         'description': description,
         'catalog_medication_id': catalogMedicationId,
@@ -1339,7 +1560,10 @@ class UpsertProcedurePayload {
         'next_due_at': _toIso8601String(nextDueAt),
         'vet_visit_id': vetVisitId,
         'notes': notes,
-        'attachment_file_ids': attachmentFileIds,
+        'attachments': _attachmentPayloadsForJson(
+          attachments,
+          attachmentFileIds,
+        )?.map((item) => item.toJson()).toList(growable: false),
         'reminder': reminder?.toJson(),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
@@ -1349,7 +1573,7 @@ class MedicalRecordCard {
   const MedicalRecordCard({
     required this.id,
     required this.petId,
-    required this.recordType,
+    this.recordTypeItem,
     required this.status,
     required this.title,
     this.descriptionPreview,
@@ -1365,7 +1589,7 @@ class MedicalRecordCard {
 
   final String id;
   final String petId;
-  final String recordType;
+  final HealthDictionaryItem? recordTypeItem;
   final String status;
   final String title;
   final String? descriptionPreview;
@@ -1383,7 +1607,9 @@ class MedicalRecordCard {
     return MedicalRecordCard(
       id: asString(json['id']),
       petId: asString(json['pet_id']),
-      recordType: asString(json['record_type']),
+      recordTypeItem: json['record_type_item'] == null
+          ? null
+          : HealthDictionaryItem.fromJson(json['record_type_item']),
       status: asString(json['status']),
       title: asString(json['title']),
       descriptionPreview: asNullableString(json['description_preview']),
@@ -1403,7 +1629,7 @@ class MedicalRecord {
   const MedicalRecord({
     required this.id,
     required this.petId,
-    required this.recordType,
+    this.recordTypeItem,
     required this.status,
     required this.title,
     this.description,
@@ -1421,7 +1647,7 @@ class MedicalRecord {
 
   final String id;
   final String petId;
-  final String recordType;
+  final HealthDictionaryItem? recordTypeItem;
   final String status;
   final String title;
   final String? description;
@@ -1441,7 +1667,9 @@ class MedicalRecord {
     return MedicalRecord(
       id: asString(json['id']),
       petId: asString(json['pet_id']),
-      recordType: asString(json['record_type']),
+      recordTypeItem: json['record_type_item'] == null
+          ? null
+          : HealthDictionaryItem.fromJson(json['record_type_item']),
       status: asString(json['status']),
       title: asString(json['title']),
       description: asNullableString(json['description']),
@@ -1479,33 +1707,41 @@ class MedicalRecordListResponse {
 
 class UpsertMedicalRecordPayload {
   const UpsertMedicalRecordPayload({
-    required this.recordType,
+    this.recordTypeId,
+    this.recordTypeName,
     required this.status,
     required this.title,
     this.description,
     this.startedAt,
     this.resolvedAt,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.rowVersion,
   });
 
-  final String recordType;
+  final String? recordTypeId;
+  final String? recordTypeName;
   final String status;
   final String title;
   final String? description;
   final DateTime? startedAt;
   final DateTime? resolvedAt;
+  final List<AttachmentPayload>? attachments;
   final List<String> attachmentFileIds;
   final int? rowVersion;
 
   JsonMap toJson() => <String, dynamic>{
-        'record_type': recordType,
+        'record_type_id': recordTypeId,
+        'record_type_name': recordTypeName,
         'status': status,
         'title': title,
         'description': description,
         'started_at': _toIso8601String(startedAt),
         'resolved_at': _toIso8601String(resolvedAt),
-        'attachment_file_ids': attachmentFileIds,
+        'attachments': _attachmentPayloadsForJson(
+          attachments,
+          attachmentFileIds,
+        )?.map((item) => item.toJson()).toList(growable: false),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
 }
@@ -1515,6 +1751,21 @@ List<T> _decodeList<T>(Object? data, T Function(Object? item) decoder) {
     return <T>[];
   }
   return data.map(decoder).toList(growable: false);
+}
+
+List<AttachmentPayload>? _attachmentPayloadsForJson(
+  List<AttachmentPayload>? attachments,
+  List<String> attachmentFileIds,
+) {
+  if (attachments != null) {
+    return attachments;
+  }
+  if (attachmentFileIds.isEmpty) {
+    return null;
+  }
+  return attachmentFileIds
+      .map((fileId) => AttachmentPayload(fileId: fileId))
+      .toList(growable: false);
 }
 
 List<String> _decodeStringList(Object? data) {

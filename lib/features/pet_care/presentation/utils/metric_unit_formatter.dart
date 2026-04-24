@@ -14,9 +14,12 @@ String formatDisplayUnitCode(String? unitCode) {
     'cm' => 'см',
     'mm' => 'мм',
     'm' => 'м',
+    'h' => 'ч',
     'c' || '°c' || 'degc' => '°C',
     'f' || '°f' || 'degf' => '°F',
     'bpm' => 'уд/мин',
+    'rpm' => 'дых/мин',
+    'count' => 'раз',
     '%' => '%',
     _ => raw,
   };

@@ -41,13 +41,11 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
     final conversationState =
         ref.watch(chatConversationControllerProvider(widget.conversationId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: conversationState.when(
-          data: (state) => _ConversationAppBarTitle(state: state),
-          loading: () => const Text('Чат'),
-          error: (_, __) => const Text('Чат'),
-        ),
+    return PawlyScreenScaffold(
+      titleWidget: conversationState.when(
+        data: (state) => _ConversationAppBarTitle(state: state),
+        loading: () => const Text('Чат'),
+        error: (_, __) => const Text('Чат'),
       ),
       body: conversationState.when(
         data: (state) {
@@ -66,9 +64,9 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
                   child: ListView(
                     controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(
-                      PawlySpacing.lg,
                       PawlySpacing.md,
-                      PawlySpacing.lg,
+                      PawlySpacing.md,
+                      PawlySpacing.md,
                       PawlySpacing.md,
                     ),
                     children: <Widget>[
@@ -78,10 +76,8 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
                             padding: const EdgeInsets.only(
                               bottom: PawlySpacing.md,
                             ),
-                            child: PawlyButton(
-                              label: state.isLoadingMoreMessages
-                                  ? 'Загружаем...'
-                                  : 'Загрузить предыдущие',
+                            child: _LoadOlderButton(
+                              isLoading: state.isLoadingMoreMessages,
                               onPressed: state.isLoadingMoreMessages
                                   ? null
                                   : () => ref
@@ -89,9 +85,6 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
                                               widget.conversationId)
                                           .notifier)
                                       .loadOlderMessages(),
-                              variant: PawlyButtonVariant.secondary,
-                              icon: Icons.expand_less_rounded,
-                              fullWidth: false,
                             ),
                           ),
                         ),
@@ -251,11 +244,8 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: PawlySpacing.md),
             child: Center(
-              child: Text(
-                _dateFormat.format(messageDay),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+              child: _DateSeparator(
+                label: _dateFormat.format(messageDay),
               ),
             ),
           ),
@@ -316,18 +306,114 @@ class _ConversationAppBarTitle extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              Text(
-                '${state.conversation.otherUserInChat ? 'В чате сейчас' : 'Не в чате'} · ${state.conversation.pet.name}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              Row(
+                children: <Widget>[
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: state.conversation.otherUserInChat
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.55),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: PawlySpacing.xxs),
+                  Expanded(
+                    child: Text(
+                      '${state.conversation.otherUserInChat ? 'В чате' : 'Не в чате'} · ${state.conversation.pet.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DateSeparator extends StatelessWidget {
+  const _DateSeparator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: PawlySpacing.sm,
+        vertical: PawlySpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(PawlyRadius.pill),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class _LoadOlderButton extends StatelessWidget {
+  const _LoadOlderButton({
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  final bool isLoading;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return TextButton.icon(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        backgroundColor: colorScheme.surface.withValues(alpha: 0.9),
+        foregroundColor: colorScheme.onSurface,
+        padding: const EdgeInsets.symmetric(
+          horizontal: PawlySpacing.md,
+          vertical: PawlySpacing.xs,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PawlyRadius.pill),
+        ),
+      ),
+      icon: isLoading
+          ? SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          : Icon(
+              Icons.keyboard_arrow_up_rounded,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+      label: Text(
+        isLoading ? 'Загружаем' : 'Ранее',
+        style: theme.textTheme.labelLarge,
+      ),
     );
   }
 }
@@ -348,11 +434,15 @@ class _ConversationAvatar extends StatelessWidget {
     final hasAvatar = avatarUrl != null && avatarUrl!.isNotEmpty;
 
     return Container(
-      width: 40,
-      height: 40,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surface,
+          width: 2,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: hasAvatar
@@ -363,7 +453,7 @@ class _ConversationAvatar extends StatelessWidget {
                 entityId: userId,
                 imageUrl: avatarUrl!,
               ),
-              targetLogicalSize: 40,
+              targetLogicalSize: 38,
               fit: BoxFit.cover,
               errorWidget: (_) => _ConversationAvatarFallback(
                 name: name,
@@ -400,12 +490,30 @@ class _EmptyConversationState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(top: PawlySpacing.xl),
       child: Center(
-        child: Text(
-          'Сообщений пока нет.',
-          style: Theme.of(context).textTheme.bodyLarge,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(
+            PawlySpacing.lg,
+            PawlySpacing.lg,
+            PawlySpacing.lg,
+            PawlySpacing.lg,
+          ),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          ),
+          child: Text(
+            'Сообщений пока нет',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       ),
     );
@@ -434,14 +542,16 @@ class _ConversationComposer extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(
           PawlySpacing.md,
+          PawlySpacing.xs,
+          PawlySpacing.md,
           PawlySpacing.sm,
-          PawlySpacing.md,
-          PawlySpacing.md,
         ),
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          color: pawlyGroupedBackground(context),
           border: Border(
-            top: BorderSide(color: colorScheme.outlineVariant),
+            top: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
         ),
         child: Row(
@@ -457,27 +567,55 @@ class _ConversationComposer extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText:
                       canSend ? 'Напишите сообщение' : 'Отправка недоступна',
+                  filled: true,
+                  fillColor: colorScheme.surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: PawlySpacing.md,
+                    vertical: PawlySpacing.sm,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(PawlyRadius.xl),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(PawlyRadius.xl),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(PawlyRadius.xl),
+                    borderSide: BorderSide(
+                      color: colorScheme.primary.withValues(alpha: 0.28),
+                    ),
+                  ),
                 ),
                 onSubmitted: canSend && !isSending ? (_) => onSend() : null,
               ),
             ),
             const SizedBox(width: PawlySpacing.sm),
-            FilledButton(
-              onPressed: canSend && !isSending ? onSend : null,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(52, 52),
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: IconButton(
+                onPressed: canSend && !isSending ? onSend : null,
                 padding: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(PawlyRadius.lg),
+                style: IconButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  disabledBackgroundColor:
+                      colorScheme.onSurface.withValues(alpha: 0.08),
+                  foregroundColor: colorScheme.onPrimary,
+                  disabledForegroundColor: colorScheme.onSurfaceVariant,
                 ),
+                icon: isSending
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.arrow_upward_rounded, size: 22),
               ),
-              child: isSending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.arrow_upward_rounded),
             ),
           ],
         ),
@@ -507,19 +645,41 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final bubbleColor = isMine ? colorScheme.primary : colorScheme.surface;
+    final foreground = isMine ? colorScheme.onPrimary : colorScheme.onSurface;
+    final metaColor = isMine
+        ? colorScheme.onPrimary.withValues(alpha: 0.78)
+        : colorScheme.onSurfaceVariant;
+    final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.76;
 
     return Row(
       mainAxisAlignment:
           isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: <Widget>[
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
+          constraints: BoxConstraints(maxWidth: maxBubbleWidth),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: isMine
-                  ? colorScheme.primaryContainer
-                  : colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(PawlyRadius.lg),
+              color: bubbleColor,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(PawlyRadius.xl),
+                topRight: const Radius.circular(PawlyRadius.xl),
+                bottomLeft: Radius.circular(
+                  isMine ? PawlyRadius.xl : PawlyRadius.sm,
+                ),
+                bottomRight: Radius.circular(
+                  isMine ? PawlyRadius.sm : PawlyRadius.xl,
+                ),
+              ),
+              boxShadow: isMine
+                  ? null
+                  : <BoxShadow>[
+                      BoxShadow(
+                        color: colorScheme.shadow.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -531,7 +691,13 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(text),
+                  Text(
+                    text,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: foreground,
+                      height: 1.32,
+                    ),
+                  ),
                   if (timeLabel.isNotEmpty) ...<Widget>[
                     const SizedBox(height: PawlySpacing.xs),
                     Align(
@@ -558,16 +724,14 @@ class _MessageBubble extends StatelessWidget {
                                 height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: colorScheme.onSurfaceVariant,
+                                  color: metaColor,
                                 ),
                               ),
                             ),
                           Text(
                             timeLabel,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: hasFailed
-                                  ? colorScheme.error
-                                  : colorScheme.onSurfaceVariant,
+                              color: hasFailed ? colorScheme.error : metaColor,
                             ),
                           ),
                           if (isMine && !hasFailed && !isSending) ...<Widget>[
@@ -578,8 +742,10 @@ class _MessageBubble extends StatelessWidget {
                                   : Icons.done_rounded,
                               size: 14,
                               color: isReadByPeer
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
+                                  ? (isMine
+                                      ? colorScheme.onPrimary
+                                      : colorScheme.primary)
+                                  : metaColor,
                             ),
                           ],
                         ],
@@ -594,9 +760,7 @@ class _MessageBubble extends StatelessWidget {
                             ? Icons.error_outline_rounded
                             : Icons.schedule_rounded,
                         size: 14,
-                        color: hasFailed
-                            ? colorScheme.error
-                            : colorScheme.onSurfaceVariant,
+                        color: hasFailed ? colorScheme.error : metaColor,
                       ),
                     ),
                   ],

@@ -47,6 +47,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Pawly использует камеру, чтобы сделать фото профиля, питомца или вложения.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pawly использует галерею, чтобы выбрать фото профиля, питомца или вложения.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

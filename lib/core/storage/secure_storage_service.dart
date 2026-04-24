@@ -65,14 +65,6 @@ class SecureStorageService {
     return _storage.read(key: userIdKey);
   }
 
-  Future<void> saveLocale(String locale) {
-    return _storage.write(key: localeKey, value: locale);
-  }
-
-  Future<String?> getLocale() {
-    return _storage.read(key: localeKey);
-  }
-
   Future<void> saveThemeMode(String themeMode) {
     return _storage.write(key: themeModeKey, value: themeMode);
   }

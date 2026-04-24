@@ -27,39 +27,37 @@ class PetLogDetailsPage extends ConsumerWidget {
       petLogDetailsControllerProvider(logRef),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Запись'),
-        actions: logAsync.maybeWhen(
-          data: (log) => <Widget>[
-            if (log.canEdit)
-              IconButton(
-                onPressed: () async {
-                  final updated = await context.pushNamed<bool>(
-                    'petLogEdit',
-                    pathParameters: <String, String>{
-                      'petId': petId,
-                      'logId': logId,
-                    },
-                  );
-                  if (updated == true && context.mounted) {
-                    await ref
-                        .read(petLogDetailsControllerProvider(logRef).notifier)
-                        .reload();
-                  }
-                },
-                icon: const Icon(Icons.edit_rounded),
-                tooltip: 'Редактировать',
-              ),
-            if (log.canDelete)
-              IconButton(
-                onPressed: () => _deleteLog(context, ref, log),
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Удалить',
-              ),
-          ],
-          orElse: () => const <Widget>[],
-        ),
+    return PawlyScreenScaffold(
+      title: 'Запись',
+      actions: logAsync.maybeWhen(
+        data: (log) => <Widget>[
+          if (log.canEdit)
+            IconButton(
+              onPressed: () async {
+                final updated = await context.pushNamed<bool>(
+                  'petLogEdit',
+                  pathParameters: <String, String>{
+                    'petId': petId,
+                    'logId': logId,
+                  },
+                );
+                if (updated == true && context.mounted) {
+                  await ref
+                      .read(petLogDetailsControllerProvider(logRef).notifier)
+                      .reload();
+                }
+              },
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: 'Редактировать',
+            ),
+          if (log.canDelete)
+            IconButton(
+              onPressed: () => _deleteLog(context, ref, log),
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Удалить',
+            ),
+        ],
+        orElse: () => const <Widget>[],
       ),
       body: logAsync.when(
         data: (log) => _PetLogDetailsView(
@@ -187,12 +185,6 @@ class _PetLogDetailsView extends StatelessWidget {
                         ],
                       ),
                     ),
-                    PawlyBadge(
-                      label: _sourceLabel(log.source),
-                      tone: log.source == 'HEALTH'
-                          ? PawlyBadgeTone.info
-                          : PawlyBadgeTone.neutral,
-                    ),
                   ],
                 ),
                 if (log.sourceLabel != null && log.sourceLabel!.isNotEmpty) ...[
@@ -237,7 +229,7 @@ class _PetLogDetailsView extends StatelessWidget {
             const SizedBox(height: PawlySpacing.md),
             PawlyCard(
               title: Text(
-                'Метрики',
+                'Показатели',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               child: Column(
@@ -252,8 +244,8 @@ class _PetLogDetailsView extends StatelessWidget {
                               _formatMetricValue(metric),
                               style: Theme.of(context)
                                   .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
@@ -410,17 +402,6 @@ class _LogDetailsErrorView extends StatelessWidget {
   }
 }
 
-String _sourceLabel(String source) {
-  switch (source) {
-    case 'HEALTH':
-      return 'Из здоровья';
-    case 'USER':
-      return 'Пользовательская';
-    default:
-      return source;
-  }
-}
-
 String _formatOccurredAt(DateTime? value) {
   if (value == null) {
     return 'Не указано';
@@ -442,9 +423,7 @@ String _formatMetricValue(LogMetricValue value) {
       ? value.valueNum.toStringAsFixed(0)
       : value.valueNum.toStringAsFixed(1);
   final unit = formatDisplayUnitCode(value.unitCode);
-  return unit.isEmpty
-      ? number
-      : '$number $unit';
+  return unit.isEmpty ? number : '$number $unit';
 }
 
 String? _relatedEntityLabel(LogEntry log) {

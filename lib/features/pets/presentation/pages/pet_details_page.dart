@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../design_system/design_system.dart';
+
 class PetDetailsPage extends StatelessWidget {
   const PetDetailsPage({
     required this.petId,
@@ -10,9 +12,9 @@ class PetDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Питомец')),
-      body: const SizedBox.expand(),
+    return const PawlyScreenScaffold(
+      title: 'Питомец',
+      body: SizedBox.expand(),
     );
   }
 }

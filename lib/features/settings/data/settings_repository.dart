@@ -40,8 +40,8 @@ class SettingsRepository {
   }
 
   Future<ProfileResponse> updatePreferences({
-    String? locale,
-    String? timeZone,
+    required String locale,
+    required String timeZone,
   }) async {
     final profile = await _profileApiClient.updatePreferences(
       UpdateProfilePreferencesPayload(
@@ -49,22 +49,18 @@ class SettingsRepository {
         timeZone: timeZone,
       ),
     );
-    await syncStoredPreferences(
-      locale: profile.locale,
-      timeZone: profile.timeZone,
-    );
+    await syncStoredPreferences(timeZone: profile.timeZone);
+    await _authSessionStore.updateLocale(profile.locale);
     return profile;
   }
 
   Future<void> syncStoredPreferences({
-    required String locale,
     required String timeZone,
   }) async {
     await _sharedPreferencesService.saveProfilePreferences(
-      locale: locale,
       timeZone: timeZone,
     );
-    await _authSessionStore.updateLocale(locale);
+    await _authSessionStore.updateLocale('ru');
   }
 
   Future<ProfileResponse> uploadAvatar({required XFile file}) async {
@@ -108,10 +104,13 @@ class SettingsRepository {
 
     final profile = confirmResponse.profile;
     await syncStoredPreferences(
-      locale: profile.locale,
       timeZone: profile.timeZone,
     );
     return profile;
+  }
+
+  Future<void> deleteAvatar() {
+    return _profileApiClient.deleteAvatar();
   }
 
   String _normalizeStorageUrl(String url) {

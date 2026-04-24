@@ -15,5 +15,6 @@ class AppRoutes {
   static const String chatInbox = '/chat';
   static const String chatConversation = '/chat/conversations';
   static const String petCreate = '/pets/create';
+  static const String invite = '/invite';
   static const String aclInvitePreview = '/invite-preview';
 }

@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_error.dart';
 import '../../../../core/network/api_exception.dart';
@@ -50,15 +49,24 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
     state = AsyncData(await _load());
   }
 
-  Future<void> uploadPhoto(ImageSource source) async {
+  Future<void> uploadPhotoFromGallery() {
+    return _uploadPhoto(fromCamera: false);
+  }
+
+  Future<void> uploadPhotoFromCamera() {
+    return _uploadPhoto(fromCamera: true);
+  }
+
+  Future<void> _uploadPhoto({required bool fromCamera}) async {
     final current = state.asData?.value;
     if (current == null) {
       return;
     }
 
-    final file = await ref.read(mediaPickerServiceProvider).pickImage(
-          source: source,
-        );
+    final mediaPicker = ref.read(mediaPickerServiceProvider);
+    final file = fromCamera
+        ? await mediaPicker.takeAvatarPhoto()
+        : await mediaPicker.pickAvatarFromGallery();
     if (file == null) {
       return;
     }
@@ -75,7 +83,38 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
       state = AsyncData(
         current.copyWith(
           pet: updatedPet,
-          speciesName: _speciesName(catalog, updatedPet.speciesId),
+          speciesName: _speciesName(catalog, updatedPet),
+          isUploadingPhoto: false,
+        ),
+      );
+
+      await ref.read(petsControllerProvider.notifier).refreshAfterPetMutation();
+    } catch (_) {
+      state = AsyncData(current.copyWith(isUploadingPhoto: false));
+      rethrow;
+    }
+  }
+
+  Future<void> deletePhoto() async {
+    final current = state.asData?.value;
+    if (current == null ||
+        ((current.pet.profilePhotoFileId ?? '').isEmpty &&
+            (current.pet.profilePhotoDownloadUrl ?? '').isEmpty)) {
+      return;
+    }
+
+    state = AsyncData(current.copyWith(isUploadingPhoto: true));
+
+    try {
+      final updatedPet = await ref.read(petsRepositoryProvider).deletePetPhoto(
+            pet: current.pet,
+          );
+      final catalog = await ref.read(petDictionariesSyncProvider.future);
+
+      state = AsyncData(
+        current.copyWith(
+          pet: updatedPet,
+          speciesName: _speciesName(catalog, updatedPet),
           isUploadingPhoto: false,
         ),
       );
@@ -135,12 +174,20 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
 
     return ActivePetDetailsState(
       pet: pet,
-      speciesName: _speciesName(catalog, pet.speciesId),
+      speciesName: _speciesName(catalog, pet),
       isUploadingPhoto: false,
     );
   }
 
-  String _speciesName(CatalogSnapshot catalog, String speciesId) {
+  String _speciesName(CatalogSnapshot catalog, Pet pet) {
+    final customSpeciesName = pet.customSpeciesName;
+    if (customSpeciesName != null && customSpeciesName.isNotEmpty) {
+      return customSpeciesName;
+    }
+    final speciesId = pet.speciesId;
+    if (speciesId == null || speciesId.isEmpty) {
+      return 'Неизвестный вид';
+    }
     for (final species in catalog.species) {
       if (species.id == speciesId) {
         return species.name;

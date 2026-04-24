@@ -14,6 +14,10 @@ class ChatSocketService {
     required AuthSessionStore authSessionStore,
   }) : _authSessionStore = authSessionStore;
 
+  static const Duration _connectTimeout = Duration(seconds: 10);
+  static const Duration _disconnectTimeout = Duration(seconds: 3);
+  static const Duration _sendConnectionTimeout = Duration(seconds: 12);
+
   final AuthSessionStore _authSessionStore;
 
   final StreamController<ChatServerEvent> _eventsController =
@@ -67,7 +71,9 @@ class ChatSocketService {
     final socket = _socket;
     _socket = null;
     if (socket != null) {
-      await socket.close(WebSocketStatus.normalClosure);
+      await socket
+          .close(WebSocketStatus.normalClosure)
+          .timeout(_disconnectTimeout, onTimeout: () {});
     }
 
     _emitLifecycle(
@@ -78,7 +84,7 @@ class ChatSocketService {
   }
 
   Future<void> send(ChatClientEvent event) async {
-    await ensureConnected();
+    await ensureConnected().timeout(_sendConnectionTimeout);
 
     final socket = _socket;
     if (socket == null || socket.readyState != WebSocket.open) {
@@ -89,6 +95,12 @@ class ChatSocketService {
     final envelope = event.toEnvelope().toJson();
     _log('send: type=${event.type} payload=${jsonEncode(envelope['payload'])}');
     socket.add(jsonEncode(envelope));
+  }
+
+  Future<void> reconnect() async {
+    _log('reconnect: recycle socket');
+    await disconnect();
+    await ensureConnected();
   }
 
   Future<void> subscribeInbox() async {
@@ -192,7 +204,7 @@ class ChatSocketService {
         headers: <String, dynamic>{
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(_connectTimeout);
       socket.pingInterval = const Duration(seconds: 20);
       _log('connect: socket connected, pingInterval=20s');
 

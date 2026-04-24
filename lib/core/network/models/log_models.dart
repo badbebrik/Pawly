@@ -1,3 +1,4 @@
+import 'common_models.dart';
 import 'json_map.dart';
 import 'json_parsers.dart';
 
@@ -108,7 +109,7 @@ class LogCard {
 
   factory LogCard.fromJson(Object? data) {
     final json = asJsonMap(data);
-    final rawMetricValues = json['metric_values_preview'];
+    final rawMetricValues = _readLogCardMetricValues(json);
     return LogCard(
       id: asString(json['id']),
       petId: asString(json['pet_id']),
@@ -142,6 +143,13 @@ class LogCard {
       ),
     );
   }
+}
+
+Object? _readLogCardMetricValues(JsonMap json) {
+  return json['metric_values_preview'] ??
+      json['metric_values'] ??
+      json['metrics_preview'] ??
+      json['metrics'];
 }
 
 class LogEntry {
@@ -350,10 +358,7 @@ class LogType {
 }
 
 class MetricUsage {
-  const MetricUsage({
-    required this.logTypesCount,
-    required this.logsCount,
-  });
+  const MetricUsage({required this.logTypesCount, required this.logsCount});
 
   final int logTypesCount;
   final int logsCount;
@@ -428,10 +433,7 @@ class Metric {
 }
 
 class LogSourceFacet {
-  const LogSourceFacet({
-    required this.value,
-    required this.count,
-  });
+  const LogSourceFacet({required this.value, required this.count});
 
   final String value;
   final int count;
@@ -500,11 +502,7 @@ class LogListFacets {
 }
 
 class LogListResponse {
-  const LogListResponse({
-    required this.items,
-    this.nextCursor,
-    this.facets,
-  });
+  const LogListResponse({required this.items, this.nextCursor, this.facets});
 
   final List<LogCard> items;
   final String? nextCursor;
@@ -526,10 +524,7 @@ class LogListResponse {
 }
 
 class LogPermissionSet {
-  const LogPermissionSet({
-    required this.logRead,
-    required this.logWrite,
-  });
+  const LogPermissionSet({required this.logRead, required this.logWrite});
 
   final bool logRead;
   final bool logWrite;
@@ -570,12 +565,18 @@ class LogComposerBootstrapResponse {
     };
     return LogComposerBootstrapResponse(
       permissions: LogPermissionSet.fromJson(json['permissions']),
-      recentLogTypes:
-          _decodeLogTypeList(json['recent_log_types'], metricsById: metricsById),
-      systemLogTypes:
-          _decodeLogTypeList(json['system_log_types'], metricsById: metricsById),
-      customLogTypes:
-          _decodeLogTypeList(json['custom_log_types'], metricsById: metricsById),
+      recentLogTypes: _decodeLogTypeList(
+        json['recent_log_types'],
+        metricsById: metricsById,
+      ),
+      systemLogTypes: _decodeLogTypeList(
+        json['system_log_types'],
+        metricsById: metricsById,
+      ),
+      customLogTypes: _decodeLogTypeList(
+        json['custom_log_types'],
+        metricsById: metricsById,
+      ),
       systemMetrics: systemMetrics,
       customMetrics: customMetrics,
     );
@@ -583,9 +584,7 @@ class LogComposerBootstrapResponse {
 }
 
 class LogTypeListResponse {
-  const LogTypeListResponse({
-    required this.items,
-  });
+  const LogTypeListResponse({required this.items});
 
   final List<LogType> items;
 
@@ -596,9 +595,7 @@ class LogTypeListResponse {
 }
 
 class MetricListResponse {
-  const MetricListResponse({
-    required this.items,
-  });
+  const MetricListResponse({required this.items});
 
   final List<Metric> items;
 
@@ -629,6 +626,7 @@ class UpsertLogPayload {
     this.logTypeId,
     this.description,
     this.metricValues = const <LogMetricValue>[],
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.rowVersion,
   });
@@ -637,6 +635,7 @@ class UpsertLogPayload {
   final String? logTypeId;
   final String? description;
   final List<LogMetricValue> metricValues;
+  final List<AttachmentPayload>? attachments;
   final List<String> attachmentFileIds;
   final int? rowVersion;
 
@@ -646,7 +645,10 @@ class UpsertLogPayload {
         'description': description,
         'metric_values':
             metricValues.map((item) => item.toJson()).toList(growable: false),
-        'attachment_file_ids': attachmentFileIds,
+        'attachments': _attachmentPayloadsForJson(
+          attachments,
+          attachmentFileIds,
+        )?.map((item) => item.toJson()).toList(growable: false),
         'row_version': rowVersion,
       }..removeWhere((_, dynamic value) => value == null);
 }
@@ -657,6 +659,21 @@ class DeleteLogPayload {
   final int rowVersion;
 
   JsonMap toJson() => <String, dynamic>{'row_version': rowVersion};
+}
+
+List<AttachmentPayload>? _attachmentPayloadsForJson(
+  List<AttachmentPayload>? attachments,
+  List<String> attachmentFileIds,
+) {
+  if (attachments != null) {
+    return attachments;
+  }
+  if (attachmentFileIds.isEmpty) {
+    return null;
+  }
+  return attachmentFileIds
+      .map((fileId) => AttachmentPayload(fileId: fileId))
+      .toList(growable: false);
 }
 
 class CreateLogTypePayload {
@@ -809,9 +826,7 @@ class AnalyticsMetricSummary {
 }
 
 class AnalyticsMetricSummaryListResponse {
-  const AnalyticsMetricSummaryListResponse({
-    required this.items,
-  });
+  const AnalyticsMetricSummaryListResponse({required this.items});
 
   final List<AnalyticsMetricSummary> items;
 
@@ -933,11 +948,7 @@ List<Metric> _decodeMetricList(Object? data) {
   return data.map(Metric.fromJson).toList(growable: false);
 }
 
-String? _readNullableString(
-  JsonMap json,
-  String key, {
-  String? fallbackKey,
-}) {
+String? _readNullableString(JsonMap json, String key, {String? fallbackKey}) {
   final value = asNullableString(json[key]);
   if (value != null) {
     return value;

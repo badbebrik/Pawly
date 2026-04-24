@@ -1,26 +1,30 @@
 class ApiEndpoints {
   const ApiEndpoints._();
 
-  static const String authRegisterEmail = '/auth/register/email';
+  static const String authRegisterEmail = '/v1/auth/email:register';
   static const String authVerificationEmailResend =
-      '/auth/verification/email/resend';
-  static const String authVerifyEmail = '/auth/verify/email';
-  static const String authLoginEmail = '/auth/login/email';
-  static const String authLoginOAuth = '/auth/login/oauth';
-  static const String authLogout = '/auth/logout';
-  static const String authLogoutAll = '/auth/logout-all';
-  static const String authRefresh = '/auth/refresh';
-  static const String authPasswordResetRequest = '/auth/password/reset/request';
-  static const String authPasswordResetVerify = '/auth/password/reset/verify';
-  static const String authPasswordResetConfirm = '/auth/password/reset/confirm';
-  static const String authPasswordChange = '/auth/password/change';
+      '/v1/auth/email-verification:resend';
+  static const String authVerifyEmail = '/v1/auth/email-verification:verify';
+  static const String authLoginEmail = '/v1/auth/sessions:login-email';
+  static const String authLoginOAuth = '/v1/auth/sessions:login-oauth';
+  static const String authLogout = '/v1/auth/sessions:revoke';
+  static const String authLogoutAll = '/v1/auth/sessions:revoke-all';
+  static const String authRefresh = '/v1/auth/sessions:refresh';
+  static const String authPasswordResetRequest =
+      '/v1/auth/password-reset:request';
+  static const String authPasswordResetVerify =
+      '/v1/auth/password-reset:verify';
+  static const String authPasswordResetConfirm =
+      '/v1/auth/password-reset:confirm';
+  static const String authPasswordChange = '/v1/auth/password:change';
 
-  static const String profileMe = '/v1/profile/me';
-  static const String profilePreferences = '/v1/profile/me/preferences';
+  static const String profileMe = '/v1/profiles/me';
+  static const String profilePreferences = '/v1/profiles/me/preferences';
   static const String profileAvatarInitUpload =
-      '/v1/profile/me/avatar:init-upload';
+      '/v1/profiles/me/avatar:init-upload';
   static const String profileAvatarConfirmUpload =
-      '/v1/profile/me/avatar:confirm-upload';
+      '/v1/profiles/me/avatar:confirm-upload';
+  static const String profileAvatar = '/v1/profiles/me/avatar';
 
   static const String chatConversationsOpen = '/v1/chat/conversations:open';
   static const String chatConversations = '/v1/chat/conversations';
@@ -34,22 +38,24 @@ class ApiEndpoints {
       '/v1/chat/conversations/$conversationId/messages';
 
   static String chatConversationRead(String conversationId) =>
-      '/v1/chat/conversations/$conversationId/read';
+      '/v1/chat/conversations/$conversationId:mark-read';
 
   static const String pets = '/v1/pets';
 
   static String petById(String petId) => '/v1/pets/$petId';
 
-  static String petStatus(String petId) => '/v1/pets/$petId/status';
+  static String petStatus(String petId) => '/v1/pets/$petId:change-status';
 
   static String petTransferOwnership(String petId) =>
-      '/v1/pets/$petId/transfer-ownership';
+      '/v1/pets/$petId:transfer-ownership';
 
   static String petPhotoInitUpload(String petId) =>
       '/v1/pets/$petId/photo:init-upload';
 
   static String petPhotoConfirmUpload(String petId) =>
       '/v1/pets/$petId/photo:confirm-upload';
+
+  static String petPhoto(String petId) => '/v1/pets/$petId/photo';
 
   static String petLogsBootstrap(String petId) =>
       '/v1/pets/$petId/logs/bootstrap';
@@ -79,6 +85,8 @@ class ApiEndpoints {
       '/v1/pets/$petId/health/bootstrap';
 
   static const String healthDay = '/v1/health/day';
+
+  static const String healthCalendar = '/v1/health/calendar';
 
   static String petHealthDay(String petId) => '/v1/pets/$petId/health/day';
 
@@ -114,6 +122,9 @@ class ApiEndpoints {
       '/v1/pets/$petId/attachments:confirm-upload';
 
   static String petDocuments(String petId) => '/v1/pets/$petId/documents';
+
+  static String petDocumentById(String petId, String documentId) =>
+      '/v1/pets/$petId/documents/$documentId';
 
   static String petVetVisits(String petId) => '/v1/pets/$petId/vet-visits';
 
@@ -164,11 +175,14 @@ class ApiEndpoints {
   static String aclInviteById(String petId, String inviteId) =>
       '/v1/pets/$petId/acl/invites/$inviteId';
 
+  static String aclInviteRegenerateLink(String petId, String inviteId) =>
+      '/v1/pets/$petId/acl/invites/$inviteId:regenerate-link';
+
   static const String aclPreviewInviteByToken =
-      '/v1/acl/invites/preview-by-token';
-  static const String aclAcceptInviteByCode = '/v1/acl/invites/accept-by-code';
+      '/v1/acl/invites:preview-by-token';
+  static const String aclAcceptInviteByCode = '/v1/acl/invites:accept-by-code';
   static const String aclAcceptInviteByToken =
-      '/v1/acl/invites/accept-by-token';
+      '/v1/acl/invites:accept-by-token';
 
   static const String petDictionaries = '/v1/pet-dictionaries';
 }

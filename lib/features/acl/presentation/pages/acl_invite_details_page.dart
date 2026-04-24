@@ -27,22 +27,20 @@ class AclInviteDetailsPage extends ConsumerWidget {
       ),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Приглашение'),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () => _editInvite(context),
-            icon: const Icon(Icons.edit_rounded),
-            tooltip: 'Редактировать',
-          ),
-          IconButton(
-            onPressed: () => _deleteInvite(context, ref),
-            icon: const Icon(Icons.delete_outline_rounded),
-            tooltip: 'Удалить',
-          ),
-        ],
-      ),
+    return PawlyScreenScaffold(
+      title: 'Приглашение',
+      actions: <Widget>[
+        IconButton(
+          onPressed: () => _editInvite(context),
+          icon: const Icon(Icons.edit_rounded),
+          tooltip: 'Редактировать',
+        ),
+        IconButton(
+          onPressed: () => _deleteInvite(context, ref),
+          icon: const Icon(Icons.delete_outline_rounded),
+          tooltip: 'Удалить',
+        ),
+      ],
       body: state.when(
         data: (value) => _AclInviteDetailsContent(state: value),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -62,10 +60,7 @@ class AclInviteDetailsPage extends ConsumerWidget {
   Future<void> _editInvite(BuildContext context) async {
     final nextInviteId = await context.pushNamed<String>(
       'aclInviteEdit',
-      pathParameters: <String, String>{
-        'petId': petId,
-        'inviteId': inviteId,
-      },
+      pathParameters: <String, String>{'petId': petId, 'inviteId': inviteId},
     );
     if (nextInviteId == null || !context.mounted) {
       return;
@@ -142,81 +137,62 @@ class _AclInviteDetailsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final invite = state.invite;
+    final deeplinkUrl = invite.deeplinkUrl;
+    final hasLink = deeplinkUrl != null && deeplinkUrl.isNotEmpty;
     final permissions = AclPermissionDraft.fromPolicy(invite.policy);
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
-        Text(
-          'Ссылка',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+        _InviteSummaryCard(invite: invite),
         const SizedBox(height: PawlySpacing.md),
-        _CopyValueCard(
-          value: invite.deeplinkUrl ?? 'Ссылка недоступна',
-          onCopy: invite.deeplinkUrl == null
-              ? null
-              : () => _copyText(
-                    context,
-                    invite.deeplinkUrl!,
-                    'Ссылка приглашения скопирована.',
-                  ),
-        ),
-        const SizedBox(height: PawlySpacing.sm),
-        PawlyButton(
-          label: 'Поделиться ссылкой',
-          onPressed: invite.deeplinkUrl == null
-              ? null
-              : () => _shareLink(
-                    context,
-                    invite.deeplinkUrl!,
-                  ),
-          variant: PawlyButtonVariant.secondary,
-          icon: Icons.ios_share_rounded,
-        ),
-        const SizedBox(height: PawlySpacing.lg),
-        Text(
-          'Код',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+        _InviteDetailsSection(
+          title: 'Ссылка',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _InviteValueTile(
+                value: hasLink ? deeplinkUrl : 'Ссылка недоступна',
+                isMuted: !hasLink,
+                onCopy: hasLink
+                    ? () => _copyText(
+                          context,
+                          deeplinkUrl,
+                          'Ссылка приглашения скопирована.',
+                        )
+                    : null,
               ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        _CopyValueCard(
-          value: invite.code,
-          onCopy: () => _copyText(
-            context,
-            invite.code,
-            'Код приглашения скопирован.',
+              const SizedBox(height: PawlySpacing.sm),
+              PawlyButton(
+                label: 'Поделиться ссылкой',
+                onPressed:
+                    hasLink ? () => _shareLink(context, deeplinkUrl) : null,
+                variant: PawlyButtonVariant.secondary,
+                icon: Icons.ios_share_rounded,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: PawlySpacing.lg),
-        Text(
-          'Роль',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
         const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          child: Text(
-            _localizedRoleTitle(invite.role),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+        _InviteDetailsSection(
+          title: 'Код',
+          child: _InviteValueTile(
+            value: invite.code,
+            isCode: true,
+            onCopy: () =>
+                _copyText(context, invite.code, 'Код приглашения скопирован.'),
           ),
         ),
-        const SizedBox(height: PawlySpacing.lg),
-        Text(
-          'Права',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
         const SizedBox(height: PawlySpacing.md),
-        _ReadOnlyPermissionsTable(draft: permissions),
+        _InviteDetailsSection(
+          title: 'Права доступа',
+          child: _ReadOnlyPermissionsList(draft: permissions),
+        ),
       ],
     );
   }
@@ -230,15 +206,12 @@ class _AclInviteDetailsContent extends StatelessWidget {
     if (!context.mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _shareLink(
-    BuildContext context,
-    String url,
-  ) async {
+  Future<void> _shareLink(BuildContext context, String url) async {
     final box = context.findRenderObject() as RenderBox?;
     await Share.share(
       url,
@@ -251,44 +224,190 @@ class _AclInviteDetailsContent extends StatelessWidget {
   }
 }
 
-class _CopyValueCard extends StatelessWidget {
-  const _CopyValueCard({
-    required this.value,
-    this.onCopy,
-  });
+class _InviteSummaryCard extends StatelessWidget {
+  const _InviteSummaryCard({required this.invite});
 
-  final String value;
-  final VoidCallback? onCopy;
+  final AclInvite invite;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return PawlyCard(
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyLarge?.copyWith(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Доступ по приглашению',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xxs),
+            Text(
+              'Роль: ${_localizedRoleTitle(invite.role)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
-          ),
-          const SizedBox(width: PawlySpacing.md),
-          IconButton.outlined(
-            onPressed: onCopy,
-            icon: const Icon(Icons.copy_rounded),
-            tooltip: 'Копировать',
-          ),
-        ],
+            const SizedBox(height: PawlySpacing.xxs),
+            Text(
+              _inviteMetaLabel(invite),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ReadOnlyPermissionsTable extends StatelessWidget {
-  const _ReadOnlyPermissionsTable({required this.draft});
+class _InviteDetailsSection extends StatelessWidget {
+  const _InviteDetailsSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteValueTile extends StatelessWidget {
+  const _InviteValueTile({
+    required this.value,
+    this.isCode = false,
+    this.isMuted = false,
+    this.onCopy,
+  });
+
+  final String value;
+  final bool isCode;
+  final bool isMuted;
+  final VoidCallback? onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PawlySpacing.md,
+          vertical: PawlySpacing.sm,
+        ),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: SelectableText(
+                value,
+                style: (isCode
+                        ? theme.textTheme.titleMedium
+                        : theme.textTheme.bodyMedium)
+                    ?.copyWith(
+                  color: isMuted
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.onSurface,
+                  fontWeight: isCode ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: PawlySpacing.sm),
+            _InviteCopyButton(onPressed: onCopy),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteCopyButton extends StatelessWidget {
+  const _InviteCopyButton({this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return IconButton(
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: colorScheme.surface,
+        disabledBackgroundColor: colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.36,
+        ),
+        foregroundColor: colorScheme.primary,
+        disabledForegroundColor: colorScheme.onSurfaceVariant,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PawlyRadius.md),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.68),
+          ),
+        ),
+      ),
+      icon: const Icon(Icons.content_copy_rounded),
+      tooltip: 'Копировать',
+    );
+  }
+}
+
+class _ReadOnlyPermissionsList extends StatelessWidget {
+  const _ReadOnlyPermissionsList({required this.draft});
 
   final AclPermissionDraft draft;
 
@@ -297,108 +416,49 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return PawlyCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: PawlySpacing.md,
-              vertical: PawlySpacing.sm,
-            ),
+    return Column(
+      children: draft.items.map((item) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+          child: DecoratedBox(
             decoration: BoxDecoration(
-              color:
-                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(PawlyRadius.lg),
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.42,
+              ),
+              borderRadius: BorderRadius.circular(PawlyRadius.lg),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.64),
               ),
             ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    'Домен',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'Просмотр',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'Изменение',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ...draft.items.map((item) {
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: PawlySpacing.md,
-                vertical: PawlySpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: colorScheme.outlineVariant),
-                ),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.all(PawlySpacing.sm),
               child: Row(
                 children: <Widget>[
                   Expanded(
-                    flex: 3,
                     child: Text(
                       _domainLabel(item.domain),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Icon(
-                        item.canRead
-                            ? Icons.check_rounded
-                            : Icons.close_rounded,
-                        color: item.canRead
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: Center(
-                      child: Icon(
-                        item.canWrite
-                            ? Icons.check_rounded
-                            : Icons.close_rounded,
-                        color: item.canWrite
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
+                  const SizedBox(width: PawlySpacing.sm),
+                  Flexible(
+                    child: Text(
+                      _permissionLabel(item),
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ],
               ),
-            );
-          }),
-        ],
-      ),
+            ),
+          ),
+        );
+      }).toList(growable: false),
     );
   }
 }
@@ -410,23 +470,75 @@ class _AclInviteDetailsErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить приглашение'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const Text(
-            'Попробуйте открыть приглашение снова чуть позже.',
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить приглашение',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Попробуйте открыть приглашение снова чуть позже.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+String _inviteMetaLabel(AclInvite invite) {
+  final expiresAt = invite.expiresAt;
+  return expiresAt == null
+      ? 'Без срока действия'
+      : 'До ${_formatShortDate(expiresAt)}';
+}
+
+String _permissionLabel(AclPermissionSelection item) {
+  if (item.canWrite) {
+    return 'Просмотр и изменение';
+  }
+  if (item.canRead) {
+    return 'Только просмотр';
+  }
+  return 'Нет доступа';
+}
+
+String _formatShortDate(DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '$day.$month.${date.year}';
 }
 
 String _localizedRoleTitle(AclRole role) {

@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/models/profile_models.dart';
 import '../../../../core/providers/core_providers.dart';
@@ -55,15 +54,24 @@ class SettingsProfileController extends AsyncNotifier<SettingsProfileState> {
     state = AsyncData(await _load());
   }
 
-  Future<void> uploadPhoto(ImageSource source) async {
+  Future<void> uploadPhotoFromGallery() {
+    return _uploadPhoto(fromCamera: false);
+  }
+
+  Future<void> uploadPhotoFromCamera() {
+    return _uploadPhoto(fromCamera: true);
+  }
+
+  Future<void> _uploadPhoto({required bool fromCamera}) async {
     final current = state.asData?.value;
     if (current == null) {
       return;
     }
 
-    final file = await ref.read(mediaPickerServiceProvider).pickImage(
-          source: source,
-        );
+    final mediaPicker = ref.read(mediaPickerServiceProvider);
+    final file = fromCamera
+        ? await mediaPicker.takeAvatarPhoto()
+        : await mediaPicker.pickAvatarFromGallery();
     if (file == null) {
       return;
     }
@@ -80,31 +88,34 @@ class SettingsProfileController extends AsyncNotifier<SettingsProfileState> {
     }
   }
 
+  Future<void> deletePhoto() async {
+    final current = state.asData?.value;
+    if (current == null || (current.profile.avatarDownloadUrl ?? '').isEmpty) {
+      return;
+    }
+
+    state = AsyncData(current.copyWith(isUploadingPhoto: true));
+
+    try {
+      await ref.read(settingsRepositoryProvider).deleteAvatar();
+      final updatedProfile =
+          await ref.read(settingsRepositoryProvider).getProfile();
+      await _setProfile(updatedProfile, isUploadingPhoto: false);
+    } catch (_) {
+      state = AsyncData(current.copyWith(isUploadingPhoto: false));
+      rethrow;
+    }
+  }
+
   Future<ProfileResponse> updateName({
     required String firstName,
     required String lastName,
   }) async {
     final current = state.requireValue;
-    final updatedProfile = await ref.read(settingsRepositoryProvider).updateProfile(
-          firstName: firstName,
-          lastName: lastName,
-        );
-    await _setProfile(
-      updatedProfile,
-      isUploadingPhoto: current.isUploadingPhoto,
-    );
-    return updatedProfile;
-  }
-
-  Future<ProfileResponse> updatePreferences({
-    String? locale,
-    String? timeZone,
-  }) async {
-    final current = state.requireValue;
     final updatedProfile =
-        await ref.read(settingsRepositoryProvider).updatePreferences(
-              locale: locale,
-              timeZone: timeZone,
+        await ref.read(settingsRepositoryProvider).updateProfile(
+              firstName: firstName,
+              lastName: lastName,
             );
     await _setProfile(
       updatedProfile,
@@ -116,7 +127,6 @@ class SettingsProfileController extends AsyncNotifier<SettingsProfileState> {
   Future<SettingsProfileState> _load() async {
     final profile = await ref.read(settingsRepositoryProvider).getProfile();
     await ref.read(settingsRepositoryProvider).syncStoredPreferences(
-          locale: profile.locale,
           timeZone: profile.timeZone,
         );
     return SettingsProfileState(profile: profile, isUploadingPhoto: false);
@@ -127,7 +137,6 @@ class SettingsProfileController extends AsyncNotifier<SettingsProfileState> {
     required bool isUploadingPhoto,
   }) async {
     await ref.read(settingsRepositoryProvider).syncStoredPreferences(
-          locale: profile.locale,
           timeZone: profile.timeZone,
         );
     state = AsyncData(

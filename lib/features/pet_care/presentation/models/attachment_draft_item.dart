@@ -28,7 +28,8 @@ class AttachmentDraftItem {
     );
   }
 
-  factory AttachmentDraftItem.fromHealthAttachment(HealthAttachment attachment) {
+  factory AttachmentDraftItem.fromHealthAttachment(
+      HealthAttachment attachment) {
     return AttachmentDraftItem(
       fileId: attachment.fileId,
       fileName: attachment.fileName ?? 'Файл',
@@ -41,4 +42,15 @@ class AttachmentDraftItem {
   final String fileName;
   final String mimeType;
   final int sizeBytes;
+
+  AttachmentDraftItem copyWith({
+    String? fileName,
+  }) {
+    return AttachmentDraftItem(
+      fileId: fileId,
+      fileName: fileName ?? this.fileName,
+      mimeType: mimeType,
+      sizeBytes: sizeBytes,
+    );
+  }
 }

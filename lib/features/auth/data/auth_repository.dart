@@ -46,7 +46,7 @@ class AuthRepository {
 
       await _persistTokens(
         refreshed,
-        locale: existingSession.locale,
+        locale: 'ru',
       );
       _syncPushTokenInBackground();
 
@@ -73,7 +73,12 @@ class AuthRepository {
   Future<void> loginWithGoogle({required String idToken}) async {
     final devicePreferences = await _devicePreferencesService.read();
     final tokens = await _authApiClient.loginByOAuth(
-      LoginOAuthRequest(provider: 'google', idToken: idToken),
+      LoginOAuthRequest(
+        provider: 'google',
+        idToken: idToken,
+        locale: devicePreferences.locale,
+        timeZone: devicePreferences.timeZone,
+      ),
     );
 
     await _persistTokens(tokens, locale: devicePreferences.locale);

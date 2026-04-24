@@ -1,3 +1,4 @@
+import 'json_map.dart';
 import 'json_parsers.dart';
 
 class PetDictionariesResponse {
@@ -107,13 +108,13 @@ class SpeciesDictionaryItem {
     final json = asJsonMap(data);
 
     return SpeciesDictionaryItem(
-      id: asString(json['id']),
-      code: asString(json['code']),
-      nameRu: asString(json['name_ru']),
-      nameEn: asString(json['name_en']),
-      iconKey: asString(json['icon_key']),
+      id: asString(json['id'], fallback: asString(json['code'])),
+      code: asString(json['code'], fallback: asString(json['id'])),
+      nameRu: _readLocalizedName(json, primaryKey: 'name_ru'),
+      nameEn: _readLocalizedName(json, primaryKey: 'name_en'),
+      iconKey: asString(json['icon_key'], fallback: 'paw'),
       sortOrder: asInt(json['sort_order']),
-      isActive: asBool(json['is_active']),
+      isActive: asBool(json['is_active'], fallback: asBool(json['active'])),
     );
   }
 
@@ -145,8 +146,8 @@ class BreedDictionaryItem {
     return BreedDictionaryItem(
       id: asString(json['id']),
       speciesId: asString(json['species_id']),
-      nameRu: asString(json['name_ru']),
-      nameEn: asString(json['name_en']),
+      nameRu: _readLocalizedName(json, primaryKey: 'name_ru'),
+      nameEn: _readLocalizedName(json, primaryKey: 'name_en'),
       sortOrder: asInt(json['sort_order']),
       isActive: asBool(json['is_active']),
     );
@@ -182,8 +183,8 @@ class PatternDictionaryItem {
     return PatternDictionaryItem(
       id: asString(json['id']),
       speciesId: asNullableString(json['species_id']),
-      nameRu: asString(json['name_ru']),
-      nameEn: asString(json['name_en']),
+      nameRu: _readLocalizedName(json, primaryKey: 'name_ru'),
+      nameEn: _readLocalizedName(json, primaryKey: 'name_en'),
       iconKey: asNullableString(json['icon_key']),
       sortOrder: asInt(json['sort_order']),
       isActive: asBool(json['is_active']),
@@ -217,8 +218,8 @@ class ColorPresetDictionaryItem {
 
     return ColorPresetDictionaryItem(
       id: asString(json['id']),
-      nameRu: asString(json['name_ru']),
-      nameEn: asString(json['name_en']),
+      nameRu: _readLocalizedName(json, primaryKey: 'name_ru'),
+      nameEn: _readLocalizedName(json, primaryKey: 'name_en'),
       hex: asString(json['hex']),
       sortOrder: asInt(json['sort_order']),
       isActive: asBool(json['is_active']),
@@ -228,6 +229,15 @@ class ColorPresetDictionaryItem {
   String localizedName({String? locale}) {
     return _pickLocalizedName(nameRu: nameRu, nameEn: nameEn, locale: locale);
   }
+}
+
+String _readLocalizedName(JsonMap json, {required String primaryKey}) {
+  final localized = asString(json[primaryKey]);
+  if (localized.isNotEmpty) {
+    return localized;
+  }
+
+  return asString(json['name']);
 }
 
 String _pickLocalizedName({

@@ -33,12 +33,12 @@ class PawlyApp extends ConsumerWidget {
       ],
       supportedLocales: const <Locale>[
         Locale('ru'),
-        Locale('en'),
       ],
       routerConfig: router,
       builder: (context, child) {
         return _PushNotificationsBinding(
           child: PawlyDeepLinkListener(
+            router: router,
             child: child ?? const SizedBox.shrink(),
           ),
         );

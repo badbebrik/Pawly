@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/models/health_models.dart';
-import '../../../../core/network/models/json_parsers.dart';
 import '../../../../core/network/models/log_models.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../data/health_file_upload_service.dart';
@@ -14,7 +13,8 @@ final healthRepositoryProvider = Provider<HealthRepository>((ref) {
   return HealthRepository(healthApiClient: healthApiClient);
 });
 
-final healthFileUploadServiceProvider = Provider<HealthFileUploadService>((ref) {
+final healthFileUploadServiceProvider =
+    Provider<HealthFileUploadService>((ref) {
   final healthRepository = ref.watch(healthRepositoryProvider);
   final uploadDio = ref.watch(uploadDioProvider);
   return HealthFileUploadService(
@@ -33,17 +33,159 @@ final petDocumentsSummaryProvider =
 });
 
 final petScheduledItemsProvider = FutureProvider.autoDispose
-    .family<List<ScheduledItemCard>, String>((ref, petId) async {
-  final response = await ref.read(healthRepositoryProvider).listScheduledItems(
-        petId,
-        query: ScheduledItemsQuery(
-          limit: 50,
-          includePast: false,
-          dateFrom: formatDate(DateTime.now()),
-        ),
-      );
-  return response.items;
+    .family<PetScheduledItemsState, String>((ref, petId) async {
+  final repository = ref.read(healthRepositoryProvider);
+  final now = DateTime.now();
+  final scheduledItems = await _loadScheduledReminderItems(repository, petId);
+  final occurrencesResponse = await repository.listScheduledItemOccurrences(
+    petId,
+    query: ScheduledItemOccurrencesQuery(
+      limit: 100,
+      dateFrom: now.toUtc().toIso8601String(),
+      dateTo: now.add(const Duration(days: 90)).toUtc().toIso8601String(),
+    ),
+  );
+  final nextOccurrencesByItemId = <String, DateTime>{};
+  for (final occurrence in occurrencesResponse.items) {
+    final scheduledFor = occurrence.scheduledFor;
+    if (scheduledFor == null) {
+      continue;
+    }
+    nextOccurrencesByItemId.putIfAbsent(
+      occurrence.scheduledItemId,
+      () => scheduledFor,
+    );
+  }
+
+  final active = <ScheduledReminderEntry>[];
+  final past = <ScheduledReminderEntry>[];
+  for (final item in scheduledItems) {
+    final nextOccurrenceAt = nextOccurrencesByItemId[item.id];
+    final entry = ScheduledReminderEntry(
+      item: item,
+      nextOccurrenceAt: nextOccurrenceAt,
+    );
+    if (_isScheduledReminderActive(item, nextOccurrenceAt, now)) {
+      active.add(entry);
+    } else {
+      past.add(entry);
+    }
+  }
+  active.sort(_compareActiveReminderEntries);
+  past.sort(_comparePastReminderEntries);
+
+  return PetScheduledItemsState(active: active, past: past);
 });
+
+Future<List<ScheduledItemCard>> _loadScheduledReminderItems(
+  HealthRepository repository,
+  String petId,
+) async {
+  String? cursor;
+  final items = <ScheduledItemCard>[];
+  for (var page = 0; page < 5; page++) {
+    final response = await repository.listScheduledItems(
+      petId,
+      query: ScheduledItemsQuery(
+        cursor: cursor,
+        limit: 100,
+        includePast: true,
+      ),
+    );
+    items.addAll(response.items);
+    cursor = response.nextCursor;
+    if (cursor == null || cursor.isEmpty) {
+      break;
+    }
+  }
+  return items;
+}
+
+@immutable
+class PetScheduledItemsState {
+  const PetScheduledItemsState({
+    required this.active,
+    required this.past,
+  });
+
+  final List<ScheduledReminderEntry> active;
+  final List<ScheduledReminderEntry> past;
+
+  bool get isEmpty => active.isEmpty && past.isEmpty;
+}
+
+@immutable
+class ScheduledReminderEntry {
+  const ScheduledReminderEntry({
+    required this.item,
+    this.nextOccurrenceAt,
+  });
+
+  final ScheduledItemCard item;
+  final DateTime? nextOccurrenceAt;
+
+  DateTime? get displayAt => nextOccurrenceAt ?? item.startsAt;
+}
+
+bool _isScheduledReminderActive(
+  ScheduledItemCard item,
+  DateTime? nextOccurrenceAt,
+  DateTime now,
+) {
+  if (_isMedicalScheduledSource(item.sourceType)) {
+    return true;
+  }
+  if (nextOccurrenceAt != null && !nextOccurrenceAt.isBefore(now)) {
+    return true;
+  }
+  final startsAt = item.startsAt;
+  if (startsAt != null && !startsAt.isBefore(now)) {
+    return true;
+  }
+  final recurrence = item.recurrence;
+  if (recurrence == null) {
+    return false;
+  }
+  final until = recurrence.until;
+  return until == null || !until.isBefore(now);
+}
+
+bool _isMedicalScheduledSource(String sourceType) {
+  return sourceType == 'VET_VISIT' ||
+      sourceType == 'VACCINATION' ||
+      sourceType == 'PROCEDURE';
+}
+
+int _compareActiveReminderEntries(
+  ScheduledReminderEntry a,
+  ScheduledReminderEntry b,
+) {
+  return _compareNullableDateTimesAsc(a.displayAt, b.displayAt);
+}
+
+int _comparePastReminderEntries(
+  ScheduledReminderEntry a,
+  ScheduledReminderEntry b,
+) {
+  return _compareNullableDateTimesDesc(a.displayAt, b.displayAt);
+}
+
+int _compareNullableDateTimesAsc(DateTime? a, DateTime? b) {
+  if (a == null && b == null) {
+    return 0;
+  }
+  if (a == null) {
+    return 1;
+  }
+  if (b == null) {
+    return -1;
+  }
+  return a.compareTo(b);
+}
+
+int _compareNullableDateTimesDesc(DateTime? a, DateTime? b) {
+  return _compareNullableDateTimesAsc(b, a);
+}
 
 final petScheduledItemProvider = FutureProvider.autoDispose
     .family<ScheduledItem, PetScheduledItemRef>((ref, args) {

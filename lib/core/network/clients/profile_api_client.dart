@@ -57,4 +57,12 @@ class ProfileApiClient {
       decoder: ConfirmAvatarUploadResponse.fromJson,
     );
   }
+
+  Future<EmptyResponse> deleteAvatar() {
+    return _apiClient.delete<EmptyResponse>(
+      ApiEndpoints.profileAvatar,
+      requestOptions: _withToken,
+      decoder: EmptyResponse.fromJson,
+    );
+  }
 }

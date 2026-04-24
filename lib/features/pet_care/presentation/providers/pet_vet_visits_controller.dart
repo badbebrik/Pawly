@@ -21,6 +21,20 @@ final petVetVisitDetailsProvider =
 
 enum VetVisitBucket { upcoming, history }
 
+class VetVisitCreateResult {
+  const VetVisitCreateResult({
+    required this.visit,
+    required this.relatedLogsLinked,
+    required this.listReloaded,
+  });
+
+  final VetVisit visit;
+  final bool relatedLogsLinked;
+  final bool listReloaded;
+
+  bool get hasPostCreateIssue => !relatedLogsLinked || !listReloaded;
+}
+
 class PetVetVisitRef {
   const PetVetVisitRef({
     required this.petId,
@@ -51,6 +65,7 @@ class PetVetVisitsState {
     required this.upcomingNextCursor,
     required this.historyNextCursor,
     required this.loadingMoreBucket,
+    required this.searchQuery,
     required this.isCreating,
     required this.busyVisitIds,
   });
@@ -62,6 +77,7 @@ class PetVetVisitsState {
   final String? upcomingNextCursor;
   final String? historyNextCursor;
   final VetVisitBucket? loadingMoreBucket;
+  final String searchQuery;
   final bool isCreating;
   final Set<String> busyVisitIds;
 
@@ -95,6 +111,7 @@ class PetVetVisitsState {
     bool clearHistoryNextCursor = false,
     VetVisitBucket? loadingMoreBucket,
     bool clearLoadingMoreBucket = false,
+    String? searchQuery,
     bool? isCreating,
     Set<String>? busyVisitIds,
   }) {
@@ -112,6 +129,7 @@ class PetVetVisitsState {
       loadingMoreBucket: clearLoadingMoreBucket
           ? null
           : loadingMoreBucket ?? this.loadingMoreBucket,
+      searchQuery: searchQuery ?? this.searchQuery,
       isCreating: isCreating ?? this.isCreating,
       busyVisitIds: busyVisitIds ?? this.busyVisitIds,
     );
@@ -157,7 +175,11 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
     try {
       final response = await ref.read(healthRepositoryProvider).listVetVisits(
             _petId,
-            query: _queryFor(bucket, cursor: cursor),
+            query: _queryFor(
+              bucket,
+              cursor: cursor,
+              searchQuery: current.searchQuery,
+            ),
           );
       state = AsyncData(
         switch (bucket) {
@@ -184,34 +206,74 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
     }
   }
 
-  Future<void> createVetVisit({
+  Future<VetVisitCreateResult> createVetVisit({
     required UpsertVetVisitInput input,
   }) async {
     final current = state.asData?.value;
     if (current == null || current.isCreating) {
-      return;
+      throw StateError('Список визитов еще не загружен.');
     }
 
     state = AsyncData(current.copyWith(isCreating: true));
 
+    late final VetVisit visit;
     try {
-      final visit = await ref.read(healthRepositoryProvider).createVetVisit(
+      visit = await ref.read(healthRepositoryProvider).createVetVisit(
             _petId,
             input: input,
           );
-      for (final logId in input.relatedLogIds) {
+    } catch (error, stackTrace) {
+      state = AsyncData(current.copyWith(isCreating: false));
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    var relatedLogsLinked = true;
+    for (final logId in input.relatedLogIds) {
+      try {
         await ref.read(healthRepositoryProvider).linkLogToVetVisit(
               _petId,
               visit.id,
               logId: logId,
             );
+      } catch (_) {
+        relatedLogsLinked = false;
       }
+    }
+
+    var listReloaded = true;
+    try {
       state = AsyncData(
         await _reloadLists(current.copyWith(isCreating: false)),
       );
-    } catch (error, stackTrace) {
+    } catch (_) {
+      listReloaded = false;
       state = AsyncData(current.copyWith(isCreating: false));
-      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    return VetVisitCreateResult(
+      visit: visit,
+      relatedLogsLinked: relatedLogsLinked,
+      listReloaded: listReloaded,
+    );
+  }
+
+  Future<void> setSearchQuery(String value) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final query = value.trim();
+    if (query == current.searchQuery) {
+      return;
+    }
+
+    try {
+      state = AsyncData(
+        await _reloadLists(current.copyWith(searchQuery: query)),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
     }
   }
 
@@ -343,6 +405,7 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
       upcomingNextCursor: upcoming.nextCursor,
       historyNextCursor: history.nextCursor,
       loadingMoreBucket: null,
+      searchQuery: '',
       isCreating: false,
       busyVisitIds: <String>{},
     );
@@ -352,11 +415,17 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
     final results = await Future.wait<Object>(<Future<Object>>[
       ref.read(healthRepositoryProvider).listVetVisits(
             _petId,
-            query: _queryFor(VetVisitBucket.upcoming),
+            query: _queryFor(
+              VetVisitBucket.upcoming,
+              searchQuery: current.searchQuery,
+            ),
           ),
       ref.read(healthRepositoryProvider).listVetVisits(
             _petId,
-            query: _queryFor(VetVisitBucket.history),
+            query: _queryFor(
+              VetVisitBucket.history,
+              searchQuery: current.searchQuery,
+            ),
           ),
     ]);
 
@@ -374,10 +443,15 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
     );
   }
 
-  VetVisitListQuery _queryFor(VetVisitBucket bucket, {String? cursor}) {
+  VetVisitListQuery _queryFor(
+    VetVisitBucket bucket, {
+    String? cursor,
+    String? searchQuery,
+  }) {
     return VetVisitListQuery(
       cursor: cursor,
       limit: 20,
+      searchQuery: searchQuery?.isEmpty == true ? null : searchQuery,
       bucket: switch (bucket) {
         VetVisitBucket.upcoming => 'upcoming',
         VetVisitBucket.history => 'history',

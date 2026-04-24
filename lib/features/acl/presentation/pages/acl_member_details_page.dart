@@ -39,8 +39,8 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
   Widget build(BuildContext context) {
     final accessState = ref.watch(aclAccessControllerProvider(widget.petId));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Участник')),
+    return PawlyScreenScaffold(
+      title: 'Участник',
       body: accessState.when(
         data: (state) {
           final member = _memberById(state.members, widget.memberId);
@@ -115,8 +115,8 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
     setState(() {
       _selectedRoleId = roleId;
       _selectedPresetId = preset?.id;
-      if (preset != null) {
-        _permissions = AclPermissionDraft.fromPolicy(preset.policy);
+      if (role != null) {
+        _permissions = AclPermissionDraft.fromPolicy(role.policy);
       }
     });
   }
@@ -149,9 +149,9 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
     if (_selectedRoleId == null ||
         _selectedRoleId!.isEmpty ||
         _permissions == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите роль участника.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Выберите роль участника.')));
       return;
     }
 
@@ -177,8 +177,10 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                _aclErrorMessage(error, 'Не удалось обновить участника.'))),
+          content: Text(
+            _aclErrorMessage(error, 'Не удалось обновить участника.'),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -227,8 +229,8 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content:
-                Text(_aclErrorMessage(error, 'Не удалось отозвать доступ.'))),
+          content: Text(_aclErrorMessage(error, 'Не удалось отозвать доступ.')),
+        ),
       );
     } finally {
       if (mounted) {
@@ -409,20 +411,17 @@ class _AclMemberDetailsContent extends StatelessWidget {
         .toList(growable: false);
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
-        _MemberSummaryCard(
-          member: member,
-          onMessageTap: onMessageTap,
-        ),
+        _MemberSummaryCard(member: member, onMessageTap: onMessageTap),
         const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          title: Text(
-            'Роль',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        _AclDetailsSection(
+          title: 'Роль',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -447,11 +446,11 @@ class _AclMemberDetailsContent extends StatelessWidget {
                     runSpacing: PawlySpacing.xs,
                     children: systemRoles
                         .map(
-                          (role) => ChoiceChip(
-                            label: Text(_localizedRoleTitle(role)),
-                            selected: selectedRoleId == role.id,
-                            onSelected:
-                                canEdit ? (_) => onRoleSelected(role.id) : null,
+                          (role) => _AclRolePill(
+                            label: _localizedRoleTitle(role),
+                            isSelected: selectedRoleId == role.id,
+                            onTap:
+                                canEdit ? () => onRoleSelected(role.id) : null,
                           ),
                         )
                         .toList(growable: false),
@@ -471,11 +470,11 @@ class _AclMemberDetailsContent extends StatelessWidget {
                     runSpacing: PawlySpacing.xs,
                     children: customRoles
                         .map(
-                          (role) => ChoiceChip(
-                            label: Text(role.title),
-                            selected: selectedRoleId == role.id,
-                            onSelected:
-                                canEdit ? (_) => onRoleSelected(role.id) : null,
+                          (role) => _AclRolePill(
+                            label: role.title,
+                            isSelected: selectedRoleId == role.id,
+                            onTap:
+                                canEdit ? () => onRoleSelected(role.id) : null,
                           ),
                         )
                         .toList(growable: false),
@@ -486,13 +485,8 @@ class _AclMemberDetailsContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          title: Text(
-            'Права доступа',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        _AclDetailsSection(
+          title: 'Права доступа',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -518,13 +512,8 @@ class _AclMemberDetailsContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          title: Text(
-            'Действия',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        _AclDetailsSection(
+          title: 'Действия',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -532,7 +521,6 @@ class _AclMemberDetailsContent extends StatelessWidget {
                 PawlyButton(
                   label: isSubmitting ? 'Сохраняем...' : 'Сохранить права',
                   onPressed: isSubmitting ? null : onSave,
-                  icon: Icons.check_rounded,
                 ),
               if (canRevoke) ...<Widget>[
                 const SizedBox(height: PawlySpacing.sm),
@@ -540,7 +528,6 @@ class _AclMemberDetailsContent extends StatelessWidget {
                   label: 'Отозвать доступ',
                   onPressed: isSubmitting ? null : onRevoke,
                   variant: PawlyButtonVariant.secondary,
-                  icon: Icons.person_remove_alt_1_rounded,
                 ),
               ],
               if (member.isPrimaryOwner) ...<Widget>[
@@ -557,7 +544,6 @@ class _AclMemberDetailsContent extends StatelessWidget {
                   label: 'Передать роль владельца',
                   onPressed: onOwnerTransferPressed,
                   variant: PawlyButtonVariant.secondary,
-                  icon: Icons.workspace_premium_rounded,
                 ),
               ],
               if (isMe && !member.isPrimaryOwner) ...<Widget>[
@@ -566,7 +552,6 @@ class _AclMemberDetailsContent extends StatelessWidget {
                   label: 'Выйти из ухода',
                   onPressed: isSubmitting ? null : onLeave,
                   variant: PawlyButtonVariant.secondary,
-                  icon: Icons.logout_rounded,
                 ),
               ],
               if (!canManage) ...<Widget>[
@@ -586,10 +571,7 @@ class _AclMemberDetailsContent extends StatelessWidget {
 }
 
 class _MemberSummaryCard extends StatelessWidget {
-  const _MemberSummaryCard({
-    required this.member,
-    this.onMessageTap,
-  });
+  const _MemberSummaryCard({required this.member, this.onMessageTap});
 
   final AclMember member;
   final VoidCallback? onMessageTap;
@@ -597,64 +579,183 @@ class _MemberSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final profile = member.profile;
     final name = _memberName(profile);
 
-    return PawlyCard(
-      trailing: onMessageTap == null
-          ? null
-          : IconButton(
-              onPressed: onMessageTap,
-              tooltip: 'Открыть чат',
-              icon: const Icon(Icons.chat_bubble_rounded),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            _AclAvatar(
+              userId: member.userId,
+              photoUrl: profile?.avatarDownloadUrl,
+              fallbackLabel: name,
+              showCrown: member.isPrimaryOwner,
             ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _AclAvatar(
-            userId: member.userId,
-            photoUrl: profile?.avatarDownloadUrl,
-            fallbackLabel: name,
-            showCrown: member.isPrimaryOwner,
-          ),
-          const SizedBox(width: PawlySpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  name,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: PawlySpacing.xs),
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xs,
-                  children: <Widget>[
-                    if (member.isPrimaryOwner)
-                      const PawlyBadge(
-                        label: 'Владелец',
-                        tone: PawlyBadgeTone.warning,
-                      )
-                    else
-                      PawlyBadge(
-                        label: _localizedRoleTitle(member.role),
-                        tone: PawlyBadgeTone.neutral,
-                      ),
-                    PawlyBadge(
-                      label: _memberStatusLabel(member.status),
-                      tone: member.status == 'ACTIVE'
-                          ? PawlyBadgeTone.success
-                          : PawlyBadgeTone.neutral,
+            const SizedBox(width: PawlySpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    member.isPrimaryOwner
+                        ? 'Роль: основной владелец'
+                        : 'Роль: ${_localizedRoleTitle(member.role)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
+            if (onMessageTap != null) ...[
+              const SizedBox(width: PawlySpacing.sm),
+              _AclDetailsIconButton(onTap: onMessageTap!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AclDetailsSection extends StatelessWidget {
+  const _AclDetailsSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AclRolePill extends StatelessWidget {
+  const _AclRolePill({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+          borderRadius: BorderRadius.circular(PawlyRadius.pill),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.84),
           ),
-        ],
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: PawlySpacing.md,
+          vertical: PawlySpacing.xs,
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AclDetailsIconButton extends StatelessWidget {
+  const _AclDetailsIconButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(PawlyRadius.pill),
+      child: Ink(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+          ),
+        ),
+        child: Icon(
+          Icons.chat_bubble_outline_rounded,
+          size: 20,
+          color: colorScheme.primary,
+        ),
       ),
     );
   }
@@ -677,43 +778,84 @@ class _PermissionEditorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            label,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+          borderRadius: BorderRadius.circular(PawlyRadius.lg),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.64),
           ),
-          const SizedBox(height: PawlySpacing.xs),
-          Row(
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(PawlySpacing.sm),
+          child: Row(
             children: <Widget>[
               Expanded(
-                child: SwitchListTile.adaptive(
-                  value: selection.canRead,
-                  onChanged: enabled ? onReadChanged : null,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: const Text('Чтение'),
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(width: PawlySpacing.sm),
-              Expanded(
-                child: SwitchListTile.adaptive(
-                  value: selection.canWrite,
-                  onChanged: enabled ? onWriteChanged : null,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: const Text('Изменение'),
-                ),
+              _PermissionSwitch(
+                label: 'Чтение',
+                value: selection.canRead,
+                enabled: enabled,
+                onChanged: onReadChanged,
+              ),
+              const SizedBox(width: PawlySpacing.sm),
+              _PermissionSwitch(
+                label: 'Изменение',
+                value: selection.canWrite,
+                enabled: enabled,
+                onChanged: onWriteChanged,
               ),
             ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _PermissionSwitch extends StatelessWidget {
+  const _PermissionSwitch({
+    required this.label,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: PawlySpacing.xxs),
+        Switch(value: value, onChanged: enabled ? onChanged : null),
+      ],
     );
   }
 }
@@ -738,17 +880,22 @@ class _AclAvatar extends StatelessWidget {
     final resolvedPhotoUrl = hasPhoto ? _normalizeStorageUrl(photoUrl!) : null;
 
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: 56,
+      height: 56,
       child: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
           Container(
-            width: 72,
-            height: 72,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.62,
+              ),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+              ),
             ),
             clipBehavior: Clip.antiAlias,
             child: hasPhoto
@@ -759,7 +906,7 @@ class _AclAvatar extends StatelessWidget {
                       entityId: userId,
                       imageUrl: resolvedPhotoUrl,
                     ),
-                    targetLogicalSize: 72,
+                    targetLogicalSize: 56,
                     fit: BoxFit.cover,
                     errorWidget: (_) =>
                         _AclAvatarFallback(label: fallbackLabel),
@@ -768,20 +915,22 @@ class _AclAvatar extends StatelessWidget {
           ),
           if (showCrown)
             Positioned(
-              top: -4,
-              right: -2,
+              top: -3,
+              right: -3,
               child: Container(
-                width: 28,
-                height: 28,
+                width: 22,
+                height: 22,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFD54F),
+                  color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(PawlyRadius.pill),
-                  border: Border.all(color: colorScheme.surface, width: 2),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+                  ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.workspace_premium_rounded,
-                  size: 16,
-                  color: Colors.black87,
+                  size: 14,
+                  color: colorScheme.primary,
                 ),
               ),
             ),
@@ -820,18 +969,47 @@ class _AclMemberMissingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить участника'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const Text(
-            'Участник не найден или список доступа еще не обновился.',
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить участника',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Участник не найден или список доступа еще не обновился.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -887,14 +1065,6 @@ String _memberName(AclMemberProfile? profile) {
   return 'Участник';
 }
 
-String _memberStatusLabel(String status) {
-  return switch (status) {
-    'ACTIVE' => 'Активен',
-    'REMOVED' => 'Отозван',
-    _ => status,
-  };
-}
-
 String _localizedRoleTitle(AclRole role) {
   return switch (role.code) {
     'OWNER' => 'Владелец',
@@ -941,10 +1111,7 @@ Future<void> _openDirectChat({
   try {
     final conversation =
         await ref.read(chatRepositoryProvider).openConversation(
-              OpenDirectChatInput(
-                petId: petId,
-                otherUserId: otherUserId,
-              ),
+              OpenDirectChatInput(petId: petId, otherUserId: otherUserId),
             );
     if (!context.mounted) {
       return;
@@ -959,8 +1126,8 @@ Future<void> _openDirectChat({
     if (!context.mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Не удалось открыть чат.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Не удалось открыть чат.')));
   }
 }

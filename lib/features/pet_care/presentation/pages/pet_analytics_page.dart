@@ -6,12 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/models/log_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/health_controllers.dart';
+import '../utils/metric_unit_formatter.dart';
 
 class PetAnalyticsPage extends ConsumerStatefulWidget {
-  const PetAnalyticsPage({
-    required this.petId,
-    super.key,
-  });
+  const PetAnalyticsPage({required this.petId, super.key});
 
   final String petId;
 
@@ -54,9 +52,8 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
     final typeCatalog = _AnalyticsTypeCatalog.fromBootstrap(
       bootstrapAsync.asData?.value,
     );
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Аналитика')),
+    return PawlyScreenScaffold(
+      title: 'Динамика',
       body: metricsAsync.when(
         data: (response) => _buildContent(
           context,
@@ -92,17 +89,22 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
 
     if (metrics.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
         children: <Widget>[
           _AnalyticsCompactToolbar(
-            metricLabel: 'Нет метрик',
+            metricLabel: 'Нет показателей',
             onPickMetric: null,
             onOpenFilters: () => _openFilters(typeCatalog),
             hasActiveFilters: _hasCustomFilters,
             activeFiltersSummary: _activeFiltersSummary(typeCatalog),
             isFiltersLoading: isTypeCatalogLoading,
           ),
-          const SizedBox(height: PawlySpacing.lg),
+          const SizedBox(height: PawlySpacing.md),
           _AnalyticsEmptyState(
             hasTypeFilters: _selectedTypeIds.isNotEmpty,
             hasPeriodFilters: _dateFrom != null || _dateTo != null,
@@ -127,7 +129,12 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
     );
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
         _AnalyticsCompactToolbar(
           metricLabel: selectedMetric.metricName,
@@ -137,15 +144,17 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
           activeFiltersSummary: _activeFiltersSummary(typeCatalog),
           isFiltersLoading: isTypeCatalogLoading,
         ),
-        const SizedBox(height: PawlySpacing.lg),
+        const SizedBox(height: PawlySpacing.md),
         seriesAsync.when(
           data: (series) => _AnalyticsMetricView(
             summaryMetric: selectedMetric,
             series: series,
           ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const PawlyCard(
-            child: Text('Не удалось загрузить график по выбранной метрике.'),
+          loading: () => const _AnalyticsLoadingBlock(),
+          error: (_, __) => const _AnalyticsInlineMessage(
+            title: 'Не удалось загрузить график',
+            message:
+                'Попробуйте выбрать показатель ещё раз или обновить экран.',
           ),
         ),
       ],
@@ -260,7 +269,7 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
   }
 }
 
-class _AnalyticsMetricView extends StatelessWidget {
+class _AnalyticsMetricView extends StatefulWidget {
   const _AnalyticsMetricView({
     required this.summaryMetric,
     required this.series,
@@ -270,42 +279,71 @@ class _AnalyticsMetricView extends StatelessWidget {
   final MetricSeriesResponse series;
 
   @override
+  State<_AnalyticsMetricView> createState() => _AnalyticsMetricViewState();
+}
+
+class _AnalyticsMetricViewState extends State<_AnalyticsMetricView> {
+  int? _selectedPointIndex;
+
+  @override
+  void didUpdateWidget(covariant _AnalyticsMetricView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.series.metric.id != widget.series.metric.id ||
+        oldWidget.series.points.length != widget.series.points.length) {
+      _selectedPointIndex = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final summary = series.summary;
-    final unit = series.metric.unitCode;
-    final inputKind = series.metric.inputKind;
-    final selectedPoint = series.points.isEmpty ? null : series.points.last;
+    final summary = widget.series.summary;
+    final unit = widget.series.metric.unitCode;
+    final inputKind = widget.series.metric.inputKind;
+    final selectedPoint = _selectedPoint();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        PawlyCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              _AnalyticsHeroValue(
-                title: summaryMetric.metricName,
-                value: _formatValue(
-                  selectedPoint?.valueNum ?? summary?.lastValueNum,
-                  inputKind,
-                  unit,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _AnalyticsHeroValue(
+                  title: widget.summaryMetric.metricName,
+                  value: _formatValue(
+                    selectedPoint?.valueNum ?? summary?.lastValueNum,
+                    inputKind,
+                    unit,
+                  ),
+                  subtitle: selectedPoint == null
+                      ? _metricKindLabel(inputKind)
+                      : _formatPointSubtitle(selectedPoint),
                 ),
-                subtitle: selectedPoint == null
-                    ? _metricKindLabel(inputKind)
-                    : _formatPointSubtitle(selectedPoint),
-              ),
-              const SizedBox(height: PawlySpacing.lg),
-              SizedBox(
-                height: 400,
-                child: series.points.isEmpty
-                    ? const Center(child: Text('Нет данных для графика.'))
-                    : _MetricLineChart(
-                        points: series.points,
-                        inputKind: inputKind,
-                        unit: unit,
-                      ),
-              ),
-            ],
+                const SizedBox(height: PawlySpacing.md),
+                SizedBox(
+                  height: 320,
+                  child: widget.series.points.isEmpty
+                      ? const _ChartEmptyState()
+                      : _MetricLineChart(
+                          points: widget.series.points,
+                          inputKind: inputKind,
+                          unit: unit,
+                          selectedIndex: _selectedPointIndex,
+                          onSelectedIndexChanged: _selectPoint,
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
         if (summary != null) ...<Widget>[
@@ -338,6 +376,129 @@ class _AnalyticsMetricView extends StatelessWidget {
       ],
     );
   }
+
+  MetricSeriesPoint? _selectedPoint() {
+    final points = widget.series.points;
+    if (points.isEmpty) {
+      return null;
+    }
+    final selectedIndex = _selectedPointIndex;
+    if (selectedIndex != null &&
+        selectedIndex >= 0 &&
+        selectedIndex < points.length) {
+      return points[selectedIndex];
+    }
+    return points.last;
+  }
+
+  void _selectPoint(int index) {
+    if (_selectedPointIndex == index) {
+      return;
+    }
+    setState(() {
+      _selectedPointIndex = index;
+    });
+  }
+}
+
+class _AnalyticsLoadingBlock extends StatelessWidget {
+  const _AnalyticsLoadingBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: const SizedBox(
+        height: 240,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+class _AnalyticsInlineMessage extends StatelessWidget {
+  const _AnalyticsInlineMessage({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChartEmptyState extends StatelessWidget {
+  const _ChartEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Text(
+            'Нет данных для графика',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _AnalyticsHeroValue extends StatelessWidget {
@@ -353,29 +514,33 @@ class _AnalyticsHeroValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
           title,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: PawlySpacing.xs),
         Text(
           value,
-          style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1,
+          ),
         ),
         const SizedBox(height: PawlySpacing.xs),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -383,35 +548,48 @@ class _AnalyticsHeroValue extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.title,
-    required this.value,
-  });
+  const _SummaryCard({required this.title, required this.value});
 
   final String title;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return PawlyCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: PawlySpacing.xs),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xxs),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -422,11 +600,15 @@ class _MetricLineChart extends StatelessWidget {
     required this.points,
     required this.inputKind,
     required this.unit,
+    required this.selectedIndex,
+    required this.onSelectedIndexChanged,
   });
 
   final List<MetricSeriesPoint> points;
   final String inputKind;
   final String? unit;
+  final int? selectedIndex;
+  final ValueChanged<int> onSelectedIndexChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -435,6 +617,8 @@ class _MetricLineChart extends StatelessWidget {
       inputKind: inputKind,
       unit: unit,
       color: Theme.of(context).colorScheme.primary,
+      selectedIndex: selectedIndex,
+      onSelectedIndexChanged: onSelectedIndexChanged,
     );
   }
 }
@@ -508,10 +692,7 @@ double _selectionBubbleLeft({
       .toDouble();
 }
 
-double _selectionBubbleTop({
-  required double anchorY,
-  required Rect plotRect,
-}) {
+double _selectionBubbleTop({required double anchorY, required Rect plotRect}) {
   final top = anchorY - 72;
   if (top >= plotRect.top) {
     return top;
@@ -525,12 +706,16 @@ class _InteractiveMetricLineChart extends StatefulWidget {
     required this.inputKind,
     required this.unit,
     required this.color,
+    required this.selectedIndex,
+    required this.onSelectedIndexChanged,
   });
 
   final List<MetricSeriesPoint> points;
   final String inputKind;
   final String? unit;
   final Color color;
+  final int? selectedIndex;
+  final ValueChanged<int> onSelectedIndexChanged;
 
   @override
   State<_InteractiveMetricLineChart> createState() =>
@@ -539,30 +724,15 @@ class _InteractiveMetricLineChart extends StatefulWidget {
 
 class _InteractiveMetricLineChartState
     extends State<_InteractiveMetricLineChart> {
-  int? _selectedIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedIndex = null;
-  }
-
-  @override
-  void didUpdateWidget(covariant _InteractiveMetricLineChart oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.points != widget.points) {
-      _selectedIndex = null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final values =
         widget.points.map((item) => item.valueNum).toList(growable: false);
     final geometry = _ChartGeometry.fromValues(values);
-    final selectedPoint =
-        _selectedIndex == null ? null : widget.points[_selectedIndex!];
+    final selectedPoint = widget.selectedIndex == null
+        ? null
+        : widget.points[widget.selectedIndex!];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -574,9 +744,9 @@ class _InteractiveMetricLineChartState
           height: constraints.maxHeight,
           geometry: geometry,
         );
-        final selectedOffset = _selectedIndex == null
+        final selectedOffset = widget.selectedIndex == null
             ? null
-            : pointOffsets[_selectedIndex!];
+            : pointOffsets[widget.selectedIndex!];
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -594,7 +764,7 @@ class _InteractiveMetricLineChartState
                     points: widget.points,
                     geometry: geometry,
                     color: widget.color,
-                    selectedIndex: _selectedIndex,
+                    selectedIndex: widget.selectedIndex,
                     inputKind: widget.inputKind,
                     unit: widget.unit,
                     axisLabelStyle: theme.textTheme.bodySmall?.copyWith(
@@ -602,8 +772,7 @@ class _InteractiveMetricLineChartState
                       height: 1,
                     ),
                     outlineColor: theme.colorScheme.outlineVariant,
-                    plotBackgroundColor:
-                        widget.color.withValues(alpha: 0.025),
+                    plotBackgroundColor: widget.color.withValues(alpha: 0.025),
                     surfaceColor: theme.colorScheme.surface,
                   ),
                 ),
@@ -640,12 +809,10 @@ class _InteractiveMetricLineChartState
 
   void _updateSelection(Offset localPosition, List<Offset> offsets) {
     final index = _nearestPointIndex(localPosition, offsets);
-    if (index == _selectedIndex) {
+    if (index == widget.selectedIndex) {
       return;
     }
-    setState(() {
-      _selectedIndex = index;
-    });
+    widget.onSelectedIndexChanged(index);
   }
 
   int _nearestPointIndex(Offset tapPosition, List<Offset> offsets) {
@@ -734,16 +901,12 @@ class _MetricLineChartPainter extends CustomPainter {
     final selectedDotPaint = Paint()..color = color;
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        chartRect,
-        const Radius.circular(PawlyRadius.md),
-      ),
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(PawlyRadius.md)),
       plotPaint,
     );
 
-    final yTicks = inputKind == 'BOOLEAN'
-        ? const <double>[1, 0]
-        : geometry.tickValues;
+    final yTicks =
+        inputKind == 'BOOLEAN' ? const <double>[1, 0] : geometry.tickValues;
 
     for (final tickValue in yTicks) {
       final y = _yPositionForValue(
@@ -785,10 +948,9 @@ class _MetricLineChartPainter extends CustomPainter {
         maxWidth: 56,
         textAlign: TextAlign.center,
       );
-      final labelX = (point.dx - (labelPainter.width / 2)).clamp(
-        0.0,
-        size.width - labelPainter.width,
-      ).toDouble();
+      final labelX = (point.dx - (labelPainter.width / 2))
+          .clamp(0.0, size.width - labelPainter.width)
+          .toDouble();
       labelPainter.paint(
         canvas,
         Offset(labelX, chartRect.bottom + PawlySpacing.sm),
@@ -803,11 +965,7 @@ class _MetricLineChartPainter extends CustomPainter {
         Paint()..color = color.withValues(alpha: 0.12),
       );
       canvas.drawCircle(point, 6.5, selectedDotPaint);
-      canvas.drawCircle(
-        point,
-        3,
-        pointFillPaint,
-      );
+      canvas.drawCircle(point, 3, pointFillPaint);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           chartRect,
@@ -834,7 +992,13 @@ class _MetricLineChartPainter extends CustomPainter {
         } else {
           final controlX = (previous.dx + point.dx) / 2;
           path.cubicTo(
-              controlX, previous.dy, controlX, point.dy, point.dx, point.dy);
+            controlX,
+            previous.dy,
+            controlX,
+            point.dy,
+            point.dx,
+            point.dy,
+          );
           areaPath.cubicTo(
             controlX,
             previous.dy,
@@ -874,11 +1038,7 @@ class _MetricLineChartPainter extends CustomPainter {
         );
       }
 
-      canvas.drawCircle(
-        point,
-        isSelected || isLast ? 5.5 : 4,
-        pointFillPaint,
-      );
+      canvas.drawCircle(point, isSelected || isLast ? 5.5 : 4, pointFillPaint);
       canvas.drawCircle(
         point,
         isSelected || isLast ? 5.5 : 4,
@@ -904,10 +1064,7 @@ class _MetricLineChartPainter extends CustomPainter {
     }
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        chartRect,
-        const Radius.circular(PawlyRadius.md),
-      ),
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(PawlyRadius.md)),
       borderPaint,
     );
   }
@@ -950,8 +1107,7 @@ class _MetricLineChartPainter extends CustomPainter {
     required _ChartGeometry geometry,
     required Rect chartRect,
   }) {
-    final normalized =
-        (value - geometry.displayMin) / geometry.displayRange;
+    final normalized = (value - geometry.displayMin) / geometry.displayRange;
     return chartRect.bottom - (normalized * chartRect.height);
   }
 
@@ -994,9 +1150,7 @@ class _ChartSelectionBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(PawlyRadius.md),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1082,93 +1236,168 @@ class _AnalyticsCompactToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
           children: <Widget>[
             Expanded(
-              child: PawlyCard(
+              child: _AnalyticsToolbarButton(
                 onTap: onPickMetric,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: PawlySpacing.md,
-                  vertical: PawlySpacing.md,
-                ),
                 child: Row(
                   children: <Widget>[
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(PawlyRadius.md),
+                      ),
+                      child: Icon(
+                        Icons.show_chart_rounded,
+                        color: colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: PawlySpacing.sm),
                     Expanded(
                       child: Text(
                         metricLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     const SizedBox(width: PawlySpacing.sm),
-                    const Icon(Icons.keyboard_arrow_down_rounded),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ],
                 ),
               ),
             ),
             const SizedBox(width: PawlySpacing.sm),
-            Material(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(PawlyRadius.lg),
-              child: InkWell(
-                onTap: onOpenFilters,
-                borderRadius: BorderRadius.circular(PawlyRadius.lg),
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                    borderRadius: BorderRadius.circular(PawlyRadius.lg),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[
-                      if (isFiltersLoading)
-                        const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else
-                        const Icon(Icons.tune_rounded),
-                      if (hasActiveFilters)
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+            _AnalyticsFilterButton(
+              onTap: onOpenFilters,
+              isLoading: isFiltersLoading,
+              hasActiveFilters: hasActiveFilters,
             ),
           ],
         ),
         if (activeFiltersSummary != null) ...<Widget>[
-          const SizedBox(height: PawlySpacing.sm),
+          const SizedBox(height: PawlySpacing.xs),
           Text(
             activeFiltersSummary!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ],
+    );
+  }
+}
+
+class _AnalyticsToolbarButton extends StatelessWidget {
+  const _AnalyticsToolbarButton({required this.child, this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 62),
+          padding: const EdgeInsets.symmetric(
+            horizontal: PawlySpacing.md,
+            vertical: PawlySpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalyticsFilterButton extends StatelessWidget {
+  const _AnalyticsFilterButton({
+    required this.onTap,
+    required this.isLoading,
+    required this.hasActiveFilters,
+  });
+
+  final VoidCallback onTap;
+  final bool isLoading;
+  final bool hasActiveFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Container(
+          width: 62,
+          height: 62,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              if (isLoading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(Icons.tune_rounded, color: colorScheme.onSurface),
+              if (hasActiveFilters)
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1236,17 +1465,17 @@ class _AnalyticsFiltersSheetState extends State<_AnalyticsFiltersSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Фильтры аналитики',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              'Фильтры динамики',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: PawlySpacing.md),
             Text(
               'Период',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: PawlySpacing.sm),
             Wrap(
@@ -1254,28 +1483,28 @@ class _AnalyticsFiltersSheetState extends State<_AnalyticsFiltersSheet> {
               runSpacing: PawlySpacing.xs,
               children: <Widget>[
                 for (final item in const <String>['7d', '30d', '90d', 'all'])
-                  ChoiceChip(
+                  _AnalyticsRangePill(
                     label: Text(_rangeLabel(item)),
-                    selected: _range == item,
-                    onSelected: (_) => _setPresetRange(item),
+                    isSelected: _range == item,
+                    onTap: () => _setPresetRange(item),
                   ),
-                ChoiceChip(
+                _AnalyticsRangePill(
                   label: Text(
                     _range == 'custom' && _customDateRange != null
                         ? _formatDateRange(_customDateRange!)
                         : 'Свои даты',
                   ),
-                  selected: _range == 'custom',
-                  onSelected: (_) => _pickCustomRange(),
+                  isSelected: _range == 'custom',
+                  onTap: _pickCustomRange,
                 ),
               ],
             ),
             const SizedBox(height: PawlySpacing.lg),
             Text(
               'Типы записей',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: PawlySpacing.sm),
             OutlinedButton.icon(
@@ -1290,9 +1519,9 @@ class _AnalyticsFiltersSheetState extends State<_AnalyticsFiltersSheet> {
                 runSpacing: PawlySpacing.xs,
                 children: selectedTypes
                     .map(
-                      (type) => InputChip(
+                      (type) => _SelectedTypeToken(
                         label: Text(type.name),
-                        onDeleted: () {
+                        onDelete: () {
                           setState(() {
                             _selectedTypeIds.remove(type.id);
                           });
@@ -1348,16 +1577,13 @@ class _AnalyticsFiltersSheetState extends State<_AnalyticsFiltersSheet> {
   Future<void> _pickCustomRange() async {
     final now = DateTime.now();
     final initialRange = _customDateRange ??
-        DateTimeRange(
-          start: now.subtract(const Duration(days: 29)),
-          end: now,
-        );
+        DateTimeRange(start: now.subtract(const Duration(days: 29)), end: now);
     final pickedRange = await showDateRangePicker(
       context: context,
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 1),
       initialDateRange: initialRange,
-      helpText: 'Выбери период',
+      helpText: 'Выберите период',
       saveText: 'Применить',
       cancelText: 'Отмена',
     );
@@ -1428,6 +1654,106 @@ class _AnalyticsFiltersSheetState extends State<_AnalyticsFiltersSheet> {
   }
 }
 
+class _AnalyticsRangePill extends StatelessWidget {
+  const _AnalyticsRangePill({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final Widget label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+          borderRadius: BorderRadius.circular(PawlyRadius.pill),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.84),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: PawlySpacing.md,
+          vertical: PawlySpacing.xs,
+        ),
+        child: DefaultTextStyle.merge(
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color:
+                    isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+          child: label,
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedTypeToken extends StatelessWidget {
+  const _SelectedTypeToken({required this.label, required this.onDelete});
+
+  final Widget label;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(PawlyRadius.pill),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(
+          left: PawlySpacing.sm,
+          right: PawlySpacing.xxs,
+          top: PawlySpacing.xxs,
+          bottom: PawlySpacing.xxs,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            DefaultTextStyle.merge(
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+              child: label,
+            ),
+            const SizedBox(width: PawlySpacing.xxs),
+            GestureDetector(
+              onTap: onDelete,
+              child: Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AnalyticsMetricPickerSheet extends StatefulWidget {
   const _AnalyticsMetricPickerSheet({
     required this.metrics,
@@ -1481,15 +1807,15 @@ class _AnalyticsMetricPickerSheetState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Выбери метрику',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              'Выберите показатель',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: PawlySpacing.md),
             PawlyTextField(
               controller: _searchController,
-              hintText: 'Поиск по метрикам',
+              hintText: 'Поиск по показателям',
               prefixIcon: const Icon(Icons.search_rounded),
               onChanged: (value) {
                 setState(() {
@@ -1503,7 +1829,7 @@ class _AnalyticsMetricPickerSheetState
                   ? const Center(
                       child: Padding(
                         padding: EdgeInsets.all(PawlySpacing.lg),
-                        child: Text('Метрики не найдены.'),
+                        child: Text('Показатели не найдены.'),
                       ),
                     )
                   : ListView.builder(
@@ -1513,15 +1839,10 @@ class _AnalyticsMetricPickerSheetState
                         final metric = filteredMetrics[index];
                         final isSelected =
                             metric.metricId == widget.selectedMetricId;
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(
-                            isSelected
-                                ? Icons.radio_button_checked_rounded
-                                : Icons.radio_button_off_rounded,
-                          ),
-                          title: Text(metric.metricName),
-                          subtitle: Text(_metricKindLabel(metric.inputKind)),
+                        return _AnalyticsMetricOption(
+                          title: metric.metricName,
+                          subtitle: _analyticsMetricSubtitle(metric),
+                          isSelected: isSelected,
                           onTap: () =>
                               Navigator.of(context).pop(metric.metricId),
                         );
@@ -1529,6 +1850,85 @@ class _AnalyticsMetricPickerSheetState
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalyticsMetricOption extends StatelessWidget {
+  const _AnalyticsMetricOption({
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+      child: Material(
+        color: isSelected
+            ? colorScheme.primary.withValues(alpha: 0.10)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(PawlyRadius.lg),
+          child: Container(
+            padding: const EdgeInsets.all(PawlySpacing.sm),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PawlyRadius.lg),
+              border: Border.all(
+                color: isSelected
+                    ? colorScheme.primary.withValues(alpha: 0.52)
+                    : colorScheme.outlineVariant.withValues(alpha: 0.64),
+              ),
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: PawlySpacing.xxs),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: PawlySpacing.sm),
+                Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1550,40 +1950,67 @@ class _AnalyticsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PawlyCard(
-      title: const Text('Нет данных для аналитики'),
-      footer: Wrap(
-        spacing: PawlySpacing.sm,
-        runSpacing: PawlySpacing.sm,
-        children: <Widget>[
-          if (onClearTypes != null)
-            PawlyButton(
-              label: 'Убрать типы',
-              onPressed: onClearTypes,
-              variant: PawlyButtonVariant.secondary,
-            ),
-          if (onShowAllTime != null)
-            PawlyButton(
-              label: 'Показать всё время',
-              onPressed: onShowAllTime,
-              variant: PawlyButtonVariant.secondary,
-            ),
-        ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
       ),
-      child: Text(
-        hasTypeFilters || hasPeriodFilters
-            ? 'За выбранный период и фильтры по типам записи пока не найдены.'
-            : 'Для аналитики пока нет метрик с данными.',
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Нет данных для динамики',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              hasTypeFilters || hasPeriodFilters
+                  ? 'За выбранный период и фильтры по типам записи пока не найдены.'
+                  : 'Для динамики пока нет показателей с данными.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (onClearTypes != null || onShowAllTime != null) ...<Widget>[
+              const SizedBox(height: PawlySpacing.md),
+              Wrap(
+                spacing: PawlySpacing.sm,
+                runSpacing: PawlySpacing.sm,
+                children: <Widget>[
+                  if (onClearTypes != null)
+                    PawlyButton(
+                      label: 'Убрать типы',
+                      onPressed: onClearTypes,
+                      variant: PawlyButtonVariant.secondary,
+                    ),
+                  if (onShowAllTime != null)
+                    PawlyButton(
+                      label: 'Показать всё время',
+                      onPressed: onShowAllTime,
+                      variant: PawlyButtonVariant.secondary,
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _AnalyticsTypeCatalog {
-  const _AnalyticsTypeCatalog({
-    required this.sections,
-    required this.byId,
-  });
+  const _AnalyticsTypeCatalog({required this.sections, required this.byId});
 
   final List<_AnalyticsTypeSection> sections;
   final Map<String, LogType> byId;
@@ -1608,11 +2035,7 @@ class _AnalyticsTypeCatalog {
     final recent = unique(bootstrap.recentLogTypes);
     final system = unique(bootstrap.systemLogTypes);
     final custom = unique(bootstrap.customLogTypes);
-    final allTypes = <LogType>[
-      ...recent,
-      ...system,
-      ...custom,
-    ];
+    final allTypes = <LogType>[...recent, ...system, ...custom];
 
     return _AnalyticsTypeCatalog(
       sections: <_AnalyticsTypeSection>[
@@ -1623,9 +2046,7 @@ class _AnalyticsTypeCatalog {
         if (custom.isNotEmpty)
           _AnalyticsTypeSection(title: 'Мои', items: custom),
       ],
-      byId: <String, LogType>{
-        for (final type in allTypes) type.id: type,
-      },
+      byId: <String, LogType>{for (final type in allTypes) type.id: type},
     );
   }
 
@@ -1666,10 +2087,7 @@ class _AnalyticsTypeCatalog {
 }
 
 class _AnalyticsTypeSection {
-  const _AnalyticsTypeSection({
-    required this.title,
-    required this.items,
-  });
+  const _AnalyticsTypeSection({required this.title, required this.items});
 
   final String title;
   final List<LogType> items;
@@ -1725,9 +2143,9 @@ class _AnalyticsTypeFilterSheetState extends State<_AnalyticsTypeFilterSheet> {
           children: <Widget>[
             Text(
               'Фильтр по типам записей',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: PawlySpacing.md),
             PawlyTextField(
@@ -1787,9 +2205,9 @@ class _AnalyticsTypeFilterSheetState extends State<_AnalyticsTypeFilterSheet> {
                 Expanded(
                   child: PawlyButton(
                     label: 'Применить',
-                    onPressed: () => Navigator.of(context).pop(
-                      _selectedTypeIds.toList(growable: false)..sort(),
-                    ),
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pop(_selectedTypeIds.toList(growable: false)..sort()),
                   ),
                 ),
               ],
@@ -1831,17 +2249,14 @@ class _AnalyticsTypeSectionWidget extends StatelessWidget {
         children: <Widget>[
           Text(
             section.title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: PawlySpacing.xs),
           ...section.items.map(
-            (type) => CheckboxListTile(
-              value: selectedTypeIds.contains(type.id),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              controlAffinity: ListTileControlAffinity.leading,
+            (type) => _AnalyticsTypeOption(
+              isSelected: selectedTypeIds.contains(type.id),
               title: Text(type.name),
               subtitle: type.metricRequirements.isEmpty
                   ? null
@@ -1851,10 +2266,93 @@ class _AnalyticsTypeSectionWidget extends StatelessWidget {
                           .where((value) => value.isNotEmpty)
                           .join(', '),
                     ),
-              onChanged: (selected) => onToggle(type.id, selected ?? false),
+              onTap: () =>
+                  onToggle(type.id, !selectedTypeIds.contains(type.id)),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnalyticsTypeOption extends StatelessWidget {
+  const _AnalyticsTypeOption({
+    required this.isSelected,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+  });
+
+  final bool isSelected;
+  final Widget title;
+  final Widget? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PawlySpacing.xs),
+      child: Material(
+        color: isSelected
+            ? colorScheme.primary.withValues(alpha: 0.10)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(PawlyRadius.lg),
+          child: Container(
+            padding: const EdgeInsets.all(PawlySpacing.sm),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PawlyRadius.lg),
+              border: Border.all(
+                color: isSelected
+                    ? colorScheme.primary.withValues(alpha: 0.52)
+                    : colorScheme.outlineVariant.withValues(alpha: 0.48),
+              ),
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      DefaultTextStyle.merge(
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        child: title,
+                      ),
+                      if (subtitle != null) ...<Widget>[
+                        const SizedBox(height: PawlySpacing.xxs),
+                        DefaultTextStyle.merge(
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          child: subtitle!,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: PawlySpacing.sm),
+                Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1867,17 +2365,48 @@ class _AnalyticsErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить аналитику.'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const SizedBox.shrink(),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить динамику',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Попробуйте обновить данные через несколько секунд.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1885,10 +2414,7 @@ class _AnalyticsErrorView extends StatelessWidget {
 }
 
 class _ResolvedAnalyticsRange {
-  const _ResolvedAnalyticsRange({
-    this.dateFrom,
-    this.dateTo,
-  });
+  const _ResolvedAnalyticsRange({this.dateFrom, this.dateTo});
 
   final String? dateFrom;
   final String? dateTo;
@@ -1941,6 +2467,18 @@ String _metricKindLabel(String inputKind) {
   };
 }
 
+String _analyticsMetricSubtitle(AnalyticsMetricSummary metric) {
+  final kind = _metricKindLabel(metric.inputKind);
+  if (metric.inputKind == 'BOOLEAN') {
+    return kind;
+  }
+  final unit = formatDisplayUnitCode(metric.unitCode);
+  if (unit.isEmpty) {
+    return kind;
+  }
+  return '$kind · $unit';
+}
+
 String _formatValue(double? value, String inputKind, String? unit) {
   if (value == null) {
     return '—';
@@ -1950,10 +2488,11 @@ String _formatValue(double? value, String inputKind, String? unit) {
   }
   final number =
       value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
-  if (unit == null || unit.isEmpty) {
+  final displayUnit = formatDisplayUnitCode(unit);
+  if (displayUnit.isEmpty) {
     return number;
   }
-  return '$number $unit';
+  return '$number $displayUnit';
 }
 
 String _formatAxisDate(DateTime? value) {

@@ -4,57 +4,105 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../pets/data/pets_repository.dart';
+import '../../../pets/presentation/providers/pets_controller.dart';
 import '../providers/health_controllers.dart';
 
 class PetRemindersPage extends ConsumerWidget {
-  const PetRemindersPage({
-    required this.petId,
-    super.key,
-  });
+  const PetRemindersPage({required this.petId, super.key});
 
   final String petId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final remindersAsync = ref.watch(petScheduledItemsProvider(petId));
-    final pushSettingsAsync = ref.watch(petPushSettingsProvider(petId));
+    final accessAsync = ref.watch(petAccessPolicyProvider(petId));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Напоминания')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final created = await context.pushNamed<bool>(
-            'petReminderCreate',
-            pathParameters: <String, String>{'petId': petId},
+    return accessAsync.when(
+      data: (access) {
+        if (!access.remindersRead) {
+          return const PawlyScreenScaffold(
+            title: 'Напоминания',
+            body: _ReminderNoAccessView(),
           );
-          if (created == true) {
-            ref.invalidate(petScheduledItemsProvider(petId));
-          }
-        },
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Добавить'),
-      ),
-      body: remindersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(PawlySpacing.lg),
-            child: PawlyCard(
-              title: const Text('Не удалось загрузить напоминания'),
-              footer: PawlyButton(
-                label: 'Повторить',
-                onPressed: () => ref.invalidate(petScheduledItemsProvider(petId)),
-                variant: PawlyButtonVariant.secondary,
+        }
+
+        final remindersAsync = ref.watch(petScheduledItemsProvider(petId));
+        final pushSettingsAsync = ref.watch(petPushSettingsProvider(petId));
+        return PawlyScreenScaffold(
+          title: 'Напоминания',
+          actions: <Widget>[
+            if (access.remindersWrite) ...<Widget>[
+              _ReminderAddButton(
+                onTap: () async {
+                  final created = await context.pushNamed<bool>(
+                    'petReminderCreate',
+                    pathParameters: <String, String>{'petId': petId},
+                  );
+                  if (created == true) {
+                    ref.invalidate(petScheduledItemsProvider(petId));
+                  }
+                },
               ),
-              child: const SizedBox.shrink(),
+              const SizedBox(width: PawlySpacing.sm),
+            ],
+          ],
+          body: remindersAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => _ReminderErrorView(
+              onRetry: () => ref.invalidate(petScheduledItemsProvider(petId)),
+            ),
+            data: (items) => RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(petScheduledItemsProvider(petId));
+                await ref.read(petScheduledItemsProvider(petId).future);
+              },
+              child: _RemindersListView(
+                petId: petId,
+                access: access,
+                items: items,
+                pushSettingsAsync: pushSettingsAsync,
+              ),
             ),
           ),
+        );
+      },
+      loading: () => const PawlyScreenScaffold(
+        title: 'Напоминания',
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => PawlyScreenScaffold(
+        title: 'Напоминания',
+        body: _ReminderErrorView(
+          onRetry: () => ref.invalidate(petAccessPolicyProvider(petId)),
         ),
-        data: (items) => _RemindersListView(
-          petId: petId,
-          items: items,
-          pushSettingsAsync: pushSettingsAsync,
+      ),
+    );
+  }
+}
+
+class _ReminderAddButton extends StatelessWidget {
+  const _ReminderAddButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(PawlyRadius.pill),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+          ),
         ),
+        width: 42,
+        height: 42,
+        child: Icon(Icons.add_rounded, color: colorScheme.primary),
       ),
     );
   }
@@ -63,43 +111,110 @@ class PetRemindersPage extends ConsumerWidget {
 class _RemindersListView extends StatelessWidget {
   const _RemindersListView({
     required this.petId,
+    required this.access,
     required this.items,
     required this.pushSettingsAsync,
   });
 
   final String petId;
-  final List<ScheduledItemCard> items;
+  final PetAccessPolicy access;
+  final PetScheduledItemsState items;
   final AsyncValue<PetPushSettings> pushSettingsAsync;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
         _PetReminderSettingsCard(
           petId: petId,
           pushSettingsAsync: pushSettingsAsync,
         ),
         const SizedBox(height: PawlySpacing.md),
+        if (!access.remindersWrite) ...<Widget>[
+          const _ReminderReadOnlyNotice(),
+          const SizedBox(height: PawlySpacing.md),
+        ],
         if (items.isEmpty)
-          const PawlyCard(
-            title: Text('Напоминаний пока нет'),
-            child: Text(
-              'Создай первое правило, чтобы оно появилось в календаре и могло присылать уведомления.',
+          const _EmptyRemindersCard()
+        else ...<Widget>[
+          if (items.active.isNotEmpty) ...<Widget>[
+            _ReminderSectionHeader(
+              title: 'Активные',
+              count: items.active.length,
             ),
-          )
-        else
-          ...List<Widget>.generate(items.length, (index) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: index == items.length - 1 ? 0 : PawlySpacing.md,
-              ),
-              child: _ReminderListItem(
-                petId: petId,
-                item: items[index],
-              ),
-            );
-          }),
+            const SizedBox(height: PawlySpacing.sm),
+            ..._buildReminderItems(items.active),
+          ],
+          if (items.past.isNotEmpty) ...<Widget>[
+            if (items.active.isNotEmpty)
+              const SizedBox(height: PawlySpacing.lg),
+            _ReminderSectionHeader(
+              title: 'Прошедшие',
+              count: items.past.length,
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            ..._buildReminderItems(items.past),
+          ],
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildReminderItems(List<ScheduledReminderEntry> entries) {
+    return List<Widget>.generate(entries.length, (index) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: index == entries.length - 1 ? 0 : PawlySpacing.md,
+        ),
+        child: _ReminderListItem(
+          petId: petId,
+          access: access,
+          entry: entries[index],
+        ),
+      );
+    });
+  }
+}
+
+class _ReminderSectionHeader extends StatelessWidget {
+  const _ReminderSectionHeader({
+    required this.title,
+    required this.count,
+  });
+
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+        ),
+        Text(
+          count.toString(),
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ],
     );
   }
@@ -131,67 +246,83 @@ class _PetReminderSettingsCardState
     final settings = widget.pushSettingsAsync.asData?.value;
     final enabled = settings?.scheduledItemsEnabled ?? true;
 
-    return PawlyCard(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Уведомления по питомцу',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: PawlySpacing.xs),
-          Text(
-            'Выключает или включает push для всех напоминаний этого питомца только у тебя.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: PawlySpacing.sm),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: enabled,
-            onChanged: isBusy
-                ? null
-                : (value) async {
-                    final previous = enabled;
-                    setState(() {
-                      _isSubmitting = true;
-                    });
-                    try {
-                      await ref.read(healthRepositoryProvider).updatePetPushSettings(
-                            widget.petId,
-                            scheduledItemsEnabled: value,
-                          );
-                      ref.invalidate(petPushSettingsProvider(widget.petId));
-                    } catch (_) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Не удалось обновить настройки push'),
-                          ),
-                        );
-                      }
-                      if (previous != value) {
-                        ref.invalidate(petPushSettingsProvider(widget.petId));
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() {
-                          _isSubmitting = false;
-                        });
-                      }
-                    }
-                  },
-            title: Text(enabled ? 'Включены' : 'Выключены'),
-            secondary: isBusy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+          Padding(
+            padding: const EdgeInsets.all(PawlySpacing.md),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Уведомления',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: PawlySpacing.xxs),
+                      Text(
+                        enabled ? 'Включены для этого питомца' : 'Выключены',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isBusy)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
                   )
-                : const Icon(Icons.notifications_rounded),
+                else
+                  Switch(
+                    value: enabled,
+                    onChanged: (value) async {
+                      final previous = enabled;
+                      setState(() => _isSubmitting = true);
+                      try {
+                        await ref
+                            .read(healthRepositoryProvider)
+                            .updatePetPushSettings(
+                              widget.petId,
+                              scheduledItemsEnabled: value,
+                            );
+                        ref.invalidate(petPushSettingsProvider(widget.petId));
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Не удалось обновить настройки push',
+                              ),
+                            ),
+                          );
+                        }
+                        if (previous != value) {
+                          ref.invalidate(petPushSettingsProvider(widget.petId));
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isSubmitting = false);
+                        }
+                      }
+                    },
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -202,80 +333,186 @@ class _PetReminderSettingsCardState
 class _ReminderListItem extends ConsumerWidget {
   const _ReminderListItem({
     required this.petId,
-    required this.item,
+    required this.access,
+    required this.entry,
   });
 
   final String petId;
-  final ScheduledItemCard item;
+  final PetAccessPolicy access;
+  final ScheduledReminderEntry entry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final item = entry.item;
 
-    return PawlyCard(
+    return InkWell(
       onTap: () => _showScheduledItemDetailsSheet(
         context,
         ref,
         petId,
+        access,
         item,
       ),
-      child: Row(
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _ReminderTimeBadge(value: entry.displayAt),
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xxs),
+                    Text(
+                      _scheduledItemSecondaryLine(item),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if ((item.notePreview ?? '').isNotEmpty) ...<Widget>[
+                      const SizedBox(height: PawlySpacing.sm),
+                      Text(
+                        item.notePreview!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderTimeBadge extends StatelessWidget {
+  const _ReminderTimeBadge({required this.value});
+
+  final DateTime? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final local = value?.toLocal();
+
+    return SizedBox(
+      width: 56,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(PawlyRadius.md),
-            ),
-            child: Icon(
-              _scheduledItemIcon(item.sourceType),
-              size: 22,
-              color: colorScheme.primary,
+          Text(
+            local == null
+                ? '--:--'
+                : '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
             ),
           ),
-          const SizedBox(width: PawlySpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: PawlySpacing.xxs),
-                Text(
-                  _scheduledItemSecondaryLine(item),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                if ((item.notePreview ?? '').isNotEmpty) ...<Widget>[
-                  const SizedBox(height: PawlySpacing.xs),
-                  Text(
-                    item.notePreview!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
+          if (local != null) ...<Widget>[
+            const SizedBox(height: PawlySpacing.xxs),
+            Text(
+              '${local.day.toString().padLeft(2, '0')}.${local.month.toString().padLeft(2, '0')}',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(width: PawlySpacing.sm),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: colorScheme.onSurfaceVariant,
-          ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _EmptyRemindersCard extends StatelessWidget {
+  const _EmptyRemindersCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: Column(
+          children: <Widget>[
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.62,
+                ),
+                borderRadius: BorderRadius.circular(PawlyRadius.xl),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+                ),
+              ),
+              child: Icon(
+                Icons.notifications_none_rounded,
+                size: 34,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.md),
+            Text(
+              'Напоминаний пока нет',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              'Создайте первое правило, чтобы оно появилось в календаре.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -283,7 +520,7 @@ class _ReminderListItem extends ConsumerWidget {
 
 String _scheduledItemSecondaryLine(ScheduledItemCard item) {
   final parts = <String>[
-    _scheduledItemStartLabel(item.startsAt),
+    _scheduledItemSourceLabel(item.sourceType),
     _scheduledItemRecurrenceLabel(item.recurrence),
     _scheduledItemReminderLabel(
       pushEnabled: item.pushEnabled,
@@ -366,30 +603,22 @@ String _scheduledItemSourceLabel(String sourceType) {
   };
 }
 
-IconData _scheduledItemIcon(String sourceType) {
-  return switch (sourceType) {
-    'LOG_TYPE' => Icons.monitor_weight_rounded,
-    'PET_EVENT' => Icons.celebration_rounded,
-    'VET_VISIT' => Icons.local_hospital_rounded,
-    'VACCINATION' => Icons.vaccines_rounded,
-    'PROCEDURE' => Icons.medical_services_rounded,
-    _ => Icons.notifications_active_rounded,
-  };
-}
-
 Future<void> _showScheduledItemDetailsSheet(
   BuildContext context,
   WidgetRef ref,
   String petId,
+  PetAccessPolicy access,
   ScheduledItemCard item,
 ) async {
   final parentContext = context;
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
-  final canDelete = _isUserManagedRule(item.sourceType);
+  final canWrite = access.canWriteScheduledSource(item.sourceType);
+  final canDelete = canWrite && _isUserManagedRule(item.sourceType);
 
   await showModalBottomSheet<void>(
     context: context,
+    showDragHandle: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(PawlyRadius.xl)),
     ),
@@ -408,23 +637,18 @@ Future<void> _showScheduledItemDetailsSheet(
             children: <Widget>[
               Text(
                 item.title,
-                style: theme.textTheme.headlineSmall?.copyWith(
+                style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
                 ),
               ),
-              const SizedBox(height: PawlySpacing.sm),
-              Wrap(
-                spacing: PawlySpacing.xs,
-                runSpacing: PawlySpacing.xs,
-                children: <Widget>[
-                  _ReminderMetaChip(label: _scheduledItemSourceLabel(item.sourceType)),
-                  _ReminderMetaChip(
-                    label: _scheduledItemReminderLabel(
-                      pushEnabled: item.pushEnabled,
-                      remindOffsetMinutes: item.remindOffsetMinutes,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: PawlySpacing.xs),
+              Text(
+                _scheduledItemSourceLabel(item.sourceType),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(height: PawlySpacing.md),
               _ReminderDetailRow(
@@ -450,19 +674,24 @@ Future<void> _showScheduledItemDetailsSheet(
                   Expanded(
                     child: PawlyButton(
                       label: 'Редактировать',
-                      onPressed: () async {
-                        Navigator.of(context).pop();
-                        final updated = await parentContext.pushNamed<bool>(
-                          'petReminderEdit',
-                          pathParameters: <String, String>{
-                            'petId': petId,
-                            'itemId': item.id,
-                          },
-                        );
-                        if (updated == true) {
-                          ref.invalidate(petScheduledItemsProvider(petId));
-                        }
-                      },
+                      onPressed: canWrite
+                          ? () async {
+                              Navigator.of(context).pop();
+                              final updated =
+                                  await parentContext.pushNamed<bool>(
+                                'petReminderEdit',
+                                pathParameters: <String, String>{
+                                  'petId': petId,
+                                  'itemId': item.id,
+                                },
+                              );
+                              if (updated == true) {
+                                ref.invalidate(
+                                  petScheduledItemsProvider(petId),
+                                );
+                              }
+                            }
+                          : null,
                       variant: PawlyButtonVariant.secondary,
                     ),
                   ),
@@ -482,11 +711,13 @@ Future<void> _showScheduledItemDetailsSheet(
                               ),
                               actions: <Widget>[
                                 TextButton(
-                                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(false),
                                   child: const Text('Отмена'),
                                 ),
                                 FilledButton(
-                                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(true),
                                   child: const Text('Удалить'),
                                 ),
                               ],
@@ -496,7 +727,9 @@ Future<void> _showScheduledItemDetailsSheet(
                             return;
                           }
                           try {
-                            await ref.read(healthRepositoryProvider).deleteScheduledItem(
+                            await ref
+                                .read(healthRepositoryProvider)
+                                .deleteScheduledItem(
                                   petId,
                                   item.id,
                                   rowVersion: item.rowVersion,
@@ -513,7 +746,9 @@ Future<void> _showScheduledItemDetailsSheet(
                             if (parentContext.mounted) {
                               ScaffoldMessenger.of(parentContext).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Не удалось удалить напоминание'),
+                                  content: Text(
+                                    'Не удалось удалить напоминание',
+                                  ),
                                 ),
                               );
                             }
@@ -538,38 +773,8 @@ bool _isUserManagedRule(String sourceType) {
       sourceType == 'PET_EVENT';
 }
 
-class _ReminderMetaChip extends StatelessWidget {
-  const _ReminderMetaChip({
-    required this.label,
-  });
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(PawlyRadius.pill),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: PawlySpacing.sm,
-          vertical: PawlySpacing.xxs,
-        ),
-        child: Text(label),
-      ),
-    );
-  }
-}
-
 class _ReminderDetailRow extends StatelessWidget {
-  const _ReminderDetailRow({
-    required this.label,
-    required this.value,
-  });
+  const _ReminderDetailRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -603,6 +808,150 @@ class _ReminderDetailRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReminderNoAccessView extends StatelessWidget {
+  const _ReminderNoAccessView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Нет доступа',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'У вас нет права просмотра напоминаний этого питомца.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderReadOnlyNotice extends StatelessWidget {
+  const _ReminderReadOnlyNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: PawlySpacing.sm),
+            Expanded(
+              child: Text(
+                'Редактирование недоступно',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderErrorView extends StatelessWidget {
+  const _ReminderErrorView({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить напоминания',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Попробуйте обновить экран ещё раз.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

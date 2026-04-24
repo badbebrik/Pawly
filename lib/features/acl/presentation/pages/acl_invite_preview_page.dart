@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
@@ -23,8 +24,8 @@ class AclInvitePreviewPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final normalizedToken = token.trim();
     if (normalizedToken.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Приглашение к питомцу')),
+      return PawlyScreenScaffold(
+        title: 'Приглашение',
         body: _AclInvitePreviewErrorView(
           title: 'Ссылка приглашения недействительна',
           message: 'В ссылке отсутствует токен приглашения.',
@@ -37,12 +38,13 @@ class AclInvitePreviewPage extends ConsumerWidget {
       aclInvitePreviewControllerProvider(normalizedToken),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Приглашение к питомцу')),
+    return PawlyScreenScaffold(
+      title: 'Приглашение',
       body: state.when(
         data: (value) => _AclInvitePreviewContent(
           state: value,
           onAccept: () => _acceptInvite(context, ref, normalizedToken),
+          onClose: () => _closePreview(context),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _AclInvitePreviewErrorView(
@@ -111,124 +113,294 @@ class AclInvitePreviewPage extends ConsumerWidget {
       );
     }
   }
+
+  void _closePreview(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go(AppRoutes.pets);
+  }
 }
 
 class _AclInvitePreviewContent extends StatelessWidget {
   const _AclInvitePreviewContent({
     required this.state,
     required this.onAccept,
+    required this.onClose,
   });
 
   final AclInvitePreviewState state;
   final Future<void> Function() onAccept;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     final invite = state.invite;
+    final pet = state.pet;
     final permissions = AclPermissionDraft.fromPolicy(invite.policy);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
-        Container(
-          padding: const EdgeInsets.all(PawlySpacing.lg),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(PawlyRadius.xl),
-          ),
+        _InvitePetHeaderCard(
+          pet: pet,
+          roleTitle: _localizedRoleTitle(invite.role),
+        ),
+        const SizedBox(height: PawlySpacing.md),
+        _InvitePreviewSection(
+          title: 'Доступ',
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'Вас приглашают к уходу за питомцем',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+              _InviteMetaRow(
+                  label: 'Роль', value: _localizedRoleTitle(invite.role)),
+              const Divider(height: PawlySpacing.lg),
+              _InviteMetaRow(label: 'Код', value: invite.code),
+              if (invite.expiresAt != null) ...<Widget>[
+                const Divider(height: PawlySpacing.lg),
+                _InviteMetaRow(
+                  label: 'Срок действия',
+                  value: _formatInviteExpiry(invite.expiresAt!),
                 ),
-              ),
-              const SizedBox(height: PawlySpacing.sm),
-              Text(
-                'Перед вступлением проверьте роль, код и набор прав.',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
+              ],
             ],
           ),
         ),
-        const SizedBox(height: PawlySpacing.lg),
-        Text(
-          'Роль',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
         const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          child: Text(
-            _localizedRoleTitle(invite.role),
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        _InvitePreviewSection(
+          title: 'Права доступа',
+          child: _ReadOnlyPermissionsList(draft: permissions),
         ),
-        const SizedBox(height: PawlySpacing.lg),
-        Text(
-          'Код',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        PawlyCard(
-          child: Text(
-            invite.code,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        if (invite.expiresAt != null) ...<Widget>[
-          const SizedBox(height: PawlySpacing.lg),
-          Text(
-            'Срок действия',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: PawlySpacing.md),
-          PawlyCard(
-            child: Text(
-              _formatInviteExpiry(invite.expiresAt!),
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: PawlySpacing.lg),
-        Text(
-          'Права',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        _ReadOnlyPermissionsTable(draft: permissions),
         const SizedBox(height: PawlySpacing.xl),
         PawlyButton(
-          label: state.isSubmitting ? 'Подключаем...' : 'Присоединиться',
+          label: state.isSubmitting ? 'Подключаем...' : 'Принять приглашение',
           onPressed: state.isSubmitting ? null : onAccept,
-          icon: Icons.check_rounded,
+        ),
+        const SizedBox(height: PawlySpacing.sm),
+        PawlyButton(
+          label: 'Закрыть',
+          onPressed: state.isSubmitting ? null : onClose,
+          variant: PawlyButtonVariant.secondary,
         ),
       ],
     );
   }
 }
 
-class _ReadOnlyPermissionsTable extends StatelessWidget {
-  const _ReadOnlyPermissionsTable({required this.draft});
+class _InvitePetHeaderCard extends StatelessWidget {
+  const _InvitePetHeaderCard({
+    required this.pet,
+    required this.roleTitle,
+  });
+
+  final AclInvitePreviewPet pet;
+  final String roleTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Row(
+          children: <Widget>[
+            _InvitePetAvatar(
+              photoUrl: pet.photoDownloadUrl,
+              name: pet.name,
+            ),
+            const SizedBox(width: PawlySpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    pet.name.isEmpty ? 'Питомец' : pet.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    roleTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InvitePreviewSection extends StatelessWidget {
+  const _InvitePreviewSection({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InvitePetAvatar extends StatelessWidget {
+  const _InvitePetAvatar({
+    required this.photoUrl,
+    required this.name,
+  });
+
+  final String? photoUrl;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final url = photoUrl;
+    final initial = name.trim().isEmpty ? 'P' : name.trim().characters.first;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(PawlyRadius.lg),
+      child: Container(
+        width: 68,
+        height: 68,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.62),
+        child: url == null || url.isEmpty
+            ? _InvitePetInitial(initial: initial)
+            : CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                errorWidget: (_, __, ___) =>
+                    _InvitePetInitial(initial: initial),
+              ),
+      ),
+    );
+  }
+}
+
+class _InvitePetInitial extends StatelessWidget {
+  const _InvitePetInitial({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Text(
+        initial.toUpperCase(),
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteMetaRow extends StatelessWidget {
+  const _InviteMetaRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(width: PawlySpacing.md),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReadOnlyPermissionsList extends StatelessWidget {
+  const _ReadOnlyPermissionsList({required this.draft});
 
   final AclPermissionDraft draft;
 
@@ -237,108 +409,49 @@ class _ReadOnlyPermissionsTable extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return PawlyCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: PawlySpacing.md,
-              vertical: PawlySpacing.sm,
-            ),
+    return Column(
+      children: draft.items.map((item) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+          child: DecoratedBox(
             decoration: BoxDecoration(
-              color:
-                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(PawlyRadius.lg),
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.42,
+              ),
+              borderRadius: BorderRadius.circular(PawlyRadius.lg),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.64),
               ),
             ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    'Домен',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'Просмотр',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'Изменение',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ...draft.items.map((item) {
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: PawlySpacing.md,
-                vertical: PawlySpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: colorScheme.outlineVariant),
-                ),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.all(PawlySpacing.sm),
               child: Row(
                 children: <Widget>[
                   Expanded(
-                    flex: 3,
                     child: Text(
                       _domainLabel(item.domain),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Icon(
-                        item.canRead
-                            ? Icons.check_rounded
-                            : Icons.close_rounded,
-                        color: item.canRead
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: Center(
-                      child: Icon(
-                        item.canWrite
-                            ? Icons.check_rounded
-                            : Icons.close_rounded,
-                        color: item.canWrite
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
+                  const SizedBox(width: PawlySpacing.sm),
+                  Flexible(
+                    child: Text(
+                      _permissionLabel(item),
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ],
               ),
-            );
-          }),
-        ],
-      ),
+            ),
+          ),
+        );
+      }).toList(growable: false),
     );
   }
 }
@@ -356,19 +469,50 @@ class _AclInvitePreviewErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: Text(title),
-          footer: onRetry == null
-              ? null
-              : PawlyButton(
-                  label: 'Повторить',
-                  onPressed: onRetry,
-                  variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-          child: Text(message),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (onRetry != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.md),
+                  PawlyButton(
+                    label: 'Повторить',
+                    onPressed: onRetry,
+                    variant: PawlyButtonVariant.secondary,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -393,6 +537,16 @@ String _domainLabel(AclPermissionDomain domain) {
     AclPermissionDomain.health => 'Здоровье',
     AclPermissionDomain.members => 'Участники',
   };
+}
+
+String _permissionLabel(AclPermissionSelection item) {
+  if (item.canWrite) {
+    return 'Просмотр и изменение';
+  }
+  if (item.canRead) {
+    return 'Только просмотр';
+  }
+  return 'Нет доступа';
 }
 
 String _formatInviteExpiry(DateTime value) {

@@ -25,6 +25,7 @@ class AclRole {
     required this.petId,
     required this.code,
     required this.title,
+    required this.policy,
     required this.createdByUserId,
   });
 
@@ -33,6 +34,7 @@ class AclRole {
   final String? petId;
   final String? code;
   final String title;
+  final AclPolicy policy;
   final String? createdByUserId;
 
   factory AclRole.fromJson(Object? data) {
@@ -43,6 +45,7 @@ class AclRole {
       petId: asNullableString(json['pet_id']),
       code: asNullableString(json['code']),
       title: asString(json['title']),
+      policy: AclPolicy.fromJson(json['policy']),
       createdByUserId: asNullableString(json['created_by_user_id']),
     );
   }
@@ -400,14 +403,40 @@ class AcceptInviteResponse {
 }
 
 class AclInvitePreviewResponse {
-  const AclInvitePreviewResponse({required this.invite});
+  const AclInvitePreviewResponse({
+    required this.invite,
+    required this.pet,
+  });
 
   final AclInvite invite;
+  final AclInvitePreviewPet pet;
 
   factory AclInvitePreviewResponse.fromJson(Object? data) {
     final json = asJsonMap(data);
     return AclInvitePreviewResponse(
       invite: AclInvite.fromJson(json['invite']),
+      pet: AclInvitePreviewPet.fromJson(json['pet']),
+    );
+  }
+}
+
+class AclInvitePreviewPet {
+  const AclInvitePreviewPet({
+    required this.id,
+    required this.name,
+    required this.photoDownloadUrl,
+  });
+
+  final String id;
+  final String name;
+  final String? photoDownloadUrl;
+
+  factory AclInvitePreviewPet.fromJson(Object? data) {
+    final json = asJsonMap(data);
+    return AclInvitePreviewPet(
+      id: asString(json['id']),
+      name: asString(json['name']),
+      photoDownloadUrl: asNullableString(json['photo_download_url']),
     );
   }
 }
@@ -433,11 +462,33 @@ class UpdateMemberPayload {
 }
 
 class CreateRolePayload {
-  const CreateRolePayload({required this.title});
+  const CreateRolePayload({
+    required this.title,
+    required this.policy,
+  });
 
   final String title;
+  final AclPolicy policy;
 
-  JsonMap toJson() => <String, dynamic>{'title': title};
+  JsonMap toJson() => <String, dynamic>{
+        'title': title,
+        'policy': policy.toJson(),
+      };
+}
+
+class UpdateRolePayload {
+  const UpdateRolePayload({
+    required this.title,
+    required this.policy,
+  });
+
+  final String title;
+  final AclPolicy policy;
+
+  JsonMap toJson() => <String, dynamic>{
+        'title': title,
+        'policy': policy.toJson(),
+      };
 }
 
 class CreateInvitePayload {

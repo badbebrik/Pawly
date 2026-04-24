@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../models/attachment_kind.dart';
 import '../models/attachment_draft_item.dart';
+import 'attachment_rename_dialog.dart';
+
+typedef AttachmentRenameCallback = void Function(
+    String fileId, String fileName);
 
 class HealthAttachmentsField extends StatelessWidget {
   const HealthAttachmentsField({
@@ -13,6 +17,7 @@ class HealthAttachmentsField extends StatelessWidget {
     required this.onAddFromGallery,
     required this.onAddFromCamera,
     required this.onRemove,
+    this.onRename,
     super.key,
   });
 
@@ -23,6 +28,7 @@ class HealthAttachmentsField extends StatelessWidget {
   final VoidCallback onAddFromGallery;
   final VoidCallback onAddFromCamera;
   final ValueChanged<String> onRemove;
+  final AttachmentRenameCallback? onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +47,8 @@ class HealthAttachmentsField extends StatelessWidget {
                 ),
               ),
               TextButton.icon(
-                onPressed: enabled ? () => _showAddAttachmentSheet(context) : null,
+                onPressed:
+                    enabled ? () => _showAddAttachmentSheet(context) : null,
                 icon: isUploading
                     ? const SizedBox(
                         width: 16,
@@ -55,7 +62,7 @@ class HealthAttachmentsField extends StatelessWidget {
           ),
           const SizedBox(height: PawlySpacing.xs),
           Text(
-            'Поддерживаются JPG, PNG, WEBP, HEIC, HEIF и PDF.',
+            'Поддерживаются PNG, JPEG и PDF. До 10 файлов, всего до 50 МБ. PDF до 25 МБ, фото до 15 МБ.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -71,18 +78,14 @@ class HealthAttachmentsField extends StatelessWidget {
             ...attachments.map(
               (attachment) => ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  switch (
-                    detectAttachmentKind(
-                      fileType: attachment.mimeType,
-                      fileName: attachment.fileName,
-                    )
-                  ) {
-                    AttachmentKind.image => Icons.photo_rounded,
-                    AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
-                    AttachmentKind.other => Icons.description_rounded,
-                  },
-                ),
+                leading: Icon(switch (detectAttachmentKind(
+                  fileType: attachment.mimeType,
+                  fileName: attachment.fileName,
+                )) {
+                  AttachmentKind.image => Icons.photo_rounded,
+                  AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                  AttachmentKind.other => Icons.description_rounded,
+                }),
                 title: Text(attachment.fileName),
                 subtitle: Text(
                   attachment.sizeBytes > 0
@@ -92,10 +95,23 @@ class HealthAttachmentsField extends StatelessWidget {
                           fileName: attachment.fileName,
                         ),
                 ),
-                trailing: IconButton(
-                  onPressed: enabled ? () => onRemove(attachment.fileId) : null,
-                  icon: const Icon(Icons.close_rounded),
-                  tooltip: 'Убрать',
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    IconButton(
+                      onPressed: enabled && onRename != null
+                          ? () => _renameAttachment(context, attachment)
+                          : null,
+                      icon: const Icon(Icons.edit_rounded),
+                      tooltip: 'Переименовать',
+                    ),
+                    IconButton(
+                      onPressed:
+                          enabled ? () => onRemove(attachment.fileId) : null,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Убрать',
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -145,12 +161,24 @@ class HealthAttachmentsField extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _renameAttachment(
+    BuildContext context,
+    AttachmentDraftItem attachment,
+  ) async {
+    final newName = await showAttachmentRenameDialog(
+      context,
+      initialName: attachment.fileName,
+    );
+    if (newName == null || newName == attachment.fileName) {
+      return;
+    }
+    onRename?.call(attachment.fileId, newName);
+  }
 }
 
 String attachmentTypeLabel(String mimeType, {String? fileName}) {
-  return switch (
-    detectAttachmentKind(fileType: mimeType, fileName: fileName)
-  ) {
+  return switch (detectAttachmentKind(fileType: mimeType, fileName: fileName)) {
     AttachmentKind.image => 'Фото',
     AttachmentKind.pdf => 'PDF',
     AttachmentKind.other => 'Документ',

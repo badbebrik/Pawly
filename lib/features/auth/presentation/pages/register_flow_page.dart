@@ -104,7 +104,7 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
         const SizedBox(height: PawlySpacing.lg),
         PawlyTextField(
           controller: _firstNameController,
-          label: 'Имя (опционально)',
+          label: 'Имя',
           textInputAction: TextInputAction.next,
           textCapitalization: TextCapitalization.words,
           autofillHints: const <String>[AutofillHints.givenName],
@@ -112,7 +112,7 @@ class _RegisterFlowPageState extends ConsumerState<RegisterFlowPage> {
         const SizedBox(height: PawlySpacing.sm),
         PawlyTextField(
           controller: _lastNameController,
-          label: 'Фамилия (опционально)',
+          label: 'Фамилия',
           textInputAction: TextInputAction.done,
           textCapitalization: TextCapitalization.words,
           autofillHints: const <String>[AutofillHints.familyName],

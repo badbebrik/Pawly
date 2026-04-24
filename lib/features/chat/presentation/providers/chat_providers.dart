@@ -375,6 +375,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
 
   final String _conversationId;
   final Map<String, Timer> _pendingAckTimers = <String, Timer>{};
+  DateTime? _lastReconnectReloadAt;
 
   @override
   Future<ChatConversationState> build() async {
@@ -410,6 +411,12 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
           break;
       }
     });
+    final lifecycleSubscription = service.lifecycleEvents.listen((event) {
+      if (event.status != ChatSocketLifecycleStatus.connected) {
+        return;
+      }
+      unawaited(_reloadAfterReconnect(repository));
+    });
 
     ref.onDispose(() async {
       for (final timer in _pendingAckTimers.values) {
@@ -417,6 +424,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
       }
       _pendingAckTimers.clear();
       await subscription.cancel();
+      await lifecycleSubscription.cancel();
       _chatConversationLog(
         _conversationId,
         'dispose: unsubscribe conversation',
@@ -957,6 +965,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
           _conversationId,
           'ack-timeout: fired clientMessageId=$clientMessageId',
         );
+        unawaited(_reconnectAfterAckTimeout());
 
         state = AsyncData(
           current.copyWith(
@@ -973,6 +982,84 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
       return;
     }
     _pendingAckTimers.remove(clientMessageId)?.cancel();
+  }
+
+  Future<void> _reconnectAfterAckTimeout() async {
+    try {
+      _chatConversationLog(
+        _conversationId,
+        'ack-timeout: reconnect websocket',
+      );
+      await ref.read(chatSocketServiceProvider).reconnect();
+    } catch (error) {
+      _chatConversationLog(
+        _conversationId,
+        'ack-timeout: reconnect failed error=$error',
+      );
+    }
+  }
+
+  Future<void> _reloadAfterReconnect(ChatRepository repository) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastReloadAt = _lastReconnectReloadAt;
+    if (lastReloadAt != null &&
+        now.difference(lastReloadAt) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastReconnectReloadAt = now;
+
+    try {
+      _chatConversationLog(_conversationId, 'reconnect: reload history');
+      final reloaded = await _loadInitialState(repository);
+      final latest = state.asData?.value;
+      if (latest == null) {
+        return;
+      }
+
+      state = AsyncData(_mergeReloadedState(latest, reloaded));
+    } catch (error) {
+      _chatConversationLog(
+        _conversationId,
+        'reconnect: reload failed error=$error',
+      );
+    }
+  }
+
+  ChatConversationState _mergeReloadedState(
+    ChatConversationState current,
+    ChatConversationState reloaded,
+  ) {
+    final serverClientIds = reloaded.messages
+        .map((message) => message.clientMessageId)
+        .whereType<String>()
+        .where((clientId) => clientId.isNotEmpty)
+        .toSet();
+    final localUnresolved = current.messages.where((message) {
+      final clientId = message.clientMessageId;
+      if (clientId == null || clientId.isEmpty) {
+        return false;
+      }
+      if (!message.isSending && !message.hasFailed) {
+        return false;
+      }
+      return !serverClientIds.contains(clientId);
+    });
+    final mergedMessages = _dedupeMessages(
+      <ChatMessageItem>[
+        ...reloaded.messages,
+        ...localUnresolved,
+      ],
+    );
+
+    return reloaded.copyWith(
+      messages: mergedMessages,
+      isSendingMessage: mergedMessages.any((message) => message.isSending),
+    );
   }
 
   Future<ChatConversationState> _loadInitialState(

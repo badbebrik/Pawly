@@ -54,6 +54,7 @@ class PetMedicalRecordsState {
     required this.activeNextCursor,
     required this.archiveNextCursor,
     required this.loadingMoreBucket,
+    required this.searchQuery,
     required this.isCreating,
     required this.busyRecordIds,
   });
@@ -65,6 +66,7 @@ class PetMedicalRecordsState {
   final String? activeNextCursor;
   final String? archiveNextCursor;
   final MedicalRecordBucket? loadingMoreBucket;
+  final String searchQuery;
   final bool isCreating;
   final Set<String> busyRecordIds;
 
@@ -98,6 +100,7 @@ class PetMedicalRecordsState {
     bool clearArchiveNextCursor = false,
     MedicalRecordBucket? loadingMoreBucket,
     bool clearLoadingMoreBucket = false,
+    String? searchQuery,
     bool? isCreating,
     Set<String>? busyRecordIds,
   }) {
@@ -115,6 +118,7 @@ class PetMedicalRecordsState {
       loadingMoreBucket: clearLoadingMoreBucket
           ? null
           : loadingMoreBucket ?? this.loadingMoreBucket,
+      searchQuery: searchQuery ?? this.searchQuery,
       isCreating: isCreating ?? this.isCreating,
       busyRecordIds: busyRecordIds ?? this.busyRecordIds,
     );
@@ -162,7 +166,11 @@ class PetMedicalRecordsController
       final response =
           await ref.read(healthRepositoryProvider).listMedicalRecords(
                 _petId,
-                query: _queryFor(bucket, cursor: cursor),
+                query: _queryFor(
+                  bucket,
+                  cursor: cursor,
+                  searchQuery: current.searchQuery,
+                ),
               );
       state = AsyncData(
         switch (bucket) {
@@ -210,6 +218,26 @@ class PetMedicalRecordsController
     } catch (error, stackTrace) {
       state = AsyncData(current.copyWith(isCreating: false));
       Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> setSearchQuery(String value) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final query = value.trim();
+    if (query == current.searchQuery) {
+      return;
+    }
+
+    try {
+      state = AsyncData(
+        await _reloadLists(current.copyWith(searchQuery: query)),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
     }
   }
 
@@ -322,6 +350,7 @@ class PetMedicalRecordsController
       activeNextCursor: active.nextCursor,
       archiveNextCursor: archive.nextCursor,
       loadingMoreBucket: null,
+      searchQuery: '',
       isCreating: false,
       busyRecordIds: <String>{},
     );
@@ -333,11 +362,17 @@ class PetMedicalRecordsController
     final results = await Future.wait<Object>(<Future<Object>>[
       ref.read(healthRepositoryProvider).listMedicalRecords(
             _petId,
-            query: _queryFor(MedicalRecordBucket.active),
+            query: _queryFor(
+              MedicalRecordBucket.active,
+              searchQuery: current.searchQuery,
+            ),
           ),
       ref.read(healthRepositoryProvider).listMedicalRecords(
             _petId,
-            query: _queryFor(MedicalRecordBucket.archive),
+            query: _queryFor(
+              MedicalRecordBucket.archive,
+              searchQuery: current.searchQuery,
+            ),
           ),
     ]);
 
@@ -358,10 +393,12 @@ class PetMedicalRecordsController
   MedicalRecordListQuery _queryFor(
     MedicalRecordBucket bucket, {
     String? cursor,
+    String? searchQuery,
   }) {
     return MedicalRecordListQuery(
       cursor: cursor,
       limit: 20,
+      searchQuery: searchQuery?.isEmpty == true ? null : searchQuery,
       bucket: switch (bucket) {
         MedicalRecordBucket.active => 'active',
         MedicalRecordBucket.archive => 'archive',

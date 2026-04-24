@@ -62,6 +62,7 @@ class HealthApiClient {
     String petId, {
     String? cursor,
     int? limit,
+    String? query,
     String? entityType,
     String? fileType,
   }) {
@@ -70,11 +71,25 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{
         'cursor': cursor,
         'limit': limit,
+        'q': query,
         'entity_type': entityType,
         'file_type': fileType,
       }..removeWhere((_, dynamic value) => value == null),
       requestOptions: _withToken,
       decoder: PetDocumentsListResponse.fromJson,
+    );
+  }
+
+  Future<PetDocument> updateDocument(
+    String petId,
+    String documentId,
+    UpdatePetDocumentPayload payload,
+  ) {
+    return _apiClient.patch<PetDocument>(
+      ApiEndpoints.petDocumentById(petId, documentId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: PetDocument.fromJson,
     );
   }
 
@@ -332,6 +347,7 @@ class HealthApiClient {
     String petId, {
     String? cursor,
     int? limit,
+    String? query,
     String? status,
     String? bucket,
     String? dateFrom,
@@ -343,6 +359,7 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{
         'cursor': cursor,
         'limit': limit,
+        'q': query,
         'status': status,
         'bucket': bucket,
         'date_from': dateFrom,
@@ -426,6 +443,7 @@ class HealthApiClient {
     String petId, {
     String? cursor,
     int? limit,
+    String? query,
     String? status,
     String? bucket,
     String? dateFrom,
@@ -437,6 +455,7 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{
         'cursor': cursor,
         'limit': limit,
+        'q': query,
         'status': status,
         'bucket': bucket,
         'date_from': dateFrom,
@@ -498,9 +517,10 @@ class HealthApiClient {
     String petId, {
     String? cursor,
     int? limit,
+    String? query,
     String? status,
     String? bucket,
-    String? procedureType,
+    String? procedureTypeId,
     String? dateFrom,
     String? dateTo,
     String? sort,
@@ -510,9 +530,10 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{
         'cursor': cursor,
         'limit': limit,
+        'q': query,
         'status': status,
         'bucket': bucket,
-        'procedure_type': procedureType,
+        'procedure_type_id': procedureTypeId,
         'date_from': dateFrom,
         'date_to': dateTo,
         'sort': sort,
@@ -572,9 +593,10 @@ class HealthApiClient {
     String petId, {
     String? cursor,
     int? limit,
+    String? query,
     String? status,
     String? bucket,
-    String? recordType,
+    String? recordTypeId,
     String? sort,
   }) {
     return _apiClient.get<MedicalRecordListResponse>(
@@ -582,9 +604,10 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{
         'cursor': cursor,
         'limit': limit,
+        'q': query,
         'status': status,
         'bucket': bucket,
-        'record_type': recordType,
+        'record_type_id': recordTypeId,
         'sort': sort,
       }..removeWhere((_, dynamic value) => value == null),
       requestOptions: _withToken,
@@ -644,6 +667,21 @@ class HealthApiClient {
       queryParameters: <String, dynamic>{'date': date},
       requestOptions: _withToken,
       decoder: ScheduledDayResponse.fromJson,
+    );
+  }
+
+  Future<CalendarRangeResponse> getHealthCalendar({
+    required String dateFrom,
+    required String dateTo,
+  }) {
+    return _apiClient.get<CalendarRangeResponse>(
+      ApiEndpoints.healthCalendar,
+      queryParameters: <String, dynamic>{
+        'date_from': dateFrom,
+        'date_to': dateTo,
+      },
+      requestOptions: _withToken,
+      decoder: CalendarRangeResponse.fromJson,
     );
   }
 

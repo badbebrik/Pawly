@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,7 @@ import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_procedures_controller.dart';
 import '../widgets/health_attachments_field.dart';
+import '../widgets/health_common_widgets.dart';
 
 class PetProceduresPage extends ConsumerStatefulWidget {
   const PetProceduresPage({
@@ -30,26 +33,37 @@ class PetProceduresPage extends ConsumerStatefulWidget {
 }
 
 class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
   ProcedureBucket _selectedBucket = ProcedureBucket.planned;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final stateAsync = ref.watch(petProceduresControllerProvider(widget.petId));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Процедуры')),
+    return PawlyScreenScaffold(
+      title: 'Процедуры',
       floatingActionButton: stateAsync.asData?.value.canWrite == true
-          ? FloatingActionButton.extended(
-              onPressed: _openCreateSheet,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Новая процедура'),
+          ? PawlyAddActionButton(
+              label: 'Новая процедура',
+              tooltip: 'Добавить процедуру',
+              onTap: _openCreateSheet,
             )
           : null,
       body: stateAsync.when(
         data: (state) => _ProceduresContent(
           petId: widget.petId,
           state: state,
+          searchController: _searchController,
           selectedBucket: _selectedBucket,
+          onSearchChanged: _onSearchChanged,
           onBucketChanged: (bucket) => setState(() => _selectedBucket = bucket),
           onRetry: () => ref
               .read(petProceduresControllerProvider(widget.petId).notifier)
@@ -57,6 +71,7 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
           onLoadMore: () => ref
               .read(petProceduresControllerProvider(widget.petId).notifier)
               .loadMore(_selectedBucket),
+          onMarkDone: _handleMarkDone,
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _ProceduresErrorView(
@@ -66,6 +81,18 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
         ),
       ),
     );
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) {
+        return;
+      }
+      ref
+          .read(petProceduresControllerProvider(widget.petId).notifier)
+          .setSearchQuery(value);
+    });
   }
 
   Future<void> _openCreateSheet() async {
@@ -80,7 +107,7 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
         builder: (context) => _ProcedureComposerPage(
           petId: widget.petId,
           allowedStatuses: state.bootstrap.enums.procedureStatuses,
-          allowedTypes: state.bootstrap.enums.procedureTypes,
+          allowedTypeItems: state.bootstrap.enums.procedureTypeItems,
         ),
       ),
     );
@@ -113,13 +140,96 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
       );
     }
   }
+
+  Future<void> _handleMarkDone(ProcedureCard card) async {
+    final performedAt = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => _ProcedureCompletionDateDialog(
+        initialDate: card.scheduledAt ?? DateTime.now(),
+      ),
+    );
+    if (performedAt == null || !mounted) {
+      return;
+    }
+
+    try {
+      final updated = await ref
+          .read(petProceduresControllerProvider(widget.petId).notifier)
+          .markProcedureDone(
+            procedureId: card.id,
+            performedAt: performedAt,
+          );
+      _invalidateHealthDerivedData(ref, widget.petId);
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Процедура "${card.title}" отмечена выполненной.'),
+        ),
+      );
+
+      final nextDueAt = await showDialog<DateTime>(
+        context: context,
+        builder: (context) => _NextProcedureDateDialog(
+          initialDate: _defaultNextProcedureDate(performedAt),
+        ),
+      );
+      if (nextDueAt == null || !mounted) {
+        setState(() => _selectedBucket = ProcedureBucket.history);
+        return;
+      }
+
+      await ref
+          .read(petProceduresControllerProvider(widget.petId).notifier)
+          .setNextProcedureDate(
+            procedure: updated,
+            nextDueAt: nextDueAt,
+          );
+      _invalidateHealthDerivedData(ref, widget.petId);
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Следующая процедура запланирована: ${_formatDate(nextDueAt)}.',
+          ),
+        ),
+      );
+      setState(() => _selectedBucket = ProcedureBucket.planned);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _mutationErrorMessage(error, 'Не удалось завершить процедуру.'),
+          ),
+        ),
+      );
+    }
+  }
+
+  DateTime _defaultNextProcedureDate(DateTime value) {
+    return DateTime(
+      value.year,
+      value.month + 1,
+      value.day,
+      value.hour,
+      value.minute,
+    );
+  }
 }
 
 class _ProcedureComposerPage extends StatelessWidget {
   const _ProcedureComposerPage({
     required this.petId,
     required this.allowedStatuses,
-    required this.allowedTypes,
+    required this.allowedTypeItems,
     this.initialProcedure,
     this.title = 'Новая процедура',
     this.submitLabel = 'Сохранить процедуру',
@@ -127,19 +237,19 @@ class _ProcedureComposerPage extends StatelessWidget {
 
   final String petId;
   final List<String> allowedStatuses;
-  final List<String> allowedTypes;
+  final List<HealthDictionaryItem> allowedTypeItems;
   final Procedure? initialProcedure;
   final String title;
   final String submitLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
+    return PawlyScreenScaffold(
+      title: title,
       body: _ProcedureComposerSheet(
         petId: petId,
         allowedStatuses: allowedStatuses,
-        allowedTypes: allowedTypes,
+        allowedTypeItems: allowedTypeItems,
         initialProcedure: initialProcedure,
         title: title,
         submitLabel: submitLabel,
@@ -153,144 +263,102 @@ class _ProceduresContent extends StatelessWidget {
   const _ProceduresContent({
     required this.petId,
     required this.state,
+    required this.searchController,
     required this.selectedBucket,
+    required this.onSearchChanged,
     required this.onBucketChanged,
     required this.onRetry,
     required this.onLoadMore,
+    required this.onMarkDone,
   });
 
   final String petId;
   final PetProceduresState state;
+  final TextEditingController searchController;
   final ProcedureBucket selectedBucket;
+  final ValueChanged<String> onSearchChanged;
   final ValueChanged<ProcedureBucket> onBucketChanged;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
   final VoidCallback onLoadMore;
+  final ValueChanged<ProcedureCard> onMarkDone;
 
   @override
   Widget build(BuildContext context) {
     if (!state.canRead) {
-      return _ProceduresNoAccessView(onRetry: onRetry);
+      return _ProceduresNoAccessView(onRetry: () {
+        onRetry();
+      });
     }
 
-    final theme = Theme.of(context);
     final items = state.itemsFor(selectedBucket);
+    final isPlanned = selectedBucket == ProcedureBucket.planned;
 
-    return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
-      children: <Widget>[
-        Text(
-          state.petName,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
+    return RefreshIndicator(
+      onRefresh: onRetry,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
+        children: <Widget>[
+          PawlyTextField(
+            controller: searchController,
+            hintText: 'Название, препарат, заметки',
+            textInputAction: TextInputAction.search,
+            prefixIcon: const Icon(Icons.search_rounded),
+            onChanged: onSearchChanged,
           ),
-        ),
-        const SizedBox(height: PawlySpacing.xxs),
-        Text(
-          state.canWrite
-              ? 'Профилактические и лечебные процедуры'
-              : 'Профилактические и лечебные процедуры · только просмотр',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(height: PawlySpacing.md),
+          HealthBucketSegment<ProcedureBucket>(
+            selectedValue: selectedBucket,
+            onChanged: onBucketChanged,
+            options: <HealthBucketOption<ProcedureBucket>>[
+              HealthBucketOption<ProcedureBucket>(
+                value: ProcedureBucket.planned,
+                label: 'План',
+                count: state.plannedItems.length,
+              ),
+              HealthBucketOption<ProcedureBucket>(
+                value: ProcedureBucket.history,
+                label: 'История',
+                count: state.historyItems.length,
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        Wrap(
-          spacing: PawlySpacing.sm,
-          runSpacing: PawlySpacing.sm,
-          children: <Widget>[
-            _ProcedureBucketChip(
-              label: 'План',
-              count: state.plannedItems.length,
-              selected: selectedBucket == ProcedureBucket.planned,
-              onTap: () => onBucketChanged(ProcedureBucket.planned),
-            ),
-            _ProcedureBucketChip(
-              label: 'История',
-              count: state.historyItems.length,
-              selected: selectedBucket == ProcedureBucket.history,
-              onTap: () => onBucketChanged(ProcedureBucket.history),
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.lg),
-        if (items.isEmpty)
-          PawlyCard(
-            child: Text(
-              selectedBucket == ProcedureBucket.planned
-                  ? 'Запланированных процедур пока нет.'
-                  : 'История процедур пока пуста.',
-              style: theme.textTheme.bodyLarge,
-            ),
-          )
-        else
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-              child: _ProcedureListCard(
+          const SizedBox(height: PawlySpacing.md),
+          if (items.isEmpty)
+            _ProceduresInlineMessage(
+              title:
+                  isPlanned ? 'Запланированных процедур нет' : 'История пуста',
+              message: isPlanned
+                  ? 'Добавьте процедуру, чтобы не потерять дату выполнения.'
+                  : 'Выполненные процедуры появятся здесь.',
+            )
+          else
+            ...items.map(
+              (item) => _ProcedureListCard(
                 petId: petId,
                 item: item,
+                canWrite: state.canWrite,
+                isBusy: state.busyProcedureIds.contains(item.id),
+                onMarkDone:
+                    item.status == 'PLANNED' ? () => onMarkDone(item) : null,
               ),
             ),
-          ),
-        if (state.nextCursorFor(selectedBucket) != null) ...<Widget>[
-          const SizedBox(height: PawlySpacing.sm),
-          PawlyButton(
-            label: state.isLoadingMore(selectedBucket)
-                ? 'Загружаем...'
-                : 'Показать еще',
-            onPressed: state.isLoadingMore(selectedBucket) ? null : onLoadMore,
-            variant: PawlyButtonVariant.secondary,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _ProcedureBucketChip extends StatelessWidget {
-  const _ProcedureBucketChip({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PawlyRadius.pill),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(
-            horizontal: PawlySpacing.md,
-            vertical: PawlySpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: selected ? colorScheme.primary : colorScheme.surface,
-            borderRadius: BorderRadius.circular(PawlyRadius.pill),
-            border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outline,
+          if (state.nextCursorFor(selectedBucket) != null) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            PawlyButton(
+              label: state.isLoadingMore(selectedBucket)
+                  ? 'Загрузка...'
+                  : 'Загрузить еще',
+              onPressed:
+                  state.isLoadingMore(selectedBucket) ? null : onLoadMore,
+              variant: PawlyButtonVariant.secondary,
             ),
-          ),
-          child: Text(
-            '$label · $count',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: selected
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ),
+          ],
+        ],
       ),
     );
   }
@@ -300,125 +368,153 @@ class _ProcedureListCard extends StatelessWidget {
   const _ProcedureListCard({
     required this.petId,
     required this.item,
+    required this.canWrite,
+    required this.isBusy,
+    this.onMarkDone,
   });
 
   final String petId;
   final ProcedureCard item;
+  final bool canWrite;
+  final bool isBusy;
+  final VoidCallback? onMarkDone;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return PawlyCard(
-      onTap: () => context.pushNamed(
-        'petProcedureDetails',
-        pathParameters: <String, String>{
-          'petId': petId,
-          'procedureId': item.id,
-        },
+    final colorScheme = theme.colorScheme;
+    final dateLabel = _primaryDateLabel(item);
+    final productName = _nonEmpty(item.productName);
+    final bodyText = _nonEmpty(item.descriptionPreview);
+    final chips = <Widget>[
+      if (item.status != 'PLANNED')
+        PawlyBadge(
+          label: _procedureStatusLabel(item.status),
+          tone: _procedureStatusTone(item.status),
+        ),
+      PawlyBadge(
+        label: _procedureTypeItemLabel(item.procedureTypeItem),
+        tone: PawlyBadgeTone.neutral,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            item.title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+      child: Material(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: InkWell(
+          onTap: () => context.pushNamed(
+            'petProcedureDetails',
+            pathParameters: <String, String>{
+              'petId': petId,
+              'procedureId': item.id,
+            },
+          ),
+          borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PawlyRadius.xl),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+              ),
+            ),
+            padding: const EdgeInsets.all(PawlySpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: PawlySpacing.sm),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                if (dateLabel != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    dateLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (productName != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Text(
+                    productName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (bodyText != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Text(
+                    bodyText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                if (chips.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Wrap(
+                    spacing: PawlySpacing.xs,
+                    runSpacing: PawlySpacing.xs,
+                    children: chips,
+                  ),
+                ],
+                if (onMarkDone != null && canWrite) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.md),
+                  PawlyButton(
+                    label: isBusy ? 'Сохраняем...' : 'Отметить выполненной',
+                    onPressed: isBusy ? null : onMarkDone,
+                    fullWidth: false,
+                    icon: Icons.check_circle_outline_rounded,
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: PawlySpacing.xs),
-          Wrap(
-            spacing: PawlySpacing.xs,
-            runSpacing: PawlySpacing.xs,
-            children: <Widget>[
-              PawlyBadge(
-                label: _procedureStatusLabel(item.status),
-                tone: _procedureStatusTone(item.status),
-              ),
-              PawlyBadge(
-                label: _procedureTypeLabel(item.procedureType),
-                tone: PawlyBadgeTone.neutral,
-              ),
-            ],
-          ),
-          if (_primaryDateLabel(item) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            _ProcedureInfoLine(
-              icon: Icons.event_rounded,
-              text: value,
-            ),
-          ],
-          if (_nonEmpty(item.productName) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.xs),
-            _ProcedureInfoLine(
-              icon: Icons.medication_rounded,
-              text: value,
-            ),
-          ],
-          if (_nonEmpty(item.descriptionPreview) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            Text(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-          if (_nonEmpty(item.notesPreview) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            Text(
-              value,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
 
   String? _primaryDateLabel(ProcedureCard item) {
-    final parts = <String>[
-      if (_dateValue(item.scheduledAt) case final scheduled?) 'План $scheduled',
-      if (_dateValue(item.performedAt) case final performed?)
-        'Выполнено $performed',
-      if (_dateValue(item.nextDueAt) case final next?) 'Повтор $next',
-    ];
-    if (parts.isEmpty) {
+    final date = switch (item.status) {
+      'COMPLETED' => item.performedAt ?? item.scheduledAt,
+      _ => item.scheduledAt,
+    };
+    if (date == null) {
       return null;
     }
-    return parts.join(' · ');
-  }
-}
-
-class _ProcedureInfoLine extends StatelessWidget {
-  const _ProcedureInfoLine({
-    required this.icon,
-    required this.text,
-  });
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-        const SizedBox(width: PawlySpacing.xs),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ),
-      ],
-    );
+    final prefix = switch (item.status) {
+      'COMPLETED' => 'Выполнено',
+      _ => 'Запланировано',
+    };
+    return '$prefix ${_formatDate(date)}';
   }
 }
 
@@ -426,7 +522,7 @@ class _ProcedureComposerSheet extends ConsumerStatefulWidget {
   const _ProcedureComposerSheet({
     required this.petId,
     required this.allowedStatuses,
-    required this.allowedTypes,
+    required this.allowedTypeItems,
     this.initialProcedure,
     this.title = 'Новая процедура',
     this.submitLabel = 'Сохранить процедуру',
@@ -435,7 +531,7 @@ class _ProcedureComposerSheet extends ConsumerStatefulWidget {
 
   final String petId;
   final List<String> allowedStatuses;
-  final List<String> allowedTypes;
+  final List<HealthDictionaryItem> allowedTypeItems;
   final Procedure? initialProcedure;
   final String title;
   final String submitLabel;
@@ -453,10 +549,11 @@ class _ProcedureComposerSheetState
   final _descriptionController = TextEditingController();
   final _productNameController = TextEditingController();
   final _notesController = TextEditingController();
+  final _customProcedureTypeController = TextEditingController();
   final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
 
   late String _status;
-  late String _procedureType;
+  late String _procedureTypeSelection;
   DateTime? _scheduledAt;
   DateTime? _performedAt;
   DateTime? _nextDueAt;
@@ -469,14 +566,13 @@ class _ProcedureComposerSheetState
   void initState() {
     super.initState();
     final initial = widget.initialProcedure;
-    _status = initial?.status ??
-        (widget.allowedStatuses.contains('PLANNED')
+    final allowedStatuses = _allowedStatuses;
+    _status = initial == null
+        ? (allowedStatuses.contains('PLANNED')
             ? 'PLANNED'
-            : widget.allowedStatuses.first);
-    _procedureType = initial?.procedureType ??
-        (widget.allowedTypes.contains('DEWORMING')
-            ? 'DEWORMING'
-            : widget.allowedTypes.first);
+            : allowedStatuses.first)
+        : initial.status;
+    _procedureTypeSelection = _initialProcedureTypeSelection(initial);
     _titleController.text = initial?.title ?? '';
     _descriptionController.text = initial?.description ?? '';
     _productNameController.text = initial?.productName ?? '';
@@ -491,13 +587,73 @@ class _ProcedureComposerSheetState
     );
   }
 
+  List<String> get _allowedStatuses {
+    final statuses = <String>[];
+    for (final rawStatus in widget.allowedStatuses) {
+      final status = rawStatus.trim().toUpperCase();
+      if (!const <String>{'PLANNED', 'COMPLETED'}.contains(status) ||
+          statuses.contains(status)) {
+        continue;
+      }
+      statuses.add(status);
+    }
+    return statuses.isEmpty ? const <String>['PLANNED', 'COMPLETED'] : statuses;
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _productNameController.dispose();
     _notesController.dispose();
+    _customProcedureTypeController.dispose();
     super.dispose();
+  }
+
+  List<DropdownMenuItem<String>> get _procedureTypeOptions {
+    final items = <HealthDictionaryItem>[
+      ...widget.allowedTypeItems.where((item) => !item.isArchived),
+    ];
+    final initialItem = widget.initialProcedure?.procedureTypeItem;
+    if (initialItem != null &&
+        !items.any((item) => item.id == initialItem.id)) {
+      items.add(initialItem);
+    }
+
+    return <DropdownMenuItem<String>>[
+      ...items.map(
+        (item) => DropdownMenuItem<String>(
+          value: 'item:${item.id}',
+          child: Text(item.name),
+        ),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'custom',
+        child: Text('Другой тип'),
+      ),
+    ];
+  }
+
+  String? get _selectedProcedureTypeId {
+    if (!_procedureTypeSelection.startsWith('item:')) {
+      return null;
+    }
+    return _procedureTypeSelection.substring('item:'.length);
+  }
+
+  String _initialProcedureTypeSelection(Procedure? initial) {
+    final initialItem = initial?.procedureTypeItem;
+    if (initialItem != null) {
+      return 'item:${initialItem.id}';
+    }
+
+    final activeItems =
+        widget.allowedTypeItems.where((item) => !item.isArchived);
+    if (activeItems.isNotEmpty) {
+      return 'item:${activeItems.first.id}';
+    }
+
+    return 'custom';
   }
 
   @override
@@ -530,122 +686,150 @@ class _ProcedureComposerSheetState
                 ] else ...<Widget>[
                   const SizedBox(height: PawlySpacing.sm),
                 ],
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xs,
-                  children: widget.allowedStatuses
-                      .map(
-                        (status) => ChoiceChip(
-                          label: Text(_procedureStatusLabel(status)),
-                          selected: _status == status,
-                          onSelected: (_) => setState(() => _status = status),
-                        ),
-                      )
-                      .toList(growable: false),
+                PawlyListSection(
+                  title: 'Статус',
+                  padding: const EdgeInsets.all(PawlySpacing.sm),
+                  children: <Widget>[
+                    HealthBucketSegment<String>(
+                      selectedValue: _status,
+                      onChanged: (status) => setState(() => _status = status),
+                      options: _allowedStatuses
+                          .map(
+                            (status) => HealthBucketOption<String>(
+                              value: status,
+                              label: _procedureStatusLabel(status),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: PawlySpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: _procedureType,
-                  decoration: const InputDecoration(labelText: 'Тип процедуры'),
-                  items: widget.allowedTypes
-                      .map(
-                        (type) => DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(_procedureTypeLabel(type)),
+                PawlyListSection(
+                  title: 'Процедура',
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    _ProcedureTypeField(
+                      value: _procedureTypeSelection,
+                      items: _procedureTypeOptions,
+                      onChanged: (value) =>
+                          setState(() => _procedureTypeSelection = value),
+                    ),
+                    if (_procedureTypeSelection == 'custom')
+                      _ProcedureFormTextField(
+                        controller: _customProcedureTypeController,
+                        label: 'Свой тип процедуры',
+                        textCapitalization: TextCapitalization.sentences,
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Укажите тип процедуры.';
+                          }
+                          return null;
+                        },
+                      ),
+                    _ProcedureFormTextField(
+                      controller: _titleController,
+                      label: 'Название',
+                      textCapitalization: TextCapitalization.sentences,
+                      validator: (value) {
+                        if ((value ?? '').trim().isEmpty) {
+                          return 'Укажите название процедуры.';
+                        }
+                        return null;
+                      },
+                    ),
+                    _ProcedureFormTextField(
+                      controller: _descriptionController,
+                      label: 'Описание',
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                    _ProcedureFormTextField(
+                      controller: _productNameController,
+                      label: 'Препарат или средство',
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyListSection(
+                  title: 'Даты',
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  children: <Widget>[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        HealthDateButton(
+                          label: _scheduledAt == null
+                              ? 'Дата и время по плану'
+                              : 'Дата и время по плану: ${_formatDateTime(_scheduledAt!)}',
+                          onTap: () async {
+                            final picked = await _pickDateTime(
+                              context,
+                              initialDate: _scheduledAt ?? DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setState(() => _scheduledAt = picked);
+                            }
+                          },
                         ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _procedureType = value);
-                  },
+                        if (_status != 'PLANNED') ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          HealthDateButton(
+                            label: _performedAt == null
+                                ? 'Дата и время выполнения'
+                                : 'Дата и время выполнения: ${_formatDateTime(_performedAt!)}',
+                            onTap: () async {
+                              final picked = await _pickDateTime(
+                                context,
+                                initialDate: _performedAt ??
+                                    _scheduledAt ??
+                                    DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() => _performedAt = picked);
+                              }
+                            },
+                            secondary: true,
+                          ),
+                        ],
+                        if (_status == 'COMPLETED') ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          HealthDateButton(
+                            label: _nextDueAt == null
+                                ? 'Дата и время повтора'
+                                : 'Дата и время повтора: ${_formatDateTime(_nextDueAt!)}',
+                            onTap: () async {
+                              final picked = await _pickDateTime(
+                                context,
+                                initialDate: _nextDueAt ??
+                                    _performedAt ??
+                                    _scheduledAt ??
+                                    DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() => _nextDueAt = picked);
+                              }
+                            },
+                            secondary: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _titleController,
-                  label: 'Название',
-                  textCapitalization: TextCapitalization.sentences,
-                  validator: (value) {
-                    if ((value ?? '').trim().isEmpty) {
-                      return 'Укажи название процедуры.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _descriptionController,
-                  label: 'Описание',
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _productNameController,
-                  label: 'Препарат или средство',
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: PawlySpacing.sm),
-                _DateButton(
-                  label: _scheduledAt == null
-                      ? 'Дата и время по плану'
-                      : 'Дата и время по плану: ${_formatDateTime(_scheduledAt!)}',
-                  onTap: () async {
-                    final picked = await _pickDateTime(
-                      context,
-                      initialDate: _scheduledAt ?? DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => _scheduledAt = picked);
-                    }
-                  },
-                ),
-                if (_status != 'PLANNED') ...<Widget>[
-                  const SizedBox(height: PawlySpacing.sm),
-                  _DateButton(
-                    label: _performedAt == null
-                        ? 'Дата и время выполнения'
-                        : 'Дата и время выполнения: ${_formatDateTime(_performedAt!)}',
-                    onTap: () async {
-                      final picked = await _pickDateTime(
-                        context,
-                        initialDate:
-                            _performedAt ?? _scheduledAt ?? DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => _performedAt = picked);
-                      }
-                    },
-                    secondary: true,
-                  ),
-                ],
-                if (_status == 'DONE') ...<Widget>[
-                  const SizedBox(height: PawlySpacing.sm),
-                  _DateButton(
-                    label: _nextDueAt == null
-                        ? 'Дата и время повтора'
-                        : 'Дата и время повтора: ${_formatDateTime(_nextDueAt!)}',
-                    onTap: () async {
-                      final picked = await _pickDateTime(
-                        context,
-                        initialDate: _nextDueAt ??
-                            _performedAt ??
-                            _scheduledAt ??
-                            DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => _nextDueAt = picked);
-                      }
-                    },
-                    secondary: true,
-                  ),
-                ],
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _notesController,
-                  label: 'Заметки',
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
+                const SizedBox(height: PawlySpacing.md),
+                PawlyListSection(
+                  title: 'Заметки',
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    _ProcedureFormTextField(
+                      controller: _notesController,
+                      label: 'Заметки',
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: PawlySpacing.lg),
                 HealthAttachmentsField(
@@ -656,62 +840,63 @@ class _ProcedureComposerSheetState
                   onAddFromGallery: _pickAndUploadFromGallery,
                   onAddFromCamera: _pickAndUploadFromCamera,
                   onRemove: _removeAttachment,
+                  onRename: _renameAttachment,
                 ),
                 if (_status == 'PLANNED') ...<Widget>[
                   const SizedBox(height: PawlySpacing.lg),
-                  PawlyCard(
-                    child: Column(
-                      children: <Widget>[
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: _pushEnabled,
+                  PawlyListSection(
+                    title: 'Напоминание',
+                    padding: EdgeInsets.zero,
+                    children: <Widget>[
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: PawlySpacing.md,
+                        ),
+                        value: _pushEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _pushEnabled = value;
+                            _shouldSendReminder = true;
+                          });
+                        },
+                        title: const Text('Напоминание включено'),
+                      ),
+                      if (_pushEnabled)
+                        DropdownButtonFormField<int>(
+                          initialValue: _remindOffsetMinutes ?? 0,
+                          decoration: _procedureRowDecoration(
+                            label: 'Когда напомнить',
+                          ),
+                          items: const <DropdownMenuItem<int>>[
+                            DropdownMenuItem<int>(
+                              value: 0,
+                              child: Text('В момент события'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 15,
+                              child: Text('За 15 минут'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 30,
+                              child: Text('За 30 минут'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 60,
+                              child: Text('За 1 час'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 1440,
+                              child: Text('За 1 день'),
+                            ),
+                          ],
                           onChanged: (value) {
                             setState(() {
-                              _pushEnabled = value;
+                              _remindOffsetMinutes = value;
                               _shouldSendReminder = true;
                             });
                           },
-                          title: const Text('Напоминание включено'),
                         ),
-                        if (_pushEnabled) ...<Widget>[
-                          const SizedBox(height: PawlySpacing.sm),
-                          DropdownButtonFormField<int>(
-                            initialValue: _remindOffsetMinutes ?? 0,
-                            decoration: const InputDecoration(
-                              labelText: 'Когда напомнить',
-                            ),
-                            items: const <DropdownMenuItem<int>>[
-                              DropdownMenuItem<int>(
-                                value: 0,
-                                child: Text('В момент события'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 15,
-                                child: Text('За 15 минут'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 30,
-                                child: Text('За 30 минут'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 60,
-                                child: Text('За 1 час'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 1440,
-                                child: Text('За 1 день'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _remindOffsetMinutes = value;
-                                _shouldSendReminder = true;
-                              });
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: PawlySpacing.lg),
@@ -743,7 +928,10 @@ class _ProcedureComposerSheetState
     Navigator.of(context).pop(
       UpsertProcedureInput(
         status: _status,
-        procedureType: _procedureType,
+        procedureTypeId: _selectedProcedureTypeId,
+        procedureTypeName: _procedureTypeSelection == 'custom'
+            ? _nonEmpty(_customProcedureTypeController.text)
+            : null,
         title: _titleController.text.trim(),
         description: _nonEmpty(_descriptionController.text),
         productName: _nonEmpty(_productNameController.text),
@@ -751,9 +939,7 @@ class _ProcedureComposerSheetState
         performedAtIso: _performedAt?.toIso8601String(),
         nextDueAtIso: _nextDueAt?.toIso8601String(),
         notes: _nonEmpty(_notesController.text),
-        attachmentFileIds: _attachments
-            .map((attachment) => attachment.fileId)
-            .toList(growable: false),
+        attachments: _attachmentInputs(),
         reminder: _status == 'PLANNED' && _shouldSendReminder
             ? HealthEntityReminderInput(
                 pushEnabled: _pushEnabled,
@@ -781,7 +967,7 @@ class _ProcedureComposerSheetState
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadFiles(widget.petId, files: files);
+          .uploadFiles(widget.petId, files: files, entityType: 'PROCEDURE');
       if (!mounted) {
         return;
       }
@@ -811,8 +997,9 @@ class _ProcedureComposerSheetState
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files =
-        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files = await ref
+        .read(mediaPickerServiceProvider)
+        .pickAttachmentImagesFromGallery();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -820,9 +1007,8 @@ class _ProcedureComposerSheetState
   }
 
   Future<void> _pickAndUploadFromCamera() async {
-    final file = await ref.read(mediaPickerServiceProvider).pickImage(
-          source: ImageSource.camera,
-        );
+    final file =
+        await ref.read(mediaPickerServiceProvider).takeAttachmentPhoto();
     if (file == null || !mounted) {
       return;
     }
@@ -837,7 +1023,7 @@ class _ProcedureComposerSheetState
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadXFiles(widget.petId, files: files);
+          .uploadXFiles(widget.petId, files: files, entityType: 'PROCEDURE');
       if (!mounted) {
         return;
       }
@@ -871,26 +1057,237 @@ class _ProcedureComposerSheetState
       _attachments.removeWhere((attachment) => attachment.fileId == fileId);
     });
   }
+
+  void _renameAttachment(String fileId, String fileName) {
+    setState(() {
+      final index = _attachments.indexWhere(
+        (attachment) => attachment.fileId == fileId,
+      );
+      if (index >= 0) {
+        _attachments[index] = _attachments[index].copyWith(fileName: fileName);
+      }
+    });
+  }
+
+  List<AttachmentInput> _attachmentInputs() {
+    return _attachments
+        .map(
+          (attachment) => AttachmentInput(
+            fileId: attachment.fileId,
+            fileName: attachment.fileName,
+          ),
+        )
+        .toList(growable: false);
+  }
 }
 
-class _DateButton extends StatelessWidget {
-  const _DateButton({
+class _ProcedureFormTextField extends StatelessWidget {
+  const _ProcedureFormTextField({
+    required this.controller,
     required this.label,
-    required this.onTap,
-    this.secondary = false,
+    this.maxLines = 1,
+    this.validator,
+    this.textCapitalization = TextCapitalization.none,
   });
 
+  final TextEditingController controller;
   final String label;
-  final VoidCallback onTap;
-  final bool secondary;
+  final int maxLines;
+  final FormFieldValidator<String>? validator;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
-    return PawlyButton(
-      label: label,
-      onPressed: onTap,
-      variant:
-          secondary ? PawlyButtonVariant.secondary : PawlyButtonVariant.ghost,
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      validator: validator,
+      textCapitalization: textCapitalization,
+      decoration: _procedureRowDecoration(label: label),
+    );
+  }
+}
+
+class _ProcedureTypeField extends StatelessWidget {
+  const _ProcedureTypeField({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: _procedureRowDecoration(label: 'Тип процедуры'),
+      items: items,
+      onChanged: (value) {
+        if (value == null) {
+          return;
+        }
+        onChanged(value);
+      },
+    );
+  }
+}
+
+InputDecoration _procedureRowDecoration({required String label}) {
+  return InputDecoration(
+    labelText: label,
+    filled: false,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: PawlySpacing.md,
+      vertical: PawlySpacing.sm,
+    ),
+    border: InputBorder.none,
+    enabledBorder: InputBorder.none,
+    focusedBorder: InputBorder.none,
+    errorBorder: InputBorder.none,
+    focusedErrorBorder: InputBorder.none,
+  );
+}
+
+class _ProcedureCompletionDateDialog extends StatefulWidget {
+  const _ProcedureCompletionDateDialog({
+    required this.initialDate,
+  });
+
+  final DateTime initialDate;
+
+  @override
+  State<_ProcedureCompletionDateDialog> createState() =>
+      _ProcedureCompletionDateDialogState();
+}
+
+class _ProcedureCompletionDateDialogState
+    extends State<_ProcedureCompletionDateDialog> {
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Отметить выполненной'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('Укажите дату и время, когда процедура была выполнена.'),
+          const SizedBox(height: PawlySpacing.md),
+          Text(
+            _formatDateTime(_selectedDate),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          TextButton.icon(
+            onPressed: () async {
+              final picked = await _pickDateTime(
+                context,
+                initialDate: _selectedDate,
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+            icon: const Icon(Icons.event_rounded),
+            label: const Text('Изменить дату и время'),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_selectedDate),
+          child: const Text('Сохранить'),
+        ),
+      ],
+    );
+  }
+}
+
+class _NextProcedureDateDialog extends StatefulWidget {
+  const _NextProcedureDateDialog({
+    required this.initialDate,
+  });
+
+  final DateTime initialDate;
+
+  @override
+  State<_NextProcedureDateDialog> createState() =>
+      _NextProcedureDateDialogState();
+}
+
+class _NextProcedureDateDialogState extends State<_NextProcedureDateDialog> {
+  DateTime? _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Дата и время следующей процедуры'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Следующую процедуру можно запланировать сразу. Если дата пока неизвестна, пропустите шаг.',
+          ),
+          const SizedBox(height: PawlySpacing.md),
+          if (_selectedDate != null)
+            Text(
+              _formatDateTime(_selectedDate!),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          const SizedBox(height: PawlySpacing.sm),
+          TextButton.icon(
+            onPressed: () async {
+              final picked = await _pickDateTime(
+                context,
+                initialDate: _selectedDate ?? widget.initialDate,
+                firstDate: widget.initialDate,
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Выбрать дату и время'),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Пропустить'),
+        ),
+        FilledButton(
+          onPressed: _selectedDate == null
+              ? null
+              : () => Navigator.of(context).pop(_selectedDate),
+          child: const Text('Сохранить'),
+        ),
+      ],
     );
   }
 }
@@ -913,26 +1310,24 @@ class PetProcedureDetailsPage extends ConsumerWidget {
     );
     final procedureAsync = ref.watch(petProcedureDetailsProvider(procedureRef));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Процедура'),
-        actions: procedureAsync.maybeWhen(
-          data: (procedure) => <Widget>[
-            if (procedure.canEdit)
-              IconButton(
-                onPressed: () => _editProcedure(context, ref, procedure),
-                icon: const Icon(Icons.edit_rounded),
-                tooltip: 'Редактировать',
-              ),
-            if (procedure.canDelete)
-              IconButton(
-                onPressed: () => _deleteProcedure(context, ref, procedure),
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Удалить',
-              ),
-          ],
-          orElse: () => const <Widget>[],
-        ),
+    return PawlyScreenScaffold(
+      title: 'Процедура',
+      actions: procedureAsync.maybeWhen(
+        data: (procedure) => <Widget>[
+          if (procedure.canEdit)
+            IconButton(
+              onPressed: () => _editProcedure(context, ref, procedure),
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: 'Редактировать',
+            ),
+          if (procedure.canDelete)
+            IconButton(
+              onPressed: () => _deleteProcedure(context, ref, procedure),
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Удалить',
+            ),
+        ],
+        orElse: () => const <Widget>[],
       ),
       body: procedureAsync.when(
         data: (procedure) => _ProcedureDetailsView(
@@ -963,9 +1358,9 @@ class PetProcedureDetailsPage extends ConsumerWidget {
         builder: (context) => _ProcedureComposerPage(
           petId: petId,
           allowedStatuses: state?.bootstrap.enums.procedureStatuses ??
-              const <String>['PLANNED', 'DONE', 'CANCELLED'],
-          allowedTypes:
-              state?.bootstrap.enums.procedureTypes ?? const <String>['OTHER'],
+              const <String>['PLANNED', 'COMPLETED'],
+          allowedTypeItems: state?.bootstrap.enums.procedureTypeItems ??
+              const <HealthDictionaryItem>[],
           initialProcedure: procedure,
           title: 'Редактировать процедуру',
           submitLabel: 'Сохранить изменения',
@@ -1069,77 +1464,95 @@ class _ProcedureDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final details = _detailsLines(procedure);
+    final description = _nonEmpty(procedure.description);
+    final notes = _nonEmpty(procedure.notes);
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
         children: <Widget>[
-          PawlyCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  procedure.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+          PawlyListSection(
+            children: <Widget>[
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        procedure.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
+                      const SizedBox(height: PawlySpacing.xs),
+                      Wrap(
+                        spacing: PawlySpacing.xs,
+                        runSpacing: PawlySpacing.xs,
+                        children: <Widget>[
+                          PawlyBadge(
+                            label: _procedureStatusLabel(procedure.status),
+                            tone: _procedureStatusTone(procedure.status),
+                          ),
+                          PawlyBadge(
+                            label: _procedureTypeItemLabel(
+                              procedure.procedureTypeItem,
+                            ),
+                            tone: PawlyBadgeTone.neutral,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: PawlySpacing.xs),
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xs,
-                  children: <Widget>[
-                    PawlyBadge(
-                      label: _procedureStatusLabel(procedure.status),
-                      tone: _procedureStatusTone(procedure.status),
+              ),
+            ],
+          ),
+          if (details.isNotEmpty) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            HealthDetailsSection(
+              title: 'Основное',
+              children: details
+                  .map(
+                    (line) => HealthDetailsRow(
+                      label: line.$1,
+                      value: line.$2,
                     ),
-                    PawlyBadge(
-                      label: _procedureTypeLabel(procedure.procedureType),
-                      tone: PawlyBadgeTone.neutral,
-                    ),
-                  ],
+                  )
+                  .toList(growable: false),
+            ),
+          ],
+          if (description != null) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            PawlyListSection(
+              title: 'Описание',
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Text(description, style: theme.textTheme.bodyLarge),
                 ),
               ],
             ),
-          ),
-          if (_detailsLines(procedure).isNotEmpty) ...<Widget>[
-            const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Основное',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _detailsLines(procedure)
-                    .map(
-                      (line) => _ProcedureDetailsRow(
-                        label: line.$1,
-                        value: line.$2,
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
-            ),
           ],
-          if (_nonEmpty(procedure.description) case final value?) ...<Widget>[
+          if (notes != null) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Описание',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Text(value),
-            ),
-          ],
-          if (_nonEmpty(procedure.notes) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Заметки',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Text(value),
+            PawlyListSection(
+              title: 'Заметки',
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Text(notes, style: theme.textTheme.bodyLarge),
+                ),
+              ],
             ),
           ],
           if (procedure.attachments.isNotEmpty) ...<Widget>[
@@ -1164,14 +1577,11 @@ class _ProcedureDetailsView extends StatelessWidget {
                     )
                     .toList(growable: false);
 
-                return PawlyCard(
-                  title: Text(
-                    'Вложения',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  child: Column(
-                    children: List<Widget>.generate(
-                        procedure.attachments.length, (index) {
+                return PawlyListSection(
+                  title: 'Вложения',
+                  children: List<Widget>.generate(
+                    procedure.attachments.length,
+                    (index) {
                       final attachment = procedure.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
@@ -1180,21 +1590,16 @@ class _ProcedureDetailsView extends StatelessWidget {
                             item.title == viewerItem.title,
                       );
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          switch (viewerItem.kind) {
-                            AttachmentKind.image => Icons.photo_rounded,
-                            AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
-                            AttachmentKind.other => Icons.description_rounded,
-                          },
-                        ),
-                        title: Text(viewerItem.title),
-                        subtitle: Text(
-                          attachment.addedAt == null
-                              ? attachment.fileType
-                              : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
-                        ),
+                      return PawlyListTile(
+                        title: viewerItem.title,
+                        subtitle: attachment.addedAt == null
+                            ? attachment.fileType
+                            : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
+                        leadingIcon: switch (viewerItem.kind) {
+                          AttachmentKind.image => Icons.photo_rounded,
+                          AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                          AttachmentKind.other => Icons.description_rounded,
+                        },
                         onTap: () => openAttachmentUrl(
                           context,
                           fileId: attachment.fileId,
@@ -1207,7 +1612,7 @@ class _ProcedureDetailsView extends StatelessWidget {
                               imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
-                    }),
+                    },
                   ),
                 );
               },
@@ -1232,43 +1637,6 @@ class _ProcedureDetailsView extends StatelessWidget {
   }
 }
 
-class _ProcedureDetailsRow extends StatelessWidget {
-  const _ProcedureDetailsRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-          const SizedBox(width: PawlySpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ProceduresNoAccessView extends StatelessWidget {
   const _ProceduresNoAccessView({required this.onRetry});
 
@@ -1278,28 +1646,14 @@ class _ProceduresNoAccessView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Нет доступа к процедурам',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: PawlySpacing.xs),
-              Text(
-                'У текущей роли нет права health_read для этого питомца.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: PawlySpacing.md),
-              PawlyButton(
-                label: 'Повторить',
-                onPressed: onRetry,
-                variant: PawlyButtonVariant.secondary,
-              ),
-            ],
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: _ProceduresInlineMessage(
+          title: 'Нет доступа',
+          message: 'У вас нет права просмотра процедур этого питомца.',
+          action: PawlyButton(
+            label: 'Повторить',
+            onPressed: onRetry,
+            variant: PawlyButtonVariant.secondary,
           ),
         ),
       ),
@@ -1316,15 +1670,69 @@ class _ProceduresErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить процедуры'),
-          footer: PawlyButton(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: _ProceduresInlineMessage(
+          title: 'Не удалось загрузить процедуры',
+          message: 'Попробуйте обновить экран через несколько секунд.',
+          action: PawlyButton(
             label: 'Повторить',
             onPressed: onRetry,
             variant: PawlyButtonVariant.secondary,
           ),
-          child: const Text('Попробуйте обновить экран чуть позже.'),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProceduresInlineMessage extends StatelessWidget {
+  const _ProceduresInlineMessage({
+    required this.title,
+    required this.message,
+    this.action,
+  });
+
+  final String title;
+  final String message;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (action != null) ...<Widget>[
+              const SizedBox(height: PawlySpacing.md),
+              action!,
+            ],
+          ],
         ),
       ),
     );
@@ -1334,11 +1742,12 @@ class _ProceduresErrorView extends StatelessWidget {
 Future<DateTime?> _pickDateTime(
   BuildContext context, {
   required DateTime initialDate,
+  DateTime? firstDate,
 }) async {
   final date = await showDatePicker(
     context: context,
     initialDate: initialDate,
-    firstDate: DateTime(2000),
+    firstDate: firstDate ?? DateTime(2000),
     lastDate: DateTime.now().add(const Duration(days: 3650)),
   );
   if (date == null || !context.mounted) {
@@ -1392,8 +1801,7 @@ String _mutationErrorMessage(Object error, String fallback) {
 String _procedureStatusLabel(String status) {
   return switch (status) {
     'PLANNED' => 'Запланирована',
-    'DONE' => 'Выполнена',
-    'CANCELLED' => 'Отменена',
+    'COMPLETED' => 'Выполнена',
     _ => status,
   };
 }
@@ -1401,23 +1809,13 @@ String _procedureStatusLabel(String status) {
 PawlyBadgeTone _procedureStatusTone(String status) {
   return switch (status) {
     'PLANNED' => PawlyBadgeTone.info,
-    'DONE' => PawlyBadgeTone.success,
-    'CANCELLED' => PawlyBadgeTone.warning,
+    'COMPLETED' => PawlyBadgeTone.success,
     _ => PawlyBadgeTone.neutral,
   };
 }
 
-String _procedureTypeLabel(String type) {
-  return switch (type) {
-    'PARASITE_TREATMENT' => 'Паразиты',
-    'DEWORMING' => 'Дегельминтизация',
-    'HYGIENE' => 'Гигиена',
-    'WOUND_CARE' => 'Обработка',
-    'GROOMING' => 'Груминг',
-    'OTHER' => 'Другое',
-    _ => type,
-  };
-}
+String _procedureTypeItemLabel(HealthDictionaryItem? item) =>
+    item?.name ?? 'Тип не указан';
 
 void _invalidateHealthDerivedData(WidgetRef ref, String petId) {
   ref.invalidate(petHealthHomeProvider(petId));

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/providers/session_state_reset.dart';
 import '../../../../app/providers/theme_mode_controller.dart';
@@ -11,6 +9,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/models/profile_models.dart';
 import '../../../../core/providers/core_providers.dart';
+import '../../../../core/services/system_settings_launcher.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/utils/auth_error_message.dart';
@@ -26,8 +25,6 @@ final notificationSettingsProvider =
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
-  static const _supportedLocales = <String>['ru', 'en'];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileState = ref.watch(settingsProfileControllerProvider);
@@ -36,21 +33,28 @@ class SettingsPage extends ConsumerWidget {
         ThemeMode.system;
     final notificationSettingsAsync = ref.watch(notificationSettingsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Настройки'),
-        actions: const <Widget>[
-          ChatAppBarAction(),
-        ],
-      ),
+    return PawlyScreenScaffold(
+      title: 'Настройки',
+      actions: const <Widget>[
+        ChatAppBarAction(),
+      ],
       body: ListView(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
         children: <Widget>[
           profileState.when(
             data: (state) => _ProfileHeader(
               profile: state.profile,
               isUploadingPhoto: state.isUploadingPhoto,
-              onAvatarTap: () => _showPhotoActionsSheet(context, ref),
+              onAvatarTap: () => _showPhotoActionsSheet(
+                context,
+                ref,
+                state.profile,
+              ),
             ),
             loading: _ProfileHeader.loading,
             error: (_, __) => _ProfileHeader.error(
@@ -59,74 +63,52 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: PawlySpacing.md),
-          PawlyCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: <Widget>[
-                _SettingsTile(
-                  icon: Icons.person_outline_rounded,
-                  title: 'Настройки профиля',
-                  subtitle: profile == null
-                      ? 'Имя и фамилия'
-                      : _profileSettingsSubtitle(profile),
-                  onTap: profile == null
-                      ? () {}
-                      : () => _showProfileSettingsSheet(
-                            context,
-                            profile,
-                          ),
-                ),
-                const Divider(height: 1),
-                _SettingsTile(
-                  icon: Icons.language_rounded,
-                  title: 'Язык приложения',
-                  subtitle: _localeLabel(profile?.locale),
-                  onTap: profile == null
-                      ? () {}
-                      : () => _showLanguageSheet(
-                            context,
-                            profile.locale,
-                          ),
-                ),
-                const Divider(height: 1),
-                _SettingsTile(
-                  icon: Icons.palette_outlined,
-                  title: 'Тема приложения',
-                  subtitle: _themeModeLabel(themeMode),
-                  onTap: () async {
-                    final selectedMode = await _showThemeModeSheet(
-                      context: context,
-                      currentMode: themeMode,
-                    );
-                    if (selectedMode == null) {
-                      return;
-                    }
+          _SettingsGroup(
+            children: <Widget>[
+              _SettingsTile(
+                title: 'Профиль',
+                subtitle: profile == null
+                    ? 'Имя и фамилия'
+                    : _profileSettingsSubtitle(profile),
+                onTap: profile == null
+                    ? null
+                    : () => _showProfileSettingsSheet(
+                          context,
+                          profile,
+                        ),
+              ),
+              _SettingsTile(
+                title: 'Тема',
+                subtitle: _themeModeLabel(themeMode),
+                onTap: () async {
+                  final selectedMode = await _showThemeModeSheet(
+                    context: context,
+                    currentMode: themeMode,
+                  );
+                  if (selectedMode == null) {
+                    return;
+                  }
 
-                    await ref
-                        .read(themeModeControllerProvider.notifier)
-                        .setThemeMode(selectedMode);
-                  },
+                  await ref
+                      .read(themeModeControllerProvider.notifier)
+                      .setThemeMode(selectedMode);
+                },
+              ),
+              _SettingsTile(
+                title: 'Уведомления',
+                subtitle: notificationSettingsAsync.when(
+                  data: _notificationStatusLabel,
+                  loading: () => 'Проверяем статус устройства',
+                  error: (_, __) => 'Не удалось определить статус',
                 ),
-                const Divider(height: 1),
-                _SettingsTile(
-                  icon: Icons.notifications_outlined,
-                  title: 'Уведомления',
-                  subtitle: notificationSettingsAsync.when(
-                    data: _notificationStatusLabel,
-                    loading: () => 'Проверяем статус устройства',
-                    error: (_, __) => 'Не удалось определить статус',
-                  ),
-                  onTap: () => _showNotificationSettingsSheet(context, ref),
-                ),
-                const Divider(height: 1),
-                _SettingsTile(
-                  icon: Icons.lock_outline_rounded,
-                  title: 'Безопасность',
-                  subtitle: 'Смена пароля',
-                  onTap: () => _showSecuritySheet(context),
-                ),
-              ],
-            ),
+                onTap: () => _showNotificationSettingsSheet(context, ref),
+              ),
+              _SettingsTile(
+                title: 'Безопасность',
+                subtitle: 'Смена пароля',
+                onTap: () => _showSecuritySheet(context),
+              ),
+            ],
           ),
           const SizedBox(height: PawlySpacing.md),
           PawlyButton(
@@ -150,52 +132,32 @@ class SettingsPage extends ConsumerWidget {
     required BuildContext context,
     required ThemeMode currentMode,
   }) {
-    return showModalBottomSheet<ThemeMode>(
+    return showPawlyBottomSheet<ThemeMode>(
       context: context,
-      showDragHandle: true,
+      title: 'Тема приложения',
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    PawlySpacing.lg,
-                    PawlySpacing.xs,
-                    PawlySpacing.lg,
-                    PawlySpacing.sm,
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Тема приложения',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ),
-                _ThemeModeOption(
-                  icon: Icons.brightness_auto_rounded,
-                  title: 'Как в системе',
-                  mode: ThemeMode.system,
-                  currentMode: currentMode,
-                ),
-                _ThemeModeOption(
-                  icon: Icons.light_mode_outlined,
-                  title: 'Светлая',
-                  mode: ThemeMode.light,
-                  currentMode: currentMode,
-                ),
-                _ThemeModeOption(
-                  icon: Icons.dark_mode_outlined,
-                  title: 'Темная',
-                  mode: ThemeMode.dark,
-                  currentMode: currentMode,
-                ),
-              ],
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _ThemeModeOption(
+              icon: Icons.brightness_auto_rounded,
+              title: 'Как в системе',
+              mode: ThemeMode.system,
+              currentMode: currentMode,
             ),
-          ),
+            _ThemeModeOption(
+              icon: Icons.light_mode_outlined,
+              title: 'Светлая',
+              mode: ThemeMode.light,
+              currentMode: currentMode,
+            ),
+            _ThemeModeOption(
+              icon: Icons.dark_mode_outlined,
+              title: 'Темная',
+              mode: ThemeMode.dark,
+              currentMode: currentMode,
+            ),
+          ],
         );
       },
     );
@@ -216,13 +178,6 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  static String _localeLabel(String? locale) {
-    return switch (locale) {
-      'en' => 'English',
-      _ => 'Русский',
-    };
-  }
-
   static Future<void> _showProfileSettingsSheet(
     BuildContext context,
     ProfileResponse profile,
@@ -235,24 +190,14 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  static Future<void> _showLanguageSheet(
-    BuildContext context,
-    String currentLocale,
-  ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => _LanguageSettingsSheet(
-        currentLocale: currentLocale,
-        supportedLocales: _supportedLocales,
-      ),
-    );
-  }
-
   static Future<void> _showPhotoActionsSheet(
     BuildContext context,
     WidgetRef ref,
+    ProfileResponse profile,
   ) async {
+    final hasPhoto = (profile.avatarDownloadUrl ?? '').isNotEmpty;
+    final pageContext = context;
+
     await showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -276,8 +221,7 @@ class SettingsPage extends ConsumerWidget {
                   title: const Text('Выбрать из галереи'),
                   onTap: () async {
                     Navigator.of(context).pop();
-                    await _uploadProfilePhoto(
-                        context, ref, ImageSource.gallery);
+                    await _uploadProfilePhotoFromGallery(pageContext, ref);
                   },
                 ),
                 ListTile(
@@ -285,9 +229,28 @@ class SettingsPage extends ConsumerWidget {
                   title: const Text('Сделать фото'),
                   onTap: () async {
                     Navigator.of(context).pop();
-                    await _uploadProfilePhoto(context, ref, ImageSource.camera);
+                    await _uploadProfilePhotoFromCamera(pageContext, ref);
                   },
                 ),
+                if (hasPhoto) ...<Widget>[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(
+                      Icons.delete_outline_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    title: Text(
+                      'Удалить фото',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.of(context).pop();
+                      await _deleteProfilePhoto(pageContext, ref);
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -296,15 +259,14 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  static Future<void> _uploadProfilePhoto(
+  static Future<void> _uploadProfilePhotoFromGallery(
     BuildContext context,
     WidgetRef ref,
-    ImageSource source,
   ) async {
     try {
-      await ref.read(settingsProfileControllerProvider.notifier).uploadPhoto(
-            source,
-          );
+      await ref
+          .read(settingsProfileControllerProvider.notifier)
+          .uploadPhotoFromGallery();
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -313,6 +275,50 @@ class SettingsPage extends ConsumerWidget {
               error is StateError
                   ? error.message.toString()
                   : 'Не удалось установить фото профиля.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  static Future<void> _uploadProfilePhotoFromCamera(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    try {
+      await ref
+          .read(settingsProfileControllerProvider.notifier)
+          .uploadPhotoFromCamera();
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message.toString()
+                  : 'Не удалось установить фото профиля.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  static Future<void> _deleteProfilePhoto(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    try {
+      await ref.read(settingsProfileControllerProvider.notifier).deletePhoto();
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message.toString()
+                  : 'Не удалось удалить фото профиля.',
             ),
           ),
         );
@@ -464,10 +470,8 @@ class _NotificationSettingsSheetState
     });
 
     try {
-      final opened = await launchUrl(
-        Uri.parse('app-settings:'),
-        mode: LaunchMode.externalApplication,
-      );
+      const launcher = SystemSettingsLauncher();
+      final opened = await launcher.openNotificationSettings();
       if (!opened && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -562,9 +566,17 @@ class _ProfileHeader extends StatelessWidget {
         ? 'P'
         : _initials(resolvedProfile.firstName, resolvedProfile.lastName);
 
-    return PawlyCard(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PawlySpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.64),
+        ),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Stack(
             children: <Widget>[
@@ -621,7 +633,14 @@ class _ProfileHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(resolvedTitle, style: theme.textTheme.titleLarge),
+                Text(
+                  resolvedTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 if (resolvedSubtitle != null &&
                     resolvedSubtitle.isNotEmpty) ...<Widget>[
                   const SizedBox(height: PawlySpacing.xxxs),
@@ -669,7 +688,7 @@ class _ProfileAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: colorScheme.onSurface, width: 2),
+        border: Border.all(color: colorScheme.outlineVariant, width: 1),
         color: colorScheme.primaryContainer,
       ),
       child: ClipOval(
@@ -723,33 +742,36 @@ class _ProfileAvatarFallback extends StatelessWidget {
   }
 }
 
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({
+    required this.children,
+  });
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return PawlyListSection(children: children);
+  }
+}
+
 class _SettingsTile extends StatelessWidget {
   const _SettingsTile({
-    required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
 
-  final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ListTile(
+    return PawlyListTile(
+      title: title,
+      subtitle: subtitle,
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: PawlySpacing.md,
-        vertical: PawlySpacing.xxs,
-      ),
-      leading: Icon(icon),
-      title: Text(title, style: theme.textTheme.titleSmall),
-      subtitle: Text(subtitle, style: theme.textTheme.bodySmall),
-      trailing: const Icon(Icons.chevron_right_rounded),
     );
   }
 }
@@ -769,13 +791,15 @@ class _ThemeModeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return PawlyListTile(
+      leadingIcon: icon,
+      title: title,
       trailing: currentMode == mode
           ? Icon(
               Icons.check_rounded,
-              color: Theme.of(context).colorScheme.primary,
+              color: colorScheme.primary,
             )
           : null,
       onTap: () => Navigator.of(context).pop(mode),
@@ -914,124 +938,6 @@ class _ProfileSettingsSheetState extends ConsumerState<_ProfileSettingsSheet> {
         ),
       );
     }
-  }
-}
-
-class _LanguageSettingsSheet extends ConsumerStatefulWidget {
-  const _LanguageSettingsSheet({
-    required this.currentLocale,
-    required this.supportedLocales,
-  });
-
-  final String currentLocale;
-  final List<String> supportedLocales;
-
-  @override
-  ConsumerState<_LanguageSettingsSheet> createState() =>
-      _LanguageSettingsSheetState();
-}
-
-class _LanguageSettingsSheetState
-    extends ConsumerState<_LanguageSettingsSheet> {
-  bool _isSaving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                PawlySpacing.lg,
-                PawlySpacing.xs,
-                PawlySpacing.lg,
-                PawlySpacing.sm,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Язык приложения',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ),
-            for (final locale in widget.supportedLocales)
-              _LanguageOption(
-                locale: locale,
-                title: SettingsPage._localeLabel(locale),
-                currentLocale: widget.currentLocale,
-                enabled: !_isSaving,
-                onTap: () => _selectLocale(locale),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectLocale(String locale) async {
-    if (_isSaving || locale == widget.currentLocale) {
-      Navigator.of(context).pop();
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
-      await ref
-          .read(settingsProfileControllerProvider.notifier)
-          .updatePreferences(locale: locale);
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _isSaving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось сменить язык приложения.')),
-      );
-    }
-  }
-}
-
-class _LanguageOption extends StatelessWidget {
-  const _LanguageOption({
-    required this.locale,
-    required this.title,
-    required this.currentLocale,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final String locale;
-  final String title;
-  final String currentLocale;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      enabled: enabled,
-      leading: const Icon(Icons.language_rounded),
-      title: Text(title),
-      trailing: currentLocale == locale
-          ? Icon(
-              Icons.check_rounded,
-              color: Theme.of(context).colorScheme.primary,
-            )
-          : null,
-      onTap: onTap,
-    );
   }
 }
 

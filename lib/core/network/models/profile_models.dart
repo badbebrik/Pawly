@@ -58,19 +58,17 @@ class UpdateProfilePayload {
 
 class UpdateProfilePreferencesPayload {
   const UpdateProfilePreferencesPayload({
-    this.locale,
-    this.timeZone,
+    required this.locale,
+    required this.timeZone,
   });
 
-  final String? locale;
-  final String? timeZone;
+  final String locale;
+  final String timeZone;
 
-  JsonMap toJson() {
-    return <String, dynamic>{
-      'locale': locale,
-      'time_zone': timeZone,
-    }..removeWhere((_, dynamic value) => value == null);
-  }
+  JsonMap toJson() => <String, dynamic>{
+        'locale': locale,
+        'time_zone': timeZone,
+      };
 }
 
 class InitAvatarUploadPayload {

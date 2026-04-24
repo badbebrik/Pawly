@@ -54,6 +54,7 @@ class PetProceduresState {
     required this.plannedNextCursor,
     required this.historyNextCursor,
     required this.loadingMoreBucket,
+    required this.searchQuery,
     required this.isCreating,
     required this.busyProcedureIds,
   });
@@ -65,6 +66,7 @@ class PetProceduresState {
   final String? plannedNextCursor;
   final String? historyNextCursor;
   final ProcedureBucket? loadingMoreBucket;
+  final String searchQuery;
   final bool isCreating;
   final Set<String> busyProcedureIds;
 
@@ -98,6 +100,7 @@ class PetProceduresState {
     bool clearHistoryNextCursor = false,
     ProcedureBucket? loadingMoreBucket,
     bool clearLoadingMoreBucket = false,
+    String? searchQuery,
     bool? isCreating,
     Set<String>? busyProcedureIds,
   }) {
@@ -115,6 +118,7 @@ class PetProceduresState {
       loadingMoreBucket: clearLoadingMoreBucket
           ? null
           : loadingMoreBucket ?? this.loadingMoreBucket,
+      searchQuery: searchQuery ?? this.searchQuery,
       isCreating: isCreating ?? this.isCreating,
       busyProcedureIds: busyProcedureIds ?? this.busyProcedureIds,
     );
@@ -160,7 +164,11 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
     try {
       final response = await ref.read(healthRepositoryProvider).listProcedures(
             _petId,
-            query: _queryFor(bucket, cursor: cursor),
+            query: _queryFor(
+              bucket,
+              cursor: cursor,
+              searchQuery: current.searchQuery,
+            ),
           );
       state = AsyncData(
         switch (bucket) {
@@ -211,6 +219,26 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
     }
   }
 
+  Future<void> setSearchQuery(String value) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final query = value.trim();
+    if (query == current.searchQuery) {
+      return;
+    }
+
+    try {
+      state = AsyncData(
+        await _reloadLists(current.copyWith(searchQuery: query)),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
+  }
+
   Future<Procedure> updateProcedure({
     required String procedureId,
     required UpsertProcedureInput input,
@@ -246,6 +274,99 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
         current.copyWith(
           busyProcedureIds: Set<String>.from(current.busyProcedureIds)
             ..remove(procedureId),
+        ),
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<Procedure> markProcedureDone({
+    required String procedureId,
+    required DateTime performedAt,
+  }) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      throw StateError('Список процедур еще не загружен.');
+    }
+
+    state = AsyncData(
+      current.copyWith(
+        busyProcedureIds: <String>{...current.busyProcedureIds, procedureId},
+      ),
+    );
+
+    try {
+      final procedure = await ref.read(healthRepositoryProvider).getProcedure(
+            _petId,
+            procedureId,
+          );
+      final updated = await ref.read(healthRepositoryProvider).updateProcedure(
+            _petId,
+            procedureId,
+            input: _copyProcedure(
+              procedure,
+              status: 'COMPLETED',
+              performedAtIso: _toIsoString(performedAt),
+            ),
+          );
+      state = AsyncData(
+        await _reloadLists(
+          current.copyWith(
+            busyProcedureIds: Set<String>.from(current.busyProcedureIds)
+              ..remove(procedureId),
+          ),
+        ),
+      );
+      return updated;
+    } catch (error, stackTrace) {
+      state = AsyncData(
+        current.copyWith(
+          busyProcedureIds: Set<String>.from(current.busyProcedureIds)
+            ..remove(procedureId),
+        ),
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<Procedure> setNextProcedureDate({
+    required Procedure procedure,
+    required DateTime nextDueAt,
+  }) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      throw StateError('Список процедур еще не загружен.');
+    }
+
+    state = AsyncData(
+      current.copyWith(
+        busyProcedureIds: <String>{...current.busyProcedureIds, procedure.id},
+      ),
+    );
+
+    try {
+      final updated = await ref.read(healthRepositoryProvider).updateProcedure(
+            _petId,
+            procedure.id,
+            input: _copyProcedure(
+              procedure,
+              nextDueAtIso: _toIsoString(nextDueAt),
+            ),
+          );
+      state = AsyncData(
+        await _reloadLists(
+          current.copyWith(
+            busyProcedureIds: Set<String>.from(current.busyProcedureIds)
+              ..remove(procedure.id),
+          ),
+        ),
+      );
+      return updated;
+    } catch (error, stackTrace) {
+      state = AsyncData(
+        current.copyWith(
+          busyProcedureIds: Set<String>.from(current.busyProcedureIds)
+            ..remove(procedure.id),
         ),
       );
       Error.throwWithStackTrace(error, stackTrace);
@@ -319,6 +440,7 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
       plannedNextCursor: planned.nextCursor,
       historyNextCursor: history.nextCursor,
       loadingMoreBucket: null,
+      searchQuery: '',
       isCreating: false,
       busyProcedureIds: <String>{},
     );
@@ -328,11 +450,17 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
     final results = await Future.wait<Object>(<Future<Object>>[
       ref.read(healthRepositoryProvider).listProcedures(
             _petId,
-            query: _queryFor(ProcedureBucket.planned),
+            query: _queryFor(
+              ProcedureBucket.planned,
+              searchQuery: current.searchQuery,
+            ),
           ),
       ref.read(healthRepositoryProvider).listProcedures(
             _petId,
-            query: _queryFor(ProcedureBucket.history),
+            query: _queryFor(
+              ProcedureBucket.history,
+              searchQuery: current.searchQuery,
+            ),
           ),
     ]);
 
@@ -350,10 +478,15 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
     );
   }
 
-  ProcedureListQuery _queryFor(ProcedureBucket bucket, {String? cursor}) {
+  ProcedureListQuery _queryFor(
+    ProcedureBucket bucket, {
+    String? cursor,
+    String? searchQuery,
+  }) {
     return ProcedureListQuery(
       cursor: cursor,
       limit: 20,
+      searchQuery: searchQuery?.isEmpty == true ? null : searchQuery,
       bucket: switch (bucket) {
         ProcedureBucket.planned => 'planned',
         ProcedureBucket.history => 'history',
@@ -364,4 +497,38 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
       },
     );
   }
+
+  UpsertProcedureInput _copyProcedure(
+    Procedure procedure, {
+    String? status,
+    String? performedAtIso,
+    String? nextDueAtIso,
+  }) {
+    return UpsertProcedureInput(
+      status: status ?? procedure.status,
+      procedureTypeId: procedure.procedureTypeItem?.id,
+      procedureTypeName:
+          procedure.procedureTypeItem == null ? procedure.title : null,
+      title: procedure.title,
+      description: procedure.description,
+      catalogMedicationId: procedure.catalogMedicationId,
+      productName: procedure.productName,
+      scheduledAtIso: _toIsoString(procedure.scheduledAt),
+      performedAtIso: performedAtIso ?? _toIsoString(procedure.performedAt),
+      nextDueAtIso: nextDueAtIso ?? _toIsoString(procedure.nextDueAt),
+      vetVisitId: procedure.vetVisitId,
+      notes: procedure.notes,
+      attachments: procedure.attachments
+          .map(
+            (attachment) => AttachmentInput(
+              fileId: attachment.fileId,
+              fileName: attachment.fileName ?? '',
+            ),
+          )
+          .toList(growable: false),
+      rowVersion: procedure.rowVersion,
+    );
+  }
+
+  String? _toIsoString(DateTime? value) => value?.toIso8601String();
 }

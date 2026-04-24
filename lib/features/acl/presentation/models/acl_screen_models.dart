@@ -321,25 +321,33 @@ class AclInviteDetailsState {
 class AclInvitePreviewState {
   const AclInvitePreviewState({
     required this.invite,
+    required this.pet,
     required this.isSubmitting,
   });
 
-  factory AclInvitePreviewState.initial({required AclInvite invite}) {
+  factory AclInvitePreviewState.initial({
+    required AclInvite invite,
+    required AclInvitePreviewPet pet,
+  }) {
     return AclInvitePreviewState(
       invite: invite,
+      pet: pet,
       isSubmitting: false,
     );
   }
 
   final AclInvite invite;
+  final AclInvitePreviewPet pet;
   final bool isSubmitting;
 
   AclInvitePreviewState copyWith({
     AclInvite? invite,
+    AclInvitePreviewPet? pet,
     bool? isSubmitting,
   }) {
     return AclInvitePreviewState(
       invite: invite ?? this.invite,
+      pet: pet ?? this.pet,
       isSubmitting: isSubmitting ?? this.isSubmitting,
     );
   }

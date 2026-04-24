@@ -58,6 +58,21 @@ class InitUploadResponse {
   }
 }
 
+class AttachmentPayload {
+  const AttachmentPayload({
+    required this.fileId,
+    this.fileName,
+  });
+
+  final String fileId;
+  final String? fileName;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'file_id': fileId,
+        'file_name': fileName,
+      }..removeWhere((_, dynamic value) => value == null);
+}
+
 class PagedItemsResponse<T> {
   const PagedItemsResponse({
     required this.items,

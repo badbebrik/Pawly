@@ -9,6 +9,18 @@ enum CatalogPickMode { catalog, custom }
 
 enum PetCreateStep { basic, breed, appearance, optional, review }
 
+const int petCreateMaxColors = 10;
+
+class CustomPetColorDraft {
+  const CustomPetColorDraft({
+    required this.hex,
+    required this.name,
+  });
+
+  final String hex;
+  final String name;
+}
+
 class PetCreateState {
   const PetCreateState({
     required this.step,
@@ -49,7 +61,7 @@ class PetCreateState {
         patternId: null,
         customPatternName: '',
         colorIds: <String>{},
-        customColorsHex: <String>[],
+        customColorsHex: <CustomPetColorDraft>[],
         isNeutered: 'UNKNOWN',
         isOutdoor: false,
         microchipId: '',
@@ -76,7 +88,7 @@ class PetCreateState {
   final String customPatternName;
 
   final Set<String> colorIds;
-  final List<String> customColorsHex;
+  final List<CustomPetColorDraft> customColorsHex;
 
   final String isNeutered;
   final bool isOutdoor;
@@ -105,7 +117,7 @@ class PetCreateState {
     bool clearPatternId = false,
     String? customPatternName,
     Set<String>? colorIds,
-    List<String>? customColorsHex,
+    List<CustomPetColorDraft>? customColorsHex,
     String? isNeutered,
     bool? isOutdoor,
     String? microchipId,
@@ -171,13 +183,22 @@ class PetCreateController extends Notifier<PetCreateState> {
       speciesMode: value,
       clearError: true,
       clearSpeciesId: value == CatalogPickMode.custom,
+      breedMode: value == CatalogPickMode.custom
+          ? CatalogPickMode.custom
+          : state.breedMode,
+      clearBreedId: value == CatalogPickMode.custom,
       customSpeciesName:
           value == CatalogPickMode.catalog ? '' : state.customSpeciesName,
     );
   }
 
-  void setSpeciesId(String? value) =>
-      state = state.copyWith(speciesId: value, clearError: true);
+  void setSpeciesId(String? value) => state = state.copyWith(
+        speciesMode: CatalogPickMode.catalog,
+        speciesId: value,
+        clearBreedId: value != state.speciesId,
+        customSpeciesName: '',
+        clearError: true,
+      );
 
   void setCustomSpeciesName(String value) =>
       state = state.copyWith(customSpeciesName: value, clearError: true);
@@ -219,22 +240,43 @@ class PetCreateController extends Notifier<PetCreateState> {
     if (next.contains(id)) {
       next.remove(id);
     } else {
+      if (_selectedColorsCount() >= petCreateMaxColors) {
+        state = state.copyWith(error: 'Можно выбрать до 10 цветов.');
+        return;
+      }
       next.add(id);
     }
     state = state.copyWith(colorIds: next, clearError: true);
   }
 
-  void addCustomColor(String hex) {
+  void addCustomColor({
+    required String hex,
+    required String name,
+  }) {
     final normalized = _normalizeHex(hex);
     if (normalized == null) return;
-    final next = <String>[...state.customColorsHex];
-    if (!next.contains(normalized)) next.add(normalized);
+    if (_selectedColorsCount() >= petCreateMaxColors) {
+      state = state.copyWith(error: 'Можно выбрать до 10 цветов.');
+      return;
+    }
+    final trimmedName = name.trim();
+    final next = <CustomPetColorDraft>[...state.customColorsHex];
+    final alreadyExists = next.any((entry) => entry.hex == normalized);
+    if (!alreadyExists) {
+      next.add(
+        CustomPetColorDraft(
+          hex: normalized,
+          name: trimmedName,
+        ),
+      );
+    }
     state = state.copyWith(customColorsHex: next, clearError: true);
   }
 
   void removeCustomColorAt(int index) {
     if (index < 0 || index >= state.customColorsHex.length) return;
-    final next = <String>[...state.customColorsHex]..removeAt(index);
+    final next = <CustomPetColorDraft>[...state.customColorsHex]
+      ..removeAt(index);
     state = state.copyWith(customColorsHex: next, clearError: true);
   }
 
@@ -250,8 +292,13 @@ class PetCreateController extends Notifier<PetCreateState> {
   void setMicrochipInstalledAt(DateTime? value) =>
       state = state.copyWith(microchipInstalledAt: value, clearError: true);
 
-  void nextStep() {
+  void nextStep(CatalogSnapshot catalog) {
     if (state.step.index >= PetCreateStep.values.length - 1) return;
+    final validationError = _validateCurrentStep(catalog);
+    if (validationError != null) {
+      state = state.copyWith(error: validationError);
+      return;
+    }
     state = state.copyWith(
       step: PetCreateStep.values[state.step.index + 1],
       clearError: true,
@@ -264,6 +311,25 @@ class PetCreateController extends Notifier<PetCreateState> {
       step: PetCreateStep.values[state.step.index - 1],
       clearError: true,
     );
+  }
+
+  void goToStep(CatalogSnapshot catalog, PetCreateStep target) {
+    if (target == state.step) return;
+    if (target.index < state.step.index) {
+      state = state.copyWith(step: target, clearError: true);
+      return;
+    }
+
+    for (var i = 0; i < target.index; i++) {
+      final step = PetCreateStep.values[i];
+      final validationError = _validateStep(step, catalog);
+      if (validationError != null) {
+        state = state.copyWith(step: step, error: validationError);
+        return;
+      }
+    }
+
+    state = state.copyWith(step: target, clearError: true);
   }
 
   Future<Pet?> submit(CatalogSnapshot catalog) async {
@@ -293,16 +359,69 @@ class PetCreateController extends Notifier<PetCreateState> {
     }
   }
 
+  int _selectedColorsCount() {
+    return state.colorIds.length + state.customColorsHex.length;
+  }
+
+  String? _validateCurrentStep(CatalogSnapshot catalog) {
+    return _validateStep(state.step, catalog);
+  }
+
+  String? _validateStep(PetCreateStep step, CatalogSnapshot catalog) {
+    switch (step) {
+      case PetCreateStep.basic:
+        if (state.name.trim().isEmpty) return 'Введите кличку питомца';
+        if (state.speciesMode == CatalogPickMode.catalog) {
+          final id = state.speciesId;
+          if (id == null || id.isEmpty) return 'Выберите вид питомца';
+          final exists = catalog.species.any((item) => item.id == id);
+          if (!exists) return 'Выбранный вид устарел. Обновите выбор.';
+        } else if (state.customSpeciesName.trim().isEmpty) {
+          return 'Введите свой вариант вида';
+        }
+        return null;
+      case PetCreateStep.breed:
+        if (state.breedMode == CatalogPickMode.catalog) {
+          final id = state.breedId;
+          if (id == null || id.isEmpty) return 'Выберите породу';
+          final exists = catalog.breeds.any((item) => item.id == id);
+          if (!exists) return 'Выбранная порода устарела. Обновите выбор.';
+        } else if (state.customBreedName.trim().isEmpty) {
+          return 'Введите свой вариант породы';
+        }
+        return null;
+      case PetCreateStep.appearance:
+        if (state.patternMode == CatalogPickMode.catalog) {
+          final id = state.patternId;
+          if (id == null || id.isEmpty) return 'Выберите окрас';
+          final exists = catalog.patterns.any((item) => item.id == id);
+          if (!exists) return 'Выбранный окрас устарел. Обновите выбор.';
+        } else if (state.customPatternName.trim().isEmpty) {
+          return 'Введите свой вариант окраса';
+        }
+        if (state.colorIds.isEmpty && state.customColorsHex.isEmpty) {
+          return 'Выберите минимум один цвет';
+        }
+        if (_selectedColorsCount() > petCreateMaxColors) {
+          return 'Можно выбрать до 10 цветов.';
+        }
+        return null;
+      case PetCreateStep.optional:
+      case PetCreateStep.review:
+        return null;
+    }
+  }
+
   String? _validate(CatalogSnapshot catalog) {
-    if (state.name.trim().isEmpty) return 'Введите имя питомца';
+    if (state.name.trim().isEmpty) return 'Введите кличку питомца';
 
     if (state.speciesMode == CatalogPickMode.catalog) {
       final id = state.speciesId;
       if (id == null || id.isEmpty) return 'Выберите вид питомца';
       final exists = catalog.species.any((item) => item.id == id);
       if (!exists) return 'Выбранный вид устарел. Обновите выбор.';
-    } else {
-      return 'Пользовательский вид пока не поддерживается API';
+    } else if (state.customSpeciesName.trim().isEmpty) {
+      return 'Введите свой вариант вида';
     }
 
     if (state.breedMode == CatalogPickMode.catalog) {
@@ -316,11 +435,11 @@ class PetCreateController extends Notifier<PetCreateState> {
 
     if (state.patternMode == CatalogPickMode.catalog) {
       final id = state.patternId;
-      if (id == null || id.isEmpty) return 'Выберите паттерн';
+      if (id == null || id.isEmpty) return 'Выберите окрас';
       final exists = catalog.patterns.any((item) => item.id == id);
-      if (!exists) return 'Выбранный паттерн устарел. Обновите выбор.';
+      if (!exists) return 'Выбранный окрас устарел. Обновите выбор.';
     } else if (state.customPatternName.trim().isEmpty) {
-      return 'Введите свой вариант паттерна';
+      return 'Введите свой вариант окраса';
     }
 
     if (state.colorIds.isEmpty && state.customColorsHex.isEmpty) {
@@ -333,7 +452,12 @@ class PetCreateController extends Notifier<PetCreateState> {
       return 'Один из выбранных цветов устарел. Обновите выбор.';
     }
 
-    if (state.customColorsHex.any((hex) => _normalizeHex(hex) == null)) {
+    if (_selectedColorsCount() > petCreateMaxColors) {
+      return 'Можно выбрать до 10 цветов.';
+    }
+
+    if (state.customColorsHex
+        .any((entry) => _normalizeHex(entry.hex) == null)) {
       return 'Неверный формат пользовательского цвета';
     }
 
@@ -348,18 +472,31 @@ class PetCreateController extends Notifier<PetCreateState> {
       colors.add(PetColor(presetId: id, sortOrder: sortOrder++));
     }
 
-    for (final rawHex in state.customColorsHex) {
-      final hex = _normalizeHex(rawHex)!;
-      colors.add(PetColor(hexOverride: hex, sortOrder: sortOrder++));
+    for (final customColor in state.customColorsHex) {
+      final hex = _normalizeHex(customColor.hex)!;
+      final name = customColor.name.trim();
+      colors.add(
+        PetColor(
+          hexOverride: hex,
+          note: name.isEmpty ? null : name,
+          sortOrder: sortOrder++,
+        ),
+      );
     }
 
     return CreatePetPayload(
       name: state.name.trim(),
-      speciesId: state.speciesId!,
+      speciesId:
+          state.speciesMode == CatalogPickMode.catalog ? state.speciesId : null,
+      customSpeciesName: state.speciesMode == CatalogPickMode.custom
+          ? state.customSpeciesName.trim()
+          : null,
       sex: state.sex,
       birthDate: state.birthDate,
-      breedId:
-          state.breedMode == CatalogPickMode.catalog ? state.breedId : null,
+      breedId: state.speciesMode == CatalogPickMode.catalog &&
+              state.breedMode == CatalogPickMode.catalog
+          ? state.breedId
+          : null,
       customBreedName: state.breedMode == CatalogPickMode.custom
           ? state.customBreedName.trim()
           : null,
@@ -380,8 +517,8 @@ class PetCreateController extends Notifier<PetCreateState> {
   String? _normalizeHex(String input) {
     final value = input.trim().toUpperCase();
     final prepared = value.startsWith('#') ? value : '#$value';
-    final regExp = RegExp(r'^#[0-9A-F]{6}$');
-    if (!regExp.hasMatch(prepared)) return null;
+    if (prepared.length != 7) return null;
+    if (int.tryParse(prepared.substring(1), radix: 16) == null) return null;
     return prepared;
   }
 }

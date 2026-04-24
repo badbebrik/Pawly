@@ -30,12 +30,14 @@ class PetDocumentsQuery {
   const PetDocumentsQuery({
     this.cursor,
     this.limit = 30,
+    this.searchQuery,
     this.entityType,
     this.fileType,
   });
 
   final String? cursor;
   final int limit;
+  final String? searchQuery;
   final String? entityType;
   final String? fileType;
 }
@@ -50,12 +52,33 @@ class LogMetricInput {
   final double valueNum;
 }
 
+class AttachmentInput {
+  const AttachmentInput({
+    required this.fileId,
+    required this.fileName,
+  });
+
+  final String fileId;
+  final String fileName;
+}
+
+class HealthDictionaryRefInput {
+  const HealthDictionaryRefInput({
+    this.id,
+    this.name,
+  });
+
+  final String? id;
+  final String? name;
+}
+
 class UpsertLogInput {
   const UpsertLogInput({
     required this.occurredAtIso,
     this.logTypeId,
     this.description,
     this.metricValues = const <LogMetricInput>[],
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.rowVersion,
   });
@@ -64,6 +87,7 @@ class UpsertLogInput {
   final String? logTypeId;
   final String? description;
   final List<LogMetricInput> metricValues;
+  final List<AttachmentInput>? attachments;
   final List<String> attachmentFileIds;
   final int? rowVersion;
 }
@@ -167,6 +191,7 @@ class VetVisitListQuery {
   const VetVisitListQuery({
     this.cursor,
     this.limit = 20,
+    this.searchQuery,
     this.status,
     this.bucket,
     this.dateFrom,
@@ -176,6 +201,7 @@ class VetVisitListQuery {
 
   final String? cursor;
   final int limit;
+  final String? searchQuery;
   final String? status;
   final String? bucket;
   final String? dateFrom;
@@ -187,12 +213,14 @@ class UpsertVetVisitInput {
   const UpsertVetVisitInput({
     required this.status,
     required this.visitType,
+    this.title,
     this.scheduledAtIso,
     this.completedAtIso,
     this.reasonText,
     this.resultText,
     this.clinicName,
     this.vetName,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.relatedLogIds = const <String>[],
     this.reminder,
@@ -201,12 +229,14 @@ class UpsertVetVisitInput {
 
   final String status;
   final String visitType;
+  final String? title;
   final String? scheduledAtIso;
   final String? completedAtIso;
   final String? reasonText;
   final String? resultText;
   final String? clinicName;
   final String? vetName;
+  final List<AttachmentInput>? attachments;
   final List<String> attachmentFileIds;
   final List<String> relatedLogIds;
   final HealthEntityReminderInput? reminder;
@@ -227,6 +257,7 @@ class VaccinationListQuery {
   const VaccinationListQuery({
     this.cursor,
     this.limit = 20,
+    this.searchQuery,
     this.status,
     this.bucket,
     this.dateFrom,
@@ -236,6 +267,7 @@ class VaccinationListQuery {
 
   final String? cursor;
   final int limit;
+  final String? searchQuery;
   final String? status;
   final String? bucket;
   final String? dateFrom;
@@ -248,6 +280,7 @@ class UpsertVaccinationInput {
     required this.status,
     required this.vaccineName,
     this.catalogMedicationId,
+    this.targets,
     this.scheduledAtIso,
     this.administeredAtIso,
     this.nextDueAtIso,
@@ -255,6 +288,7 @@ class UpsertVaccinationInput {
     this.clinicName,
     this.vetName,
     this.notes,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.reminder,
     this.rowVersion,
@@ -263,6 +297,7 @@ class UpsertVaccinationInput {
   final String status;
   final String vaccineName;
   final String? catalogMedicationId;
+  final List<HealthDictionaryRefInput>? targets;
   final String? scheduledAtIso;
   final String? administeredAtIso;
   final String? nextDueAtIso;
@@ -270,6 +305,7 @@ class UpsertVaccinationInput {
   final String? clinicName;
   final String? vetName;
   final String? notes;
+  final List<AttachmentInput>? attachments;
   final List<String> attachmentFileIds;
   final HealthEntityReminderInput? reminder;
   final int? rowVersion;
@@ -279,9 +315,10 @@ class ProcedureListQuery {
   const ProcedureListQuery({
     this.cursor,
     this.limit = 20,
+    this.searchQuery,
     this.status,
     this.bucket,
-    this.procedureType,
+    this.procedureTypeId,
     this.dateFrom,
     this.dateTo,
     this.sort,
@@ -289,9 +326,10 @@ class ProcedureListQuery {
 
   final String? cursor;
   final int limit;
+  final String? searchQuery;
   final String? status;
   final String? bucket;
-  final String? procedureType;
+  final String? procedureTypeId;
   final String? dateFrom;
   final String? dateTo;
   final String? sort;
@@ -300,7 +338,8 @@ class ProcedureListQuery {
 class UpsertProcedureInput {
   const UpsertProcedureInput({
     required this.status,
-    required this.procedureType,
+    this.procedureTypeId,
+    this.procedureTypeName,
     required this.title,
     this.description,
     this.catalogMedicationId,
@@ -310,13 +349,15 @@ class UpsertProcedureInput {
     this.nextDueAtIso,
     this.vetVisitId,
     this.notes,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.reminder,
     this.rowVersion,
   });
 
   final String status;
-  final String procedureType;
+  final String? procedureTypeId;
+  final String? procedureTypeName;
   final String title;
   final String? description;
   final String? catalogMedicationId;
@@ -326,6 +367,7 @@ class UpsertProcedureInput {
   final String? nextDueAtIso;
   final String? vetVisitId;
   final String? notes;
+  final List<AttachmentInput>? attachments;
   final List<String> attachmentFileIds;
   final HealthEntityReminderInput? reminder;
   final int? rowVersion;
@@ -335,38 +377,44 @@ class MedicalRecordListQuery {
   const MedicalRecordListQuery({
     this.cursor,
     this.limit = 20,
+    this.searchQuery,
     this.status,
     this.bucket,
-    this.recordType,
+    this.recordTypeId,
     this.sort,
   });
 
   final String? cursor;
   final int limit;
+  final String? searchQuery;
   final String? status;
   final String? bucket;
-  final String? recordType;
+  final String? recordTypeId;
   final String? sort;
 }
 
 class UpsertMedicalRecordInput {
   const UpsertMedicalRecordInput({
-    required this.recordType,
+    this.recordTypeId,
+    this.recordTypeName,
     required this.status,
     required this.title,
     this.description,
     this.startedAtIso,
     this.resolvedAtIso,
+    this.attachments,
     this.attachmentFileIds = const <String>[],
     this.rowVersion,
   });
 
-  final String recordType;
+  final String? recordTypeId;
+  final String? recordTypeName;
   final String status;
   final String title;
   final String? description;
   final String? startedAtIso;
   final String? resolvedAtIso;
+  final List<AttachmentInput>? attachments;
   final List<String> attachmentFileIds;
   final int? rowVersion;
 }
@@ -376,11 +424,13 @@ class UploadHealthAttachmentInput {
     required this.mimeType,
     required this.originalFilename,
     required this.expectedSizeBytes,
+    required this.entityType,
   });
 
   final String mimeType;
   final String originalFilename;
   final int expectedSizeBytes;
+  final String entityType;
 }
 
 class ScheduledItemsQuery {

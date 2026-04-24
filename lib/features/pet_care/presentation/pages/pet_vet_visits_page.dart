@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +19,7 @@ import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_vet_visits_controller.dart';
 import '../widgets/health_attachments_field.dart';
+import '../widgets/health_common_widgets.dart';
 
 class PetVetVisitsPage extends ConsumerStatefulWidget {
   const PetVetVisitsPage({
@@ -31,26 +34,37 @@ class PetVetVisitsPage extends ConsumerStatefulWidget {
 }
 
 class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
   VetVisitBucket _selectedBucket = VetVisitBucket.upcoming;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final stateAsync = ref.watch(petVetVisitsControllerProvider(widget.petId));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Ветеринарные визиты')),
+    return PawlyScreenScaffold(
+      title: 'Ветеринарные визиты',
       floatingActionButton: stateAsync.asData?.value.canWrite == true
-          ? FloatingActionButton.extended(
-              onPressed: _openCreateSheet,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Новый визит'),
+          ? PawlyAddActionButton(
+              label: 'Новый визит',
+              tooltip: 'Добавить ветеринарный визит',
+              onTap: _openCreateSheet,
             )
           : null,
       body: stateAsync.when(
         data: (state) => _VetVisitsContent(
           petId: widget.petId,
           state: state,
+          searchController: _searchController,
           selectedBucket: _selectedBucket,
+          onSearchChanged: _onSearchChanged,
           onBucketChanged: (bucket) => setState(() => _selectedBucket = bucket),
           onRetry: () => ref
               .read(petVetVisitsControllerProvider(widget.petId).notifier)
@@ -67,6 +81,18 @@ class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
         ),
       ),
     );
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) {
+        return;
+      }
+      ref
+          .read(petVetVisitsControllerProvider(widget.petId).notifier)
+          .setSearchQuery(value);
+    });
   }
 
   Future<void> _openCreateSheet() async {
@@ -90,7 +116,7 @@ class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
     }
 
     try {
-      await ref
+      final result = await ref
           .read(petVetVisitsControllerProvider(widget.petId).notifier)
           .createVetVisit(
             input: input,
@@ -98,7 +124,7 @@ class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
       ref.invalidate(petHealthHomeProvider(widget.petId));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Визит сохранен.')),
+        SnackBar(content: Text(_visitCreateSuccessMessage(result))),
       );
       setState(
         () => _selectedBucket = input.status == 'PLANNED'
@@ -120,7 +146,9 @@ class _VetVisitsContent extends StatelessWidget {
   const _VetVisitsContent({
     required this.petId,
     required this.state,
+    required this.searchController,
     required this.selectedBucket,
+    required this.onSearchChanged,
     required this.onBucketChanged,
     required this.onRetry,
     required this.onLoadMore,
@@ -128,136 +156,85 @@ class _VetVisitsContent extends StatelessWidget {
 
   final String petId;
   final PetVetVisitsState state;
+  final TextEditingController searchController;
   final VetVisitBucket selectedBucket;
+  final ValueChanged<String> onSearchChanged;
   final ValueChanged<VetVisitBucket> onBucketChanged;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
   final VoidCallback onLoadMore;
 
   @override
   Widget build(BuildContext context) {
     if (!state.canRead) {
-      return _VetVisitsNoAccessView(onRetry: onRetry);
+      return _VetVisitsNoAccessView(onRetry: () {
+        onRetry();
+      });
     }
 
-    final theme = Theme.of(context);
     final items = state.itemsFor(selectedBucket);
+    final isUpcoming = selectedBucket == VetVisitBucket.upcoming;
 
-    return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
-      children: <Widget>[
-        Text(
-          state.petName,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
+    return RefreshIndicator(
+      onRefresh: onRetry,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
+        children: <Widget>[
+          PawlyTextField(
+            controller: searchController,
+            hintText: 'Клиника, врач, причина',
+            textInputAction: TextInputAction.search,
+            prefixIcon: const Icon(Icons.search_rounded),
+            onChanged: onSearchChanged,
           ),
-        ),
-        const SizedBox(height: PawlySpacing.xxs),
-        Text(
-          state.canWrite
-              ? 'Плановые и завершенные визиты к ветеринару'
-              : 'Плановые и завершенные визиты к ветеринару · только просмотр',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(height: PawlySpacing.md),
+          HealthBucketSegment<VetVisitBucket>(
+            selectedValue: selectedBucket,
+            onChanged: onBucketChanged,
+            options: <HealthBucketOption<VetVisitBucket>>[
+              HealthBucketOption<VetVisitBucket>(
+                value: VetVisitBucket.upcoming,
+                label: 'План',
+                count: state.upcomingItems.length,
+              ),
+              HealthBucketOption<VetVisitBucket>(
+                value: VetVisitBucket.history,
+                label: 'История',
+                count: state.historyItems.length,
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        Wrap(
-          spacing: PawlySpacing.sm,
-          runSpacing: PawlySpacing.sm,
-          children: <Widget>[
-            _VisitBucketChip(
-              label: 'Предстоящие',
-              count: state.upcomingItems.length,
-              selected: selectedBucket == VetVisitBucket.upcoming,
-              onTap: () => onBucketChanged(VetVisitBucket.upcoming),
-            ),
-            _VisitBucketChip(
-              label: 'История',
-              count: state.historyItems.length,
-              selected: selectedBucket == VetVisitBucket.history,
-              onTap: () => onBucketChanged(VetVisitBucket.history),
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.lg),
-        if (items.isEmpty)
-          PawlyCard(
-            child: Text(
-              selectedBucket == VetVisitBucket.upcoming
-                  ? 'Предстоящих визитов пока нет.'
-                  : 'История визитов пока пуста.',
-              style: theme.textTheme.bodyLarge,
-            ),
-          )
-        else
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-              child: _VetVisitListCard(
+          const SizedBox(height: PawlySpacing.md),
+          if (items.isEmpty)
+            _VetVisitsInlineMessage(
+              title: isUpcoming ? 'Предстоящих визитов нет' : 'История пуста',
+              message: isUpcoming
+                  ? 'Добавьте визит, чтобы не потерять дату приема.'
+                  : 'Завершенные визиты появятся здесь.',
+            )
+          else
+            ...items.map(
+              (item) => _VetVisitListCard(
                 petId: petId,
                 item: item,
               ),
             ),
-          ),
-        if (state.nextCursorFor(selectedBucket) != null) ...<Widget>[
-          const SizedBox(height: PawlySpacing.sm),
-          PawlyButton(
-            label: state.isLoadingMore(selectedBucket)
-                ? 'Загружаем...'
-                : 'Показать еще',
-            onPressed: state.isLoadingMore(selectedBucket) ? null : onLoadMore,
-            variant: PawlyButtonVariant.secondary,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _VisitBucketChip extends StatelessWidget {
-  const _VisitBucketChip({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PawlyRadius.pill),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(
-            horizontal: PawlySpacing.md,
-            vertical: PawlySpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: selected ? colorScheme.primary : colorScheme.surface,
-            borderRadius: BorderRadius.circular(PawlyRadius.pill),
-            border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outline,
+          if (state.nextCursorFor(selectedBucket) != null) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            PawlyButton(
+              label: state.isLoadingMore(selectedBucket)
+                  ? 'Загрузка...'
+                  : 'Загрузить еще',
+              onPressed:
+                  state.isLoadingMore(selectedBucket) ? null : onLoadMore,
+              variant: PawlyButtonVariant.secondary,
             ),
-          ),
-          child: Text(
-            '$label · $count',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: selected
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ),
+          ],
+        ],
       ),
     );
   }
@@ -275,58 +252,127 @@ class _VetVisitListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final dateLabel = _primaryDateLabel(item);
+    final title = _vetVisitTitle(item.title, item.visitType);
+    final typeLabel = _visitTypeLabel(item.visitType);
+    final clinicName = _nonEmpty(item.clinicName);
+    final vetName = _nonEmpty(item.vetName);
+    final bodyText = _nonEmpty(item.reasonText);
+    final chips = <Widget>[
+      if (item.status != 'PLANNED')
+        PawlyBadge(
+          label: _visitStatusLabel(item.status),
+          tone: _visitStatusTone(item.status),
+        ),
+    ];
 
-    return PawlyCard(
-      onTap: () => context.pushNamed(
-        'petVetVisitDetails',
-        pathParameters: <String, String>{
-          'petId': petId,
-          'visitId': item.id,
-        },
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            _visitTypeLabel(item.visitType),
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+      child: Material(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: InkWell(
+          onTap: () => context.pushNamed(
+            'petVetVisitDetails',
+            pathParameters: <String, String>{
+              'petId': petId,
+              'visitId': item.id,
+            },
+          ),
+          borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PawlyRadius.xl),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+              ),
+            ),
+            padding: const EdgeInsets.all(PawlySpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: PawlySpacing.sm),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                if (title != typeLabel) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    typeLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (dateLabel != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    dateLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (clinicName != null || vetName != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Text(
+                    <String>[
+                      if (clinicName != null) clinicName,
+                      if (vetName != null) vetName,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (bodyText != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Text(
+                    bodyText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                if (chips.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Wrap(
+                    spacing: PawlySpacing.xs,
+                    runSpacing: PawlySpacing.xs,
+                    children: chips,
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: PawlySpacing.xs),
-          PawlyBadge(
-            label: _visitStatusLabel(item.status),
-            tone: _visitStatusTone(item.status),
-          ),
-          if (_primaryDateLabel(item) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            _VisitInfoLine(
-              icon: Icons.event_rounded,
-              text: value,
-            ),
-          ],
-          if (_nonEmpty(item.clinicName) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.xs),
-            _VisitInfoLine(
-              icon: Icons.local_hospital_rounded,
-              text: value,
-            ),
-          ],
-          if (_nonEmpty(item.vetName) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.xs),
-            _VisitInfoLine(
-              icon: Icons.person_outline_rounded,
-              text: value,
-            ),
-          ],
-          if (_nonEmpty(item.reasonText) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            Text(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -334,49 +380,15 @@ class _VetVisitListCard extends StatelessWidget {
   String? _primaryDateLabel(VetVisitCard item) {
     final date = switch (item.status) {
       'COMPLETED' => item.completedAt ?? item.scheduledAt,
-      'CANCELLED' => item.scheduledAt,
       _ => item.scheduledAt,
     };
     if (date == null) return null;
 
     final prefix = switch (item.status) {
       'COMPLETED' => 'Завершен',
-      'CANCELLED' => 'Был запланирован',
       _ => 'Запланирован',
     };
     return '$prefix ${_formatDate(date)}';
-  }
-}
-
-class _VisitInfoLine extends StatelessWidget {
-  const _VisitInfoLine({
-    required this.icon,
-    required this.text,
-  });
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-        const SizedBox(width: PawlySpacing.xs),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -407,6 +419,7 @@ class _VetVisitComposerSheet extends ConsumerStatefulWidget {
 class _VetVisitComposerSheetState
     extends ConsumerState<_VetVisitComposerSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
   final _clinicController = TextEditingController();
   final _vetController = TextEditingController();
   final _reasonController = TextEditingController();
@@ -427,14 +440,17 @@ class _VetVisitComposerSheetState
   void initState() {
     super.initState();
     final initial = widget.initialVisit;
-    _status = initial?.status ??
-        (widget.allowedStatuses.contains('PLANNED')
+    final allowedStatuses = _allowedStatuses;
+    _status = initial == null
+        ? (allowedStatuses.contains('PLANNED')
             ? 'PLANNED'
-            : widget.allowedStatuses.first);
+            : allowedStatuses.first)
+        : initial.status;
     _visitType = initial?.visitType ??
         (widget.allowedTypes.contains('CHECKUP')
             ? 'CHECKUP'
             : widget.allowedTypes.first);
+    _titleController.text = initial?.title ?? '';
     _clinicController.text = initial?.clinicName ?? '';
     _vetController.text = initial?.vetName ?? '';
     _reasonController.text = initial?.reasonText ?? '';
@@ -448,8 +464,21 @@ class _VetVisitComposerSheetState
     );
   }
 
+  List<String> get _allowedStatuses {
+    final statuses = <String>[];
+    for (final status in widget.allowedStatuses) {
+      if (!const <String>{'PLANNED', 'COMPLETED'}.contains(status) ||
+          statuses.contains(status)) {
+        continue;
+      }
+      statuses.add(status);
+    }
+    return statuses.isEmpty ? const <String>['PLANNED', 'COMPLETED'] : statuses;
+  }
+
   @override
   void dispose() {
+    _titleController.dispose();
     _clinicController.dispose();
     _vetController.dispose();
     _reasonController.dispose();
@@ -485,96 +514,165 @@ class _VetVisitComposerSheetState
                   ),
                   const SizedBox(height: PawlySpacing.lg),
                 ],
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xs,
-                  children: widget.allowedStatuses
-                      .map(
-                        (status) => ChoiceChip(
-                          label: Text(_visitStatusLabel(status)),
-                          selected: _status == status,
-                          onSelected: (_) => setState(() => _status = status),
-                        ),
-                      )
-                      .toList(growable: false),
+                PawlyListSection(
+                  title: 'Статус',
+                  padding: const EdgeInsets.all(PawlySpacing.sm),
+                  children: <Widget>[
+                    HealthBucketSegment<String>(
+                      selectedValue: _status,
+                      onChanged: (status) => setState(() => _status = status),
+                      options: _allowedStatuses
+                          .map(
+                            (status) => HealthBucketOption<String>(
+                              value: status,
+                              label: _visitStatusLabel(status),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: PawlySpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: _visitType,
-                  decoration: const InputDecoration(labelText: 'Тип визита'),
-                  items: widget.allowedTypes
-                      .map(
-                        (type) => DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(_visitTypeLabel(type)),
-                        ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _visitType = value);
-                  },
+                PawlyListSection(
+                  title: 'Визит',
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    _VetVisitTypeField(
+                      value: _visitType,
+                      allowedTypes: widget.allowedTypes,
+                      onChanged: (value) => setState(() => _visitType = value),
+                    ),
+                    _VetVisitFormTextField(
+                      controller: _titleController,
+                      label: 'Название',
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: PawlySpacing.sm),
-                _DateButton(
-                  label: _scheduledAt == null
-                      ? 'Дата визита'
-                      : 'Дата визита: ${_formatDateTime(_scheduledAt!)}',
-                  onTap: () async {
-                    final picked = await _pickDateTime(
-                      context,
-                      initialDate: _scheduledAt ?? DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => _scheduledAt = picked);
-                    }
-                  },
-                ),
-                if (_status != 'PLANNED') ...<Widget>[
-                  const SizedBox(height: PawlySpacing.sm),
-                  _DateButton(
-                    label: _completedAt == null
-                        ? 'Дата завершения'
-                        : 'Дата завершения: ${_formatDateTime(_completedAt!)}',
-                    onTap: () async {
-                      final picked = await _pickDateTime(
-                        context,
-                        initialDate:
-                            _completedAt ?? _scheduledAt ?? DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => _completedAt = picked);
-                      }
-                    },
-                    secondary: true,
+                if (widget.initialVisit == null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.lg),
+                  PawlyListSection(
+                    title: 'Прикрепленные записи',
+                    footer: Align(
+                      alignment: Alignment.centerLeft,
+                      child: PawlyButton(
+                        label: 'Прикрепить запись',
+                        onPressed: _pickRelatedLog,
+                        variant: PawlyButtonVariant.secondary,
+                      ),
+                    ),
+                    children: _selectedLogs.isEmpty
+                        ? const <Widget>[
+                            Padding(
+                              padding: EdgeInsets.all(PawlySpacing.md),
+                              child: _AttachedLogsEmptyState(),
+                            ),
+                          ]
+                        : _selectedLogs
+                            .map(
+                              (log) => PawlyListTile(
+                                title: log.logTypeName ?? 'Запись',
+                                subtitle: _logCardSubtitle(log),
+                                leadingIcon: Icons.notes_rounded,
+                                trailing: IconButton(
+                                  onPressed: () => _removeRelatedLog(log.id),
+                                  icon: const Icon(Icons.close_rounded),
+                                  tooltip: 'Убрать',
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
                   ),
                 ],
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _clinicController,
-                  label: 'Клиника',
-                  textCapitalization: TextCapitalization.words,
+                const SizedBox(height: PawlySpacing.md),
+                PawlyListSection(
+                  title: 'Даты',
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  children: <Widget>[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        HealthDateButton(
+                          label: _scheduledAt == null
+                              ? 'Дата визита'
+                              : 'Дата визита: ${_formatDateTime(_scheduledAt!)}',
+                          onTap: () async {
+                            final picked = await _pickDateTime(
+                              context,
+                              initialDate: _scheduledAt ?? DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setState(() => _scheduledAt = picked);
+                            }
+                          },
+                        ),
+                        if (_status != 'PLANNED') ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          HealthDateButton(
+                            label: _completedAt == null
+                                ? 'Дата завершения'
+                                : 'Дата завершения: ${_formatDateTime(_completedAt!)}',
+                            onTap: () async {
+                              final picked = await _pickDateTime(
+                                context,
+                                initialDate: _completedAt ??
+                                    _scheduledAt ??
+                                    DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() => _completedAt = picked);
+                              }
+                            },
+                            secondary: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _vetController,
-                  label: 'Ветеринар',
-                  textCapitalization: TextCapitalization.words,
+                const SizedBox(height: PawlySpacing.md),
+                PawlyListSection(
+                  title: 'Клиника',
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    _VetVisitFormTextField(
+                      controller: _clinicController,
+                      label: 'Клиника',
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                    _VetVisitFormTextField(
+                      controller: _vetController,
+                      label: 'Ветеринар',
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _reasonController,
-                  label: 'Причина визита',
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
+                const SizedBox(height: PawlySpacing.md),
+                PawlyListSection(
+                  title: 'Причина',
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    _VetVisitFormTextField(
+                      controller: _reasonController,
+                      label: 'Причина визита',
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
                 ),
                 if (_status != 'PLANNED') ...<Widget>[
-                  const SizedBox(height: PawlySpacing.sm),
-                  PawlyTextField(
-                    controller: _resultController,
-                    label: 'Результат визита',
-                    maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
+                  const SizedBox(height: PawlySpacing.md),
+                  PawlyListSection(
+                    title: 'Результат',
+                    padding: EdgeInsets.zero,
+                    children: <Widget>[
+                      _VetVisitFormTextField(
+                        controller: _resultController,
+                        label: 'Результат визита',
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: PawlySpacing.lg),
@@ -586,99 +684,63 @@ class _VetVisitComposerSheetState
                   onAddFromGallery: _pickAndUploadFromGallery,
                   onAddFromCamera: _pickAndUploadFromCamera,
                   onRemove: _removeAttachment,
+                  onRename: _renameAttachment,
                 ),
                 if (_status == 'PLANNED') ...<Widget>[
                   const SizedBox(height: PawlySpacing.lg),
-                  PawlyCard(
-                    child: Column(
-                      children: <Widget>[
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: _pushEnabled,
+                  PawlyListSection(
+                    title: 'Напоминание',
+                    padding: EdgeInsets.zero,
+                    children: <Widget>[
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: PawlySpacing.md,
+                        ),
+                        value: _pushEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _pushEnabled = value;
+                            _shouldSendReminder = true;
+                          });
+                        },
+                        title: const Text('Напоминание включено'),
+                      ),
+                      if (_pushEnabled)
+                        DropdownButtonFormField<int>(
+                          initialValue: _remindOffsetMinutes ?? 0,
+                          decoration: _vetVisitRowDecoration(
+                            label: 'Когда напомнить',
+                          ),
+                          items: const <DropdownMenuItem<int>>[
+                            DropdownMenuItem<int>(
+                              value: 0,
+                              child: Text('В момент события'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 15,
+                              child: Text('За 15 минут'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 30,
+                              child: Text('За 30 минут'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 60,
+                              child: Text('За 1 час'),
+                            ),
+                            DropdownMenuItem<int>(
+                              value: 1440,
+                              child: Text('За 1 день'),
+                            ),
+                          ],
                           onChanged: (value) {
                             setState(() {
-                              _pushEnabled = value;
+                              _remindOffsetMinutes = value;
                               _shouldSendReminder = true;
                             });
                           },
-                          title: const Text('Напоминание включено'),
                         ),
-                        if (_pushEnabled) ...<Widget>[
-                          const SizedBox(height: PawlySpacing.sm),
-                          DropdownButtonFormField<int>(
-                            initialValue: _remindOffsetMinutes ?? 0,
-                            decoration: const InputDecoration(
-                              labelText: 'Когда напомнить',
-                            ),
-                            items: const <DropdownMenuItem<int>>[
-                              DropdownMenuItem<int>(
-                                value: 0,
-                                child: Text('В момент события'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 15,
-                                child: Text('За 15 минут'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 30,
-                                child: Text('За 30 минут'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 60,
-                                child: Text('За 1 час'),
-                              ),
-                              DropdownMenuItem<int>(
-                                value: 1440,
-                                child: Text('За 1 день'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _remindOffsetMinutes = value;
-                                _shouldSendReminder = true;
-                              });
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-                if (widget.initialVisit == null) ...<Widget>[
-                  const SizedBox(height: PawlySpacing.lg),
-                  PawlyCard(
-                    title: Text(
-                      'Прикрепленные записи',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    footer: Align(
-                      alignment: Alignment.centerLeft,
-                      child: PawlyButton(
-                        label: 'Прикрепить запись',
-                        onPressed: _pickRelatedLog,
-                        variant: PawlyButtonVariant.secondary,
-                      ),
-                    ),
-                    child: _selectedLogs.isEmpty
-                        ? const _AttachedLogsEmptyState()
-                        : Column(
-                            children: _selectedLogs
-                                .map(
-                                  (log) => ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: const Icon(Icons.notes_rounded),
-                                    title: Text(log.logTypeName ?? 'Запись'),
-                                    subtitle: Text(_logCardSubtitle(log)),
-                                    trailing: IconButton(
-                                      onPressed: () =>
-                                          _removeRelatedLog(log.id),
-                                      icon: const Icon(Icons.close_rounded),
-                                      tooltip: 'Убрать',
-                                    ),
-                                  ),
-                                )
-                                .toList(growable: false),
-                          ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: PawlySpacing.lg),
@@ -711,15 +773,14 @@ class _VetVisitComposerSheetState
       UpsertVetVisitInput(
         status: _status,
         visitType: _visitType,
+        title: _nonEmpty(_titleController.text),
         scheduledAtIso: _scheduledAt?.toIso8601String(),
         completedAtIso: _completedAt?.toIso8601String(),
         clinicName: _nonEmpty(_clinicController.text),
         vetName: _nonEmpty(_vetController.text),
         reasonText: _nonEmpty(_reasonController.text),
         resultText: _nonEmpty(_resultController.text),
-        attachmentFileIds: _attachments
-            .map((attachment) => attachment.fileId)
-            .toList(growable: false),
+        attachments: _attachmentInputs(),
         relatedLogIds:
             _selectedLogs.map((log) => log.id).toList(growable: false),
         reminder: _status == 'PLANNED' && _shouldSendReminder
@@ -749,7 +810,7 @@ class _VetVisitComposerSheetState
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadFiles(widget.petId, files: files);
+          .uploadFiles(widget.petId, files: files, entityType: 'VET_VISIT');
       if (!mounted) {
         return;
       }
@@ -779,8 +840,9 @@ class _VetVisitComposerSheetState
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files =
-        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files = await ref
+        .read(mediaPickerServiceProvider)
+        .pickAttachmentImagesFromGallery();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -788,9 +850,8 @@ class _VetVisitComposerSheetState
   }
 
   Future<void> _pickAndUploadFromCamera() async {
-    final file = await ref.read(mediaPickerServiceProvider).pickImage(
-          source: ImageSource.camera,
-        );
+    final file =
+        await ref.read(mediaPickerServiceProvider).takeAttachmentPhoto();
     if (file == null || !mounted) {
       return;
     }
@@ -805,7 +866,7 @@ class _VetVisitComposerSheetState
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadXFiles(widget.petId, files: files);
+          .uploadXFiles(widget.petId, files: files, entityType: 'VET_VISIT');
       if (!mounted) {
         return;
       }
@@ -840,6 +901,28 @@ class _VetVisitComposerSheetState
     });
   }
 
+  void _renameAttachment(String fileId, String fileName) {
+    setState(() {
+      final index = _attachments.indexWhere(
+        (attachment) => attachment.fileId == fileId,
+      );
+      if (index >= 0) {
+        _attachments[index] = _attachments[index].copyWith(fileName: fileName);
+      }
+    });
+  }
+
+  List<AttachmentInput> _attachmentInputs() {
+    return _attachments
+        .map(
+          (attachment) => AttachmentInput(
+            fileId: attachment.fileId,
+            fileName: attachment.fileName,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> _pickRelatedLog() async {
     final selected = await showModalBottomSheet<LogCard>(
       context: context,
@@ -866,6 +949,80 @@ class _VetVisitComposerSheetState
   }
 }
 
+class _VetVisitFormTextField extends StatelessWidget {
+  const _VetVisitFormTextField({
+    required this.controller,
+    required this.label,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      decoration: _vetVisitRowDecoration(label: label),
+    );
+  }
+}
+
+class _VetVisitTypeField extends StatelessWidget {
+  const _VetVisitTypeField({
+    required this.value,
+    required this.allowedTypes,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<String> allowedTypes;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: _vetVisitRowDecoration(label: 'Тип визита'),
+      items: allowedTypes
+          .map(
+            (type) => DropdownMenuItem<String>(
+              value: type,
+              child: Text(_visitTypeLabel(type)),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (value) {
+        if (value == null) {
+          return;
+        }
+        onChanged(value);
+      },
+    );
+  }
+}
+
+InputDecoration _vetVisitRowDecoration({required String label}) {
+  return InputDecoration(
+    labelText: label,
+    filled: false,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: PawlySpacing.md,
+      vertical: PawlySpacing.sm,
+    ),
+    border: InputBorder.none,
+    enabledBorder: InputBorder.none,
+    focusedBorder: InputBorder.none,
+    errorBorder: InputBorder.none,
+    focusedErrorBorder: InputBorder.none,
+  );
+}
+
 class _VetVisitComposerPage extends StatelessWidget {
   const _VetVisitComposerPage({
     required this.petId,
@@ -885,8 +1042,8 @@ class _VetVisitComposerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
+    return PawlyScreenScaffold(
+      title: title,
       body: _VetVisitComposerSheet(
         petId: petId,
         allowedStatuses: allowedStatuses,
@@ -896,28 +1053,6 @@ class _VetVisitComposerPage extends StatelessWidget {
         submitLabel: submitLabel,
         showHeader: false,
       ),
-    );
-  }
-}
-
-class _DateButton extends StatelessWidget {
-  const _DateButton({
-    required this.label,
-    required this.onTap,
-    this.secondary = false,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-  final bool secondary;
-
-  @override
-  Widget build(BuildContext context) {
-    return PawlyButton(
-      label: label,
-      onPressed: onTap,
-      variant:
-          secondary ? PawlyButtonVariant.secondary : PawlyButtonVariant.ghost,
     );
   }
 }
@@ -937,26 +1072,24 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
     final visitRef = PetVetVisitRef(petId: petId, visitId: visitId);
     final visitAsync = ref.watch(petVetVisitDetailsProvider(visitRef));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Визит'),
-        actions: visitAsync.maybeWhen(
-          data: (visit) => <Widget>[
-            if (visit.canEdit)
-              IconButton(
-                onPressed: () => _editVisit(context, ref, visit),
-                icon: const Icon(Icons.edit_rounded),
-                tooltip: 'Редактировать',
-              ),
-            if (visit.canDelete)
-              IconButton(
-                onPressed: () => _deleteVisit(context, ref, visit),
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Удалить',
-              ),
-          ],
-          orElse: () => const <Widget>[],
-        ),
+    return PawlyScreenScaffold(
+      title: 'Визит',
+      actions: visitAsync.maybeWhen(
+        data: (visit) => <Widget>[
+          if (visit.canEdit)
+            IconButton(
+              onPressed: () => _editVisit(context, ref, visit),
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: 'Редактировать',
+            ),
+          if (visit.canDelete)
+            IconButton(
+              onPressed: () => _deleteVisit(context, ref, visit),
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Удалить',
+            ),
+        ],
+        orElse: () => const <Widget>[],
       ),
       body: visitAsync.when(
         data: (visit) => _VetVisitDetailsView(
@@ -986,7 +1119,7 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
         builder: (context) => _VetVisitComposerPage(
           petId: petId,
           allowedStatuses: state?.bootstrap.enums.vetVisitStatuses ??
-              const <String>['PLANNED', 'COMPLETED', 'CANCELLED'],
+              const <String>['PLANNED', 'COMPLETED'],
           allowedTypes:
               state?.bootstrap.enums.vetVisitTypes ?? const <String>['CHECKUP'],
           initialVisit: visit,
@@ -1097,77 +1230,101 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
         ref.watch(petVetVisitsControllerProvider(widget.petId)).asData?.value;
     final canReadLogs = listState?.bootstrap.permissions.logRead == true;
     final canAttachLogs = visit.canEdit && canReadLogs;
+    final theme = Theme.of(context);
+    final mainRows = <Widget>[
+      if (_dateValue(visit.scheduledAt) case final value?)
+        HealthDetailsRow(label: 'Дата визита', value: value),
+      if (_dateValue(visit.completedAt) case final value?)
+        HealthDetailsRow(label: 'Дата завершения', value: value),
+      if (_nonEmpty(visit.clinicName) case final value?)
+        HealthDetailsRow(label: 'Клиника', value: value),
+      if (_nonEmpty(visit.vetName) case final value?)
+        HealthDetailsRow(label: 'Ветеринар', value: value),
+    ];
+    final reason = _nonEmpty(visit.reasonText);
+    final result = _nonEmpty(visit.resultText);
 
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: ListView(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
         children: <Widget>[
-          PawlyCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  _visitTypeLabel(visit.visitType),
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+          PawlyListSection(
+            children: <Widget>[
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        _vetVisitTitle(visit.title, visit.visitType),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
+                      const SizedBox(height: PawlySpacing.xs),
+                      Wrap(
+                        spacing: PawlySpacing.xs,
+                        runSpacing: PawlySpacing.xs,
+                        children: <Widget>[
+                          PawlyBadge(
+                            label: _visitStatusLabel(visit.status),
+                            tone: _visitStatusTone(visit.status),
+                          ),
+                          PawlyBadge(
+                            label: _visitTypeLabel(visit.visitType),
+                            tone: PawlyBadgeTone.neutral,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: PawlySpacing.xs),
-                PawlyBadge(
-                  label: _visitStatusLabel(visit.status),
-                  tone: _visitStatusTone(visit.status),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: PawlySpacing.md),
-          PawlyCard(
-            title: Text(
-              'Основное',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                if (_dateValue(visit.scheduledAt) case final value?)
-                  _VisitDetailsRow(label: 'Дата визита', value: value),
-                if (_dateValue(visit.completedAt) case final value?)
-                  _VisitDetailsRow(label: 'Дата завершения', value: value),
-                if (_nonEmpty(visit.clinicName) case final value?)
-                  _VisitDetailsRow(label: 'Клиника', value: value),
-                if (_nonEmpty(visit.vetName) case final value?)
-                  _VisitDetailsRow(label: 'Ветеринар', value: value),
-              ],
-            ),
-          ),
-          if (_nonEmpty(visit.reasonText) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Причина визита',
-                style: Theme.of(context).textTheme.titleMedium,
               ),
-              child: Text(value),
+            ],
+          ),
+          if (mainRows.isNotEmpty) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            HealthDetailsSection(
+              title: 'Основное',
+              children: mainRows,
             ),
           ],
-          if (_nonEmpty(visit.resultText) case final value?) ...<Widget>[
+          if (reason != null) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Результат визита',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Text(value),
+            PawlyListSection(
+              title: 'Причина визита',
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Text(reason, style: theme.textTheme.bodyLarge),
+                ),
+              ],
+            ),
+          ],
+          if (result != null) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            PawlyListSection(
+              title: 'Результат визита',
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Text(result, style: theme.textTheme.bodyLarge),
+                ),
+              ],
             ),
           ],
           if (visit.relatedLogs.isNotEmpty || canAttachLogs) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Связанные записи',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+            PawlyListSection(
+              title: 'Связанные записи',
               footer: canAttachLogs
                   ? PawlyButton(
                       label: _isMutatingLogs
@@ -1178,40 +1335,40 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                       variant: PawlyButtonVariant.secondary,
                     )
                   : null,
-              child: visit.relatedLogs.isEmpty
-                  ? const _AttachedLogsEmptyState()
-                  : Column(
-                      children: visit.relatedLogs
-                          .map(
-                            (log) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.notes_rounded),
-                              title: Text(log.logTypeName ?? 'Запись'),
-                              subtitle: Text(_relatedLogSubtitle(log)),
-                              trailing: visit.canEdit
-                                  ? IconButton(
-                                      onPressed: _isMutatingLogs
-                                          ? null
-                                          : () => _unlinkLog(log),
-                                      icon: const Icon(
-                                        Icons.link_off_rounded,
-                                      ),
-                                      tooltip: 'Открепить',
-                                    )
-                                  : null,
-                              onTap: canReadLogs
-                                  ? () => context.pushNamed(
-                                        'petLogDetails',
-                                        pathParameters: <String, String>{
-                                          'petId': widget.petId,
-                                          'logId': log.id,
-                                        },
-                                      )
-                                  : null,
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
+              children: visit.relatedLogs.isEmpty
+                  ? const <Widget>[
+                      Padding(
+                        padding: EdgeInsets.all(PawlySpacing.md),
+                        child: _AttachedLogsEmptyState(),
+                      ),
+                    ]
+                  : visit.relatedLogs
+                      .map(
+                        (log) => PawlyListTile(
+                          title: log.logTypeName ?? 'Запись',
+                          subtitle: _relatedLogSubtitle(log),
+                          leadingIcon: Icons.notes_rounded,
+                          trailing: visit.canEdit
+                              ? IconButton(
+                                  onPressed: _isMutatingLogs
+                                      ? null
+                                      : () => _unlinkLog(log),
+                                  icon: const Icon(Icons.link_off_rounded),
+                                  tooltip: 'Открепить',
+                                )
+                              : null,
+                          onTap: canReadLogs
+                              ? () => context.pushNamed(
+                                    'petLogDetails',
+                                    pathParameters: <String, String>{
+                                      'petId': widget.petId,
+                                      'logId': log.id,
+                                    },
+                                  )
+                              : null,
+                        ),
+                      )
+                      .toList(growable: false),
             ),
           ],
           if (visit.attachments.isNotEmpty) ...<Widget>[
@@ -1236,14 +1393,11 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                     )
                     .toList(growable: false);
 
-                return PawlyCard(
-                  title: Text(
-                    'Вложения',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  child: Column(
-                    children: List<Widget>.generate(visit.attachments.length,
-                        (index) {
+                return PawlyListSection(
+                  title: 'Вложения',
+                  children: List<Widget>.generate(
+                    visit.attachments.length,
+                    (index) {
                       final attachment = visit.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
@@ -1252,21 +1406,16 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                             item.title == viewerItem.title,
                       );
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          switch (viewerItem.kind) {
-                            AttachmentKind.image => Icons.photo_rounded,
-                            AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
-                            AttachmentKind.other => Icons.description_rounded,
-                          },
-                        ),
-                        title: Text(viewerItem.title),
-                        subtitle: Text(
-                          attachment.addedAt == null
-                              ? attachment.fileType
-                              : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
-                        ),
+                      return PawlyListTile(
+                        title: viewerItem.title,
+                        subtitle: attachment.addedAt == null
+                            ? attachment.fileType
+                            : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
+                        leadingIcon: switch (viewerItem.kind) {
+                          AttachmentKind.image => Icons.photo_rounded,
+                          AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                          AttachmentKind.other => Icons.description_rounded,
+                        },
                         onTap: () => openAttachmentUrl(
                           context,
                           fileId: attachment.fileId,
@@ -1279,7 +1428,7 @@ class _VetVisitDetailsViewState extends ConsumerState<_VetVisitDetailsView> {
                               imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
-                    }),
+                    },
                   ),
                 );
               },
@@ -1627,38 +1776,55 @@ class _LogPickerTile extends StatelessWidget {
   }
 }
 
-class _VisitDetailsRow extends StatelessWidget {
-  const _VisitDetailsRow({
-    required this.label,
-    required this.value,
+class _VetVisitsInlineMessage extends StatelessWidget {
+  const _VetVisitsInlineMessage({
+    required this.title,
+    required this.message,
+    this.action,
   });
 
-  final String label;
-  final String value;
+  final String title;
+  final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(width: PawlySpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
+            if (action != null) ...<Widget>[
+              const SizedBox(height: PawlySpacing.md),
+              action!,
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1673,28 +1839,14 @@ class _VetVisitsNoAccessView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Нет доступа к визитам',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: PawlySpacing.xs),
-              Text(
-                'У текущей роли нет права health_read для этого питомца.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: PawlySpacing.md),
-              PawlyButton(
-                label: 'Повторить',
-                onPressed: onRetry,
-                variant: PawlyButtonVariant.secondary,
-              ),
-            ],
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: _VetVisitsInlineMessage(
+          title: 'Нет доступа',
+          message: 'У вас нет права просмотра визитов этого питомца.',
+          action: PawlyButton(
+            label: 'Повторить',
+            onPressed: onRetry,
+            variant: PawlyButtonVariant.secondary,
           ),
         ),
       ),
@@ -1711,15 +1863,15 @@ class _VetVisitsErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить визиты'),
-          footer: PawlyButton(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: _VetVisitsInlineMessage(
+          title: 'Не удалось загрузить визиты',
+          message: 'Попробуйте обновить экран через несколько секунд.',
+          action: PawlyButton(
             label: 'Повторить',
             onPressed: onRetry,
             variant: PawlyButtonVariant.secondary,
           ),
-          child: const Text('Попробуйте обновить экран чуть позже.'),
         ),
       ),
     );
@@ -1784,6 +1936,23 @@ String _mutationErrorMessage(Object error, String fallback) {
   return fallback;
 }
 
+String _visitCreateSuccessMessage(VetVisitCreateResult result) {
+  if (!result.relatedLogsLinked) {
+    return 'Визит сохранен, но не все записи прикрепились.';
+  }
+
+  if (!result.listReloaded) {
+    return 'Визит сохранен. Обновите список, если он не появился.';
+  }
+
+  return 'Визит сохранен.';
+}
+
+String _vetVisitTitle(String? title, String visitType) {
+  final trimmed = title?.trim() ?? '';
+  return trimmed.isEmpty ? _visitTypeLabel(visitType) : trimmed;
+}
+
 String _relatedLogSubtitle(RelatedLog log) {
   final parts = <String>[
     if (_dateValue(log.occurredAt) case final date?) date,
@@ -1814,7 +1983,6 @@ String _visitStatusLabel(String status) {
   return switch (status) {
     'PLANNED' => 'Запланирован',
     'COMPLETED' => 'Завершен',
-    'CANCELLED' => 'Отменен',
     _ => status,
   };
 }
@@ -1823,7 +1991,6 @@ PawlyBadgeTone _visitStatusTone(String status) {
   return switch (status) {
     'PLANNED' => PawlyBadgeTone.info,
     'COMPLETED' => PawlyBadgeTone.success,
-    'CANCELLED' => PawlyBadgeTone.warning,
     _ => PawlyBadgeTone.neutral,
   };
 }

@@ -86,6 +86,26 @@ final petsRepositoryProvider = Provider<PetsRepository>((ref) {
 final petsControllerProvider =
     AsyncNotifierProvider<PetsController, PetsState>(PetsController.new);
 
+final petAccessPolicyProvider =
+    FutureProvider.autoDispose.family<PetAccessPolicy, String>((ref, petId) {
+  final petsState = ref.watch(petsControllerProvider).asData?.value;
+  if (petsState != null) {
+    for (final item in petsState.items) {
+      if (item.id == petId) {
+        return item.accessPolicy;
+      }
+    }
+  }
+
+  return ref
+      .read(aclApiClientProvider)
+      .getMyAccess(petId)
+      .then((response) => PetAccessPolicy.fromAclPolicy(
+            response.member.policy,
+            isOwner: response.member.isPrimaryOwner,
+          ));
+});
+
 class PetsController extends AsyncNotifier<PetsState> {
   @override
   Future<PetsState> build() async {

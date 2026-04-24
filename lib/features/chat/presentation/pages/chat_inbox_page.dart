@@ -39,16 +39,19 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
   Widget build(BuildContext context) {
     final inboxState = ref.watch(chatInboxControllerProvider(null));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Сообщения'),
-      ),
+    return PawlyScreenScaffold(
+      title: 'Сообщения',
       body: inboxState.when(
         data: (state) => RefreshIndicator(
           onRefresh: _refresh,
           child: state.items.isEmpty
               ? ListView(
-                  padding: const EdgeInsets.all(PawlySpacing.lg),
+                  padding: const EdgeInsets.fromLTRB(
+                    PawlySpacing.md,
+                    PawlySpacing.lg,
+                    PawlySpacing.md,
+                    PawlySpacing.xl,
+                  ),
                   children: const <Widget>[
                     SizedBox(height: PawlySpacing.xxl),
                     _EmptyInboxState(),
@@ -56,10 +59,15 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
                 )
               : ListView.separated(
                   controller: _scrollController,
-                  padding: const EdgeInsets.all(PawlySpacing.lg),
+                  padding: const EdgeInsets.fromLTRB(
+                    PawlySpacing.md,
+                    PawlySpacing.md,
+                    PawlySpacing.md,
+                    PawlySpacing.xl,
+                  ),
                   itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
                   separatorBuilder: (_, __) =>
-                      const SizedBox(height: PawlySpacing.md),
+                      const SizedBox(height: PawlySpacing.sm),
                   itemBuilder: (context, index) {
                     if (index >= state.items.length) {
                       return const Padding(
@@ -151,13 +159,26 @@ class _InboxConversationTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(PawlyRadius.xl),
         child: Ink(
           decoration: BoxDecoration(
-            color: item.hasUnread
-                ? colorScheme.primaryContainer.withValues(alpha: 0.42)
-                : colorScheme.surfaceContainerLow,
+            color: colorScheme.surface,
             borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: item.hasUnread
+                  ? colorScheme.primary.withValues(alpha: 0.20)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.82),
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.07),
+                blurRadius: 16,
+                offset: const Offset(0, 7),
+              ),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(PawlySpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: PawlySpacing.md,
+              vertical: PawlySpacing.md,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -200,7 +221,7 @@ class _InboxConversationTile extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: PawlySpacing.xs),
+                      const SizedBox(height: PawlySpacing.xxs),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
@@ -228,7 +249,7 @@ class _InboxConversationTile extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: PawlySpacing.sm),
+                      const SizedBox(height: PawlySpacing.xs),
                       _PetPill(name: item.pet.name),
                     ],
                   ),
@@ -269,21 +290,35 @@ class _PetPill extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: PawlySpacing.sm,
-        vertical: PawlySpacing.xs,
+        horizontal: PawlySpacing.xs,
+        vertical: PawlySpacing.xxs,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(PawlyRadius.pill),
+        color: colorScheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(PawlyRadius.md),
       ),
-      child: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            Icons.pets_rounded,
+            size: 13,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: PawlySpacing.xxs),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -305,11 +340,15 @@ class _InboxAvatar extends StatelessWidget {
     final hasAvatar = avatarUrl != null && avatarUrl!.isNotEmpty;
 
     return Container(
-      width: 56,
-      height: 56,
+      width: 60,
+      height: 60,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surface,
+          width: 2,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: hasAvatar
@@ -320,7 +359,7 @@ class _InboxAvatar extends StatelessWidget {
                 entityId: userId,
                 imageUrl: avatarUrl!,
               ),
-              targetLogicalSize: 56,
+              targetLogicalSize: 60,
               fit: BoxFit.cover,
               errorWidget: (_) =>
                   _InboxAvatarFallback(displayName: displayName),
@@ -361,8 +400,8 @@ class _UnreadBadge extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      constraints: const BoxConstraints(minWidth: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      constraints: const BoxConstraints(minWidth: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: colorScheme.primary,
         borderRadius: BorderRadius.circular(PawlyRadius.pill),
@@ -384,28 +423,41 @@ class _EmptyInboxState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.lg,
+        PawlySpacing.xl,
+        PawlySpacing.lg,
+        PawlySpacing.xl,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      ),
       child: Column(
         children: <Widget>[
           Icon(
             Icons.chat_bubble_outline_rounded,
-            size: 48,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            size: 38,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
           ),
           const SizedBox(height: PawlySpacing.md),
           Text(
             'У вас пока нет чатов',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: PawlySpacing.xs),
           Text(
             'Откройте диалог из списка участников питомца.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

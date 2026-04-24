@@ -53,6 +53,7 @@ class PetVaccinationsState {
     required this.plannedNextCursor,
     required this.historyNextCursor,
     required this.loadingMoreBucket,
+    required this.searchQuery,
     required this.isCreating,
     required this.busyVaccinationIds,
   });
@@ -64,6 +65,7 @@ class PetVaccinationsState {
   final String? plannedNextCursor;
   final String? historyNextCursor;
   final VaccinationBucket? loadingMoreBucket;
+  final String searchQuery;
   final bool isCreating;
   final Set<String> busyVaccinationIds;
 
@@ -97,6 +99,7 @@ class PetVaccinationsState {
     bool clearHistoryNextCursor = false,
     VaccinationBucket? loadingMoreBucket,
     bool clearLoadingMoreBucket = false,
+    String? searchQuery,
     bool? isCreating,
     Set<String>? busyVaccinationIds,
   }) {
@@ -114,6 +117,7 @@ class PetVaccinationsState {
       loadingMoreBucket: clearLoadingMoreBucket
           ? null
           : loadingMoreBucket ?? this.loadingMoreBucket,
+      searchQuery: searchQuery ?? this.searchQuery,
       isCreating: isCreating ?? this.isCreating,
       busyVaccinationIds: busyVaccinationIds ?? this.busyVaccinationIds,
     );
@@ -160,7 +164,11 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
       final response =
           await ref.read(healthRepositoryProvider).listVaccinations(
                 _petId,
-                query: _queryFor(bucket, cursor: cursor),
+                query: _queryFor(
+                  bucket,
+                  cursor: cursor,
+                  searchQuery: current.searchQuery,
+                ),
               );
       state = AsyncData(
         switch (bucket) {
@@ -210,6 +218,26 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
     }
   }
 
+  Future<void> setSearchQuery(String value) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final query = value.trim();
+    if (query == current.searchQuery) {
+      return;
+    }
+
+    try {
+      state = AsyncData(
+        await _reloadLists(current.copyWith(searchQuery: query)),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
+  }
+
   Future<Vaccination> markVaccinationDone({
     required String vaccinationId,
     required DateTime administeredAt,
@@ -240,7 +268,7 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
                 vaccinationId,
                 input: _copyVaccination(
                   vaccination,
-                  status: 'DONE',
+                  status: 'COMPLETED',
                   administeredAtIso: _toIsoString(administeredAt),
                 ),
               );
@@ -423,6 +451,7 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
       plannedNextCursor: planned.nextCursor,
       historyNextCursor: history.nextCursor,
       loadingMoreBucket: null,
+      searchQuery: '',
       isCreating: false,
       busyVaccinationIds: <String>{},
     );
@@ -434,11 +463,17 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
     final results = await Future.wait<Object>(<Future<Object>>[
       ref.read(healthRepositoryProvider).listVaccinations(
             _petId,
-            query: _queryFor(VaccinationBucket.planned),
+            query: _queryFor(
+              VaccinationBucket.planned,
+              searchQuery: current.searchQuery,
+            ),
           ),
       ref.read(healthRepositoryProvider).listVaccinations(
             _petId,
-            query: _queryFor(VaccinationBucket.history),
+            query: _queryFor(
+              VaccinationBucket.history,
+              searchQuery: current.searchQuery,
+            ),
           ),
     ]);
 
@@ -459,13 +494,15 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
   VaccinationListQuery _queryFor(
     VaccinationBucket bucket, {
     String? cursor,
+    String? searchQuery,
   }) {
     return VaccinationListQuery(
       cursor: cursor,
       limit: 20,
-      bucket: switch (bucket) {
-        VaccinationBucket.planned => 'planned',
-        VaccinationBucket.history => 'history',
+      searchQuery: searchQuery?.isEmpty == true ? null : searchQuery,
+      status: switch (bucket) {
+        VaccinationBucket.planned => 'PLANNED',
+        VaccinationBucket.history => 'COMPLETED',
       },
       sort: switch (bucket) {
         VaccinationBucket.planned => 'scheduled_at_asc',
@@ -484,6 +521,9 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
       status: status ?? vaccination.status,
       vaccineName: vaccination.vaccineName,
       catalogMedicationId: vaccination.catalogMedicationId,
+      targets: vaccination.targets
+          .map((target) => HealthDictionaryRefInput(id: target.id))
+          .toList(growable: false),
       scheduledAtIso: _toIsoString(vaccination.scheduledAt),
       administeredAtIso:
           administeredAtIso ?? _toIsoString(vaccination.administeredAt),

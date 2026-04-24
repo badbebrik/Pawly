@@ -10,16 +10,13 @@ import '../../data/health_file_upload_service.dart';
 import '../../data/health_repository_models.dart';
 import '../models/attachment_draft_item.dart';
 import '../providers/health_controllers.dart';
+import '../utils/log_attachment_limits.dart';
 import '../utils/metric_unit_formatter.dart';
 import '../widgets/health_attachments_field.dart';
 import 'pet_log_type_picker_page.dart';
 
 class PetLogEditPage extends ConsumerStatefulWidget {
-  const PetLogEditPage({
-    required this.petId,
-    required this.logId,
-    super.key,
-  });
+  const PetLogEditPage({required this.petId, required this.logId, super.key});
 
   final String petId;
   final String logId;
@@ -68,8 +65,8 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     final bootstrap = bootstrapAsync.asData?.value;
     final entry = logAsync.asData?.value;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Редактировать запись')),
+    return PawlyScreenScaffold(
+      title: 'Редактировать запись',
       body: bootstrap != null && entry != null
           ? _buildContent(context, bootstrap, entry)
           : (bootstrapAsync.hasError || logAsync.hasError)
@@ -98,96 +95,66 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     _populateFromLog(log);
     final allTypes = _allTypes(bootstrap);
     final selectedType = _selectedType(allTypes);
-    final canEdit =
-        bootstrap.permissions.logWrite &&
+    final canEdit = bootstrap.permissions.logWrite &&
         log.canEdit &&
         !_isSubmitting &&
         !_isUploadingAttachments;
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
         if (!log.canEdit)
           const Padding(
             padding: EdgeInsets.only(bottom: PawlySpacing.md),
-            child: PawlyCard(
-              child: Text('Эту запись нельзя редактировать.'),
+            child: _LogFormInlineMessage(
+              title: 'Редактирование недоступно',
+              message: 'Эту запись нельзя редактировать.',
             ),
           ),
-        PawlyCard(
+        _LogTypeSelectorCard(
           onTap: canEdit ? _openTypePicker : null,
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Тип записи',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: PawlySpacing.xs),
-                    Text(
-                      selectedType == null
-                          ? 'Без типа'
-                          : '${selectedType.name} · ${_scopeLabel(selectedType.scope)}',
-                    ),
-                    const SizedBox(height: PawlySpacing.xs),
-                    Text(
-                      selectedType == null
-                          ? 'Можно оставить запись без типа'
-                          : _typeMetricsLabel(selectedType),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: PawlySpacing.md),
-              const Icon(Icons.chevron_right_rounded),
-            ],
-          ),
+          title: selectedType == null ? 'Без типа' : selectedType.name,
+          subtitle: selectedType == null
+              ? 'Можно оставить запись без типа'
+              : '${_scopeLabel(selectedType.scope)} · ${_typeMetricsLabel(selectedType)}',
         ),
         const SizedBox(height: PawlySpacing.md),
         if (selectedType != null &&
             selectedType.metricRequirements.isNotEmpty) ...<Widget>[
-          Text(
-            'Метрики',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: PawlySpacing.sm),
-          ...selectedType.metricRequirements.map(
-            (requirement) => Padding(
-              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-              child: _buildMetricField(requirement, canEdit),
+          _LogFormSection(
+            title: 'Показатели',
+            child: Column(
+              children: selectedType.metricRequirements
+                  .map(
+                    (requirement) => Padding(
+                      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+                      child: _buildMetricField(requirement, canEdit),
+                    ),
+                  )
+                  .toList(growable: false),
             ),
           ),
           const SizedBox(height: PawlySpacing.md),
         ],
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.event_rounded),
-          title: const Text('Дата и время события'),
-          subtitle: Text(_formatOccurredAt(_occurredAt)),
-          trailing: TextButton(
-            onPressed: canEdit ? _pickOccurredAt : null,
-            child: const Text('Изменить'),
-          ),
+        _LogDateTile(
+          value: _formatOccurredAt(_occurredAt),
+          onTap: canEdit ? _pickOccurredAt : null,
         ),
-        const SizedBox(height: PawlySpacing.sm),
-        PawlyTextField(
-          controller: _descriptionController,
-          label: 'Описание',
-          hintText: 'Что произошло',
-          maxLines: 4,
-          textCapitalization: TextCapitalization.sentences,
-          enabled: canEdit,
+        const SizedBox(height: PawlySpacing.md),
+        _LogFormSection(
+          title: 'Описание',
+          child: PawlyTextField(
+            controller: _descriptionController,
+            hintText: 'Что произошло',
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            enabled: canEdit,
+          ),
         ),
         const SizedBox(height: PawlySpacing.lg),
         HealthAttachmentsField(
@@ -199,6 +166,7 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
           onAddFromGallery: _pickAndUploadFromGallery,
           onAddFromCamera: _pickAndUploadFromCamera,
           onRemove: _removeAttachment,
+          onRename: _renameAttachment,
         ),
         const SizedBox(height: PawlySpacing.lg),
         PawlyButton(
@@ -260,88 +228,68 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     return _metricControllers.putIfAbsent(metricId, TextEditingController.new);
   }
 
-  Widget _buildMetricField(
-    LogTypeMetricRequirement requirement,
-    bool enabled,
-  ) {
+  Widget _buildMetricField(LogTypeMetricRequirement requirement, bool enabled) {
     final label = _metricLabel(requirement);
     if (requirement.inputKind == 'BOOLEAN') {
       final selectedValue = _booleanMetricValues[requirement.metricId];
-      return PawlyCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      return _MetricFieldShell(
+        title: label,
+        subtitle: _metricHint(requirement),
+        child: Wrap(
+          spacing: PawlySpacing.xs,
+          runSpacing: PawlySpacing.xs,
           children: <Widget>[
-            Text(
-              label,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            _LogBooleanChoice(
+              label: 'Да',
+              isSelected: selectedValue == true,
+              enabled: enabled,
+              onTap: () {
+                setState(() {
+                  _booleanMetricValues[requirement.metricId] = true;
+                });
+              },
             ),
-            const SizedBox(height: PawlySpacing.xs),
-            Text(
-              _metricHint(requirement),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: PawlySpacing.sm),
-            Wrap(
-              spacing: PawlySpacing.xs,
-              runSpacing: PawlySpacing.xs,
-              children: <Widget>[
-                ChoiceChip(
-                  label: const Text('Да'),
-                  selected: selectedValue == true,
-                  onSelected: enabled
-                      ? (_) {
-                          setState(() {
-                            _booleanMetricValues[requirement.metricId] = true;
-                          });
-                        }
-                      : null,
-                ),
-                ChoiceChip(
-                  label: const Text('Нет'),
-                  selected: selectedValue == false,
-                  onSelected: enabled
-                      ? (_) {
-                          setState(() {
-                            _booleanMetricValues[requirement.metricId] = false;
-                          });
-                        }
-                      : null,
-                ),
-              ],
+            _LogBooleanChoice(
+              label: 'Нет',
+              isSelected: selectedValue == false,
+              enabled: enabled,
+              onTap: () {
+                setState(() {
+                  _booleanMetricValues[requirement.metricId] = false;
+                });
+              },
             ),
           ],
         ),
       );
     }
 
-    return TextFormField(
-      controller: _controllerForMetric(requirement.metricId),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      enabled: enabled,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: _metricPlaceholder(requirement),
-        helperText: _metricHint(requirement),
-        suffixIcon: (requirement.unitCode ?? '').trim().isEmpty
-            ? null
-            : Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(
-                  widthFactor: 1,
-                  child: Text(
-                    formatDisplayUnitCode(requirement.unitCode),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
+    return _MetricFieldShell(
+      title: label,
+      subtitle: _metricHint(requirement),
+      child: TextFormField(
+        controller: _controllerForMetric(requirement.metricId),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        enabled: enabled,
+        decoration: InputDecoration(
+          hintText: _metricPlaceholder(requirement),
+          suffixIcon: (requirement.unitCode ?? '').trim().isEmpty
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text(
+                      formatDisplayUnitCode(requirement.unitCode),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }
@@ -411,7 +359,7 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
         final selectedValue = _booleanMetricValues[requirement.metricId];
         if (selectedValue == null) {
           if (requirement.isRequired) {
-            _showError('Заполни метрику "${_metricName(requirement)}".');
+            _showError('Заполните показатель "${_metricName(requirement)}".');
             return;
           }
           continue;
@@ -428,14 +376,16 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
       final rawValue = _controllerForMetric(requirement.metricId).text.trim();
       if (rawValue.isEmpty) {
         if (requirement.isRequired) {
-          _showError('Заполни метрику "${_metricName(requirement)}".');
+          _showError('Заполните показатель "${_metricName(requirement)}".');
           return;
         }
         continue;
       }
       final value = double.tryParse(rawValue.replaceAll(',', '.'));
       if (value == null) {
-        _showError('Метрика "${_metricName(requirement)}" должна быть числом.');
+        _showError(
+          'Показатель "${_metricName(requirement)}" должен быть числом.',
+        );
         return;
       }
       metricInputs.add(
@@ -458,9 +408,7 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
                   ? null
                   : _descriptionController.text.trim(),
               metricValues: metricInputs,
-              attachmentFileIds: _attachments
-                  .map((attachment) => attachment.fileId)
-                  .toList(growable: false),
+              attachments: _attachmentInputs(),
               rowVersion: log.rowVersion,
             ),
           );
@@ -501,6 +449,20 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
       return;
     }
 
+    try {
+      await validatePlatformLogAttachments(
+        existingAttachments: _attachments,
+        files: files,
+      );
+    } catch (error) {
+      _showError(
+        error is StateError
+            ? error.message.toString()
+            : 'Не удалось добавить файлы.',
+      );
+      return;
+    }
+
     setState(() {
       _isUploadingAttachments = true;
     });
@@ -508,14 +470,12 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadFiles(widget.petId, files: files);
+          .uploadFiles(widget.petId, files: files, entityType: 'LOG');
       if (!mounted) {
         return;
       }
       setState(() {
-        _attachments.addAll(
-          uploaded.map(AttachmentDraftItem.fromUploaded),
-        );
+        _attachments.addAll(uploaded.map(AttachmentDraftItem.fromUploaded));
       });
     } catch (error) {
       if (!mounted) {
@@ -536,18 +496,45 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files = await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files = await ref
+        .read(mediaPickerServiceProvider)
+        .pickAttachmentImagesFromGallery();
     if (files.isEmpty || !mounted) {
+      return;
+    }
+    try {
+      await validateXFileLogAttachments(
+        existingAttachments: _attachments,
+        files: files,
+      );
+    } catch (error) {
+      _showError(
+        error is StateError
+            ? error.message.toString()
+            : 'Не удалось добавить фото.',
+      );
       return;
     }
     await _uploadPickedImages(files);
   }
 
   Future<void> _pickAndUploadFromCamera() async {
-    final file = await ref.read(mediaPickerServiceProvider).pickImage(
-          source: ImageSource.camera,
-        );
+    final file =
+        await ref.read(mediaPickerServiceProvider).takeAttachmentPhoto();
     if (file == null || !mounted) {
+      return;
+    }
+    try {
+      await validateXFileLogAttachments(
+        existingAttachments: _attachments,
+        files: <XFile>[file],
+      );
+    } catch (error) {
+      _showError(
+        error is StateError
+            ? error.message.toString()
+            : 'Не удалось добавить фото.',
+      );
       return;
     }
     await _uploadPickedImages(<XFile>[file]);
@@ -561,7 +548,7 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadXFiles(widget.petId, files: files);
+          .uploadXFiles(widget.petId, files: files, entityType: 'LOG');
       if (!mounted) {
         return;
       }
@@ -592,9 +579,351 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     });
   }
 
+  void _renameAttachment(String fileId, String fileName) {
+    setState(() {
+      final index = _attachments.indexWhere(
+        (attachment) => attachment.fileId == fileId,
+      );
+      if (index >= 0) {
+        _attachments[index] = _attachments[index].copyWith(fileName: fileName);
+      }
+    });
+  }
+
+  List<AttachmentInput> _attachmentInputs() {
+    return _attachments
+        .map(
+          (attachment) => AttachmentInput(
+            fileId: attachment.fileId,
+            fileName: attachment.fileName,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _LogTypeSelectorCard extends StatelessWidget {
+  const _LogTypeSelectorCard({
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xxs),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: PawlySpacing.sm),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogFormSection extends StatelessWidget {
+  const _LogFormSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricFieldShell extends StatelessWidget {
+  const _MetricFieldShell({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(PawlyRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.56),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xxs),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.sm),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LogBooleanChoice extends StatelessWidget {
+  const _LogBooleanChoice({
+    required this.label,
+    required this.isSelected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+          borderRadius: BorderRadius.circular(PawlyRadius.pill),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.84),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: PawlySpacing.md,
+          vertical: PawlySpacing.xs,
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogDateTile extends StatelessWidget {
+  const _LogDateTile({required this.value, this.onTap});
+
+  final String value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+          ),
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.calendar_today_rounded, color: colorScheme.primary),
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Дата и время события',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xxs),
+                    Text(
+                      value,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'Изменить',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: onTap == null
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogFormInlineMessage extends StatelessWidget {
+  const _LogFormInlineMessage({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -606,17 +935,48 @@ class _EditLogErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось подготовить редактирование записи.'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const SizedBox.shrink(),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось подготовить редактирование',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Попробуйте открыть запись снова через несколько секунд.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -625,7 +985,7 @@ class _EditLogErrorView extends StatelessWidget {
 
 String _metricHint(LogTypeMetricRequirement requirement) {
   if (requirement.inputKind == 'BOOLEAN') {
-    return 'Выбери Да или Нет';
+    return 'Выберите Да или Нет';
   }
   if (requirement.minValue != null || requirement.maxValue != null) {
     final min = _formatMetricBound(requirement.minValue) ?? '...';
@@ -658,7 +1018,7 @@ String _metricName(LogTypeMetricRequirement requirement) {
   if (name.isNotEmpty) {
     return name;
   }
-  return 'Метрика';
+  return 'Показатель';
 }
 
 String _metricKindLabel(String inputKind) {
@@ -697,8 +1057,8 @@ String _scopeLabel(String scope) {
 
 String _typeMetricsLabel(LogType type) {
   if (type.metricRequirements.isEmpty) {
-    return 'Метрики не заданы';
+    return 'Показатели не заданы';
   }
   final metrics = type.metricRequirements.map(_typeMetricSummary).join(', ');
-  return 'Метрики: $metrics';
+  return 'Показатели: $metrics';
 }

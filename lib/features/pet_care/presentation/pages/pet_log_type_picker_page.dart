@@ -9,10 +9,7 @@ import '../providers/health_controllers.dart';
 const String noLogTypeSelectionId = '__none__';
 
 class PetLogTypePickerPage extends ConsumerStatefulWidget {
-  const PetLogTypePickerPage({
-    required this.petId,
-    super.key,
-  });
+  const PetLogTypePickerPage({required this.petId, super.key});
 
   final String petId;
 
@@ -43,20 +40,19 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
       petLogComposerBootstrapProvider(widget.petId),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Выбрать тип')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateType,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Новый тип'),
+    return PawlyScreenScaffold(
+      title: 'Выбрать тип',
+      floatingActionButton: PawlyAddActionButton(
+        label: 'Новый тип',
+        tooltip: 'Создать тип записи',
+        onTap: _openCreateType,
       ),
       body: bootstrapAsync.when(
         data: (bootstrap) => _buildContent(context, bootstrap),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _TypePickerErrorView(
-          onRetry: () => ref.invalidate(
-            petLogComposerBootstrapProvider(widget.petId),
-          ),
+          onRetry: () =>
+              ref.invalidate(petLogComposerBootstrapProvider(widget.petId)),
         ),
       ),
     );
@@ -71,7 +67,12 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
     final filteredCustom = _filterTypes(bootstrap.customLogTypes);
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
         PawlyTextField(
           controller: _searchController,
@@ -84,14 +85,10 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
           },
         ),
         const SizedBox(height: PawlySpacing.md),
-        const SizedBox(height: PawlySpacing.md),
         _TypeChoiceCard(
           title: 'Без типа',
           subtitle: 'Обычная запись без привязки к конкретному типу',
-          trailing: const _LogTypeEmoji(
-            emoji: '📝',
-            semanticLabel: 'Без типа',
-          ),
+          emoji: '📝',
           onTap: () => Navigator.of(context).pop(noLogTypeSelectionId),
         ),
         if (filteredRecent.isNotEmpty) ...<Widget>[
@@ -148,11 +145,9 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
       padding: const EdgeInsets.only(bottom: PawlySpacing.md),
       child: _TypeChoiceCard(
         title: type.name,
-        subtitle: metrics.isEmpty ? 'Метрики не заданы' : 'Метрики: $metrics',
-        trailing: _LogTypeEmoji(
-          emoji: sticker.emoji,
-          semanticLabel: sticker.label,
-        ),
+        subtitle:
+            metrics.isEmpty ? 'Показатели не заданы' : 'Показатели: $metrics',
+        emoji: sticker.emoji,
         onTap: () => Navigator.of(context).pop(type.id),
       ),
     );
@@ -185,9 +180,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
     );
   }
 }
@@ -196,55 +191,84 @@ class _TypeChoiceCard extends StatelessWidget {
   const _TypeChoiceCard({
     required this.title,
     required this.subtitle,
-    required this.trailing,
+    required this.emoji,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
-  final Widget trailing;
+  final String emoji;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return PawlyCard(
-      onTap: onTap,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.xs),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
             ),
           ),
-          const SizedBox(width: PawlySpacing.md),
-          trailing,
-        ],
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              SizedBox(
+                width: 52,
+                height: 52,
+                child: Center(
+                  child: Text(emoji, style: theme.textTheme.headlineMedium),
+                ),
+              ),
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: PawlySpacing.sm),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _LogTypeSticker {
-  const _LogTypeSticker({
-    required this.emoji,
-    required this.label,
-  });
+  const _LogTypeSticker({required this.emoji, required this.label});
 
   final String emoji;
   final String label;
@@ -260,87 +284,36 @@ _LogTypeSticker _logTypeSticker({
       code?.trim().toUpperCase() ?? _inferLogTypeCode(name, metricNames);
 
   return switch (normalizedCode) {
-    'WEIGHING' => const _LogTypeSticker(
-        emoji: '⚖️',
-        label: 'Вес',
-      ),
-    'TEMPERATURE' => const _LogTypeSticker(
-        emoji: '🌡️',
-        label: 'Температура',
-      ),
-    'APPETITE' => const _LogTypeSticker(
-        emoji: '🍽️',
-        label: 'Аппетит',
-      ),
-    'WATER_INTAKE' => const _LogTypeSticker(
-        emoji: '💧',
-        label: 'Питье',
-      ),
-    'ACTIVITY' => const _LogTypeSticker(
-        emoji: '🏃',
-        label: 'Активность',
-      ),
-    'SLEEP' => const _LogTypeSticker(
-        emoji: '😴',
-        label: 'Сон',
-      ),
-    'STOOL' => const _LogTypeSticker(
-        emoji: '💩',
-        label: 'Стул',
-      ),
-    'URINATION' => const _LogTypeSticker(
-        emoji: '🚽',
-        label: 'Мочеиспускание',
-      ),
-    'VOMITING' => const _LogTypeSticker(
-        emoji: '🤮',
-        label: 'Рвота',
-      ),
-    'COUGHING' => const _LogTypeSticker(
-        emoji: '😮‍💨',
-        label: 'Кашель',
-      ),
-    'ITCHING' => const _LogTypeSticker(
-        emoji: '🐾',
-        label: 'Зуд',
-      ),
-    'PAIN_EPISODE' => const _LogTypeSticker(
-        emoji: '⚠️',
-        label: 'Боль',
-      ),
-    'MOOD_BEHAVIOR' => const _LogTypeSticker(
-        emoji: '🙂',
-        label: 'Поведение',
-      ),
-    'SEIZURE_EPISODE' => const _LogTypeSticker(
-        emoji: '⚡',
-        label: 'Судороги',
-      ),
-    'MEDICATION_TAKEN' => const _LogTypeSticker(
+    'WEIGHING' => const _LogTypeSticker(emoji: '⚖️', label: 'Вес'),
+    'WEIGHT' => const _LogTypeSticker(emoji: '⚖️', label: 'Вес'),
+    'TEMPERATURE' => const _LogTypeSticker(emoji: '🌡️', label: 'Температура'),
+    'APPETITE' => const _LogTypeSticker(emoji: '🍽️', label: 'Аппетит'),
+    'WATER_INTAKE' => const _LogTypeSticker(emoji: '💧', label: 'Питье'),
+    'ACTIVITY' => const _LogTypeSticker(emoji: '🏃', label: 'Активность'),
+    'SLEEP' => const _LogTypeSticker(emoji: '😴', label: 'Сон'),
+    'STOOL' => const _LogTypeSticker(emoji: '💩', label: 'Стул'),
+    'URINATION' => const _LogTypeSticker(emoji: '🚽', label: 'Мочеиспускание'),
+    'VOMITING' => const _LogTypeSticker(emoji: '🤮', label: 'Рвота'),
+    'COUGHING' => const _LogTypeSticker(emoji: '😮‍💨', label: 'Кашель'),
+    'ITCHING' => const _LogTypeSticker(emoji: '🐾', label: 'Зуд'),
+    'PAIN_EPISODE' => const _LogTypeSticker(emoji: '⚠️', label: 'Боль'),
+    'SEIZURE_EPISODE' => const _LogTypeSticker(emoji: '⚡', label: 'Судороги'),
+    'MEDICATION' => const _LogTypeSticker(
         emoji: '💊',
         label: 'Лекарство',
       ),
-    'MEDICATION_MISSED' => const _LogTypeSticker(
-        emoji: '⏭️',
-        label: 'Пропуск',
+    'RESPIRATORY_SYMPTOMS' => const _LogTypeSticker(
+        emoji: '🫁',
+        label: 'Дыхание',
       ),
     _ => scope == 'SYSTEM'
-        ? const _LogTypeSticker(
-            emoji: '🏷️',
-            label: 'Системный',
-          )
-        : const _LogTypeSticker(
-            emoji: '✨',
-            label: 'Мой',
-          ),
+        ? const _LogTypeSticker(emoji: '🏷️', label: 'Системный')
+        : const _LogTypeSticker(emoji: '✨', label: 'Мой'),
   };
 }
 
 String _inferLogTypeCode(String name, Iterable<String> metricNames) {
-  final haystack = <String>[
-    name,
-    ...metricNames,
-  ].join(' ').toLowerCase();
+  final haystack = <String>[name, ...metricNames].join(' ').toLowerCase();
 
   if (haystack.contains('вес')) {
     return 'WEIGHT';
@@ -369,8 +342,10 @@ String _inferLogTypeCode(String name, Iterable<String> metricNames) {
   if (haystack.contains('рвот')) {
     return 'VOMITING';
   }
-  if (haystack.contains('каш')) {
-    return 'COUGHING';
+  if (haystack.contains('дых') ||
+      haystack.contains('каш') ||
+      haystack.contains('чих')) {
+    return 'RESPIRATORY_SYMPTOMS';
   }
   if (haystack.contains('зуд')) {
     return 'ITCHING';
@@ -378,38 +353,14 @@ String _inferLogTypeCode(String name, Iterable<String> metricNames) {
   if (haystack.contains('бол')) {
     return 'PAIN_EPISODE';
   }
-  if (haystack.contains('поведени') || haystack.contains('настроени')) {
-    return 'MOOD_BEHAVIOR';
-  }
   if (haystack.contains('судорог')) {
     return 'SEIZURE_EPISODE';
   }
   if (haystack.contains('лекар')) {
-    return 'MEDICATION_TAKEN';
+    return 'MEDICATION';
   }
 
   return '';
-}
-
-class _LogTypeEmoji extends StatelessWidget {
-  const _LogTypeEmoji({
-    required this.emoji,
-    required this.semanticLabel,
-  });
-
-  final String emoji;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: semanticLabel,
-      child: Text(
-        emoji,
-        style: Theme.of(context).textTheme.headlineLarge,
-      ),
-    );
-  }
 }
 
 class _TypePickerErrorView extends StatelessWidget {
@@ -419,17 +370,48 @@ class _TypePickerErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить типы логов.'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const SizedBox.shrink(),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить типы записей',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Попробуйте обновить список через несколько секунд.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

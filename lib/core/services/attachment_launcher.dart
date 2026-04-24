@@ -26,7 +26,8 @@ Future<void> openAttachmentUrl(
   if (candidate == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-          content: Text('Для этого вложения нет ссылки на просмотр.')),
+        content: Text('Для этого вложения нет ссылки на просмотр.'),
+      ),
     );
     return;
   }
@@ -43,12 +44,12 @@ Future<void> openAttachmentUrl(
     final galleryItems = imageGalleryItems == null
         ? <AttachmentViewerItem>[item]
         : imageGalleryItems
-            .where(
-              (galleryItem) =>
-                  galleryItem.kind == AttachmentKind.image &&
-                  galleryItem.url != null,
-            )
-            .toList(growable: false);
+              .where(
+                (galleryItem) =>
+                    galleryItem.kind == AttachmentKind.image &&
+                    galleryItem.url != null,
+              )
+              .toList(growable: false);
     final fallbackIndex = galleryItems.indexWhere(
       (galleryItem) =>
           galleryItem.url == item.url && galleryItem.title == item.title,
@@ -75,6 +76,7 @@ Future<void> openAttachmentUrl(
           fileId: item.fileId,
           title: item.title,
           url: candidate,
+          downloadUrl: item.downloadUrl,
           kind: item.kind,
         ),
       ),
@@ -85,8 +87,9 @@ Future<void> openAttachmentUrl(
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content:
-            Text('Этот тип вложения пока нельзя открыть внутри приложения.'),
+        content: Text(
+          'Этот тип вложения пока нельзя открыть внутри приложения.',
+        ),
       ),
     );
   }

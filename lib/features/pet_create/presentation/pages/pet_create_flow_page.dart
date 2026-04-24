@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +8,7 @@ import '../../../catalog/data/catalog_cache_models.dart';
 import '../../../catalog/presentation/providers/pet_dictionaries_providers.dart';
 import '../../../pets/presentation/providers/active_pet_controller.dart';
 import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/presentation/widgets/pet_form_widgets.dart';
 import '../providers/pet_create_controller.dart';
 
 class PetCreateFlowPage extends ConsumerStatefulWidget {
@@ -24,6 +24,8 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
   final _customBreedCtrl = TextEditingController();
   final _customPatternCtrl = TextEditingController();
   final _microchipCtrl = TextEditingController();
+  final _breedSearchCtrl = TextEditingController();
+  String _breedSearchQuery = '';
 
   @override
   void dispose() {
@@ -32,6 +34,7 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
     _customBreedCtrl.dispose();
     _customPatternCtrl.dispose();
     _microchipCtrl.dispose();
+    _breedSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -58,19 +61,17 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
     _microchipCtrl.value =
         _microchipCtrl.value.copyWith(text: state.microchipId);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Создание питомца'),
-        leading: IconButton(
-          onPressed: () {
-            if (state.step == PetCreateStep.basic) {
-              context.pop();
-            } else {
-              c.previousStep();
-            }
-          },
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
+    return PawlyScreenScaffold(
+      title: 'Создание',
+      leading: IconButton(
+        onPressed: () {
+          if (state.step == PetCreateStep.basic) {
+            context.pop();
+          } else {
+            c.previousStep();
+          }
+        },
+        icon: const Icon(Icons.chevron_left_rounded, size: 30),
       ),
       body: catalogAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -87,6 +88,16 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
               ? catalog.breeds
               : catalog.breeds
                   .where((e) => e.speciesId == state.speciesId)
+                  .toList(growable: false);
+          final breedSearchQuery = _breedSearchQuery.trim().toLowerCase();
+          final filteredBreeds = breedSearchQuery.isEmpty
+              ? breedsForSpecies.take(12).toList(growable: false)
+              : breedsForSpecies
+                  .where(
+                    (entry) =>
+                        entry.name.toLowerCase().contains(breedSearchQuery),
+                  )
+                  .take(24)
                   .toList(growable: false);
           final patterns = catalog.patterns;
           final colors = catalog.colors;
@@ -114,231 +125,331 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
           final selectedCatalogColors = colors
               .where((e) => state.colorIds.contains(e.id))
               .toList(growable: false);
+          final selectedColorCount =
+              state.colorIds.length + state.customColorsHex.length;
 
           return SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(PawlySpacing.lg),
+              padding: const EdgeInsets.fromLTRB(
+                PawlySpacing.md,
+                PawlySpacing.sm,
+                PawlySpacing.md,
+                PawlySpacing.xl,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _StepPills(step: state.step),
-                  const SizedBox(height: PawlySpacing.lg),
+                  PetFormStepTabs<PetCreateStep>(
+                    steps: PetCreateStep.values,
+                    value: state.step,
+                    labelBuilder: _createStepLabel,
+                    onChanged: (step) => c.goToStep(catalog, step),
+                  ),
+                  const SizedBox(height: PawlySpacing.md),
                   if (state.step == PetCreateStep.basic) ...[
-                    PawlyTextField(
-                      controller: _nameCtrl,
-                      label: 'Имя питомца',
-                      onChanged: c.setName,
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    DropdownButtonFormField<String>(
-                      value: state.sex,
-                      decoration: const InputDecoration(labelText: 'Пол'),
-                      items: const <DropdownMenuItem<String>>[
-                        DropdownMenuItem(
-                            value: 'UNKNOWN', child: Text('Не указан')),
-                        DropdownMenuItem(value: 'MALE', child: Text('Самец')),
-                        DropdownMenuItem(value: 'FEMALE', child: Text('Самка')),
-                      ],
-                      onChanged: (v) => c.setSex(v ?? 'UNKNOWN'),
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    _ModeChips(
-                      title: 'Вид',
-                      mode: state.speciesMode,
-                      onChanged: c.setSpeciesMode,
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    if (state.speciesMode == CatalogPickMode.catalog)
-                      DropdownButtonFormField<String>(
-                        value: state.speciesId,
-                        decoration:
-                            const InputDecoration(labelText: 'Выберите вид'),
-                        items: species
-                            .map((e) => DropdownMenuItem<String>(
-                                value: e.id, child: Text(e.name)))
-                            .toList(growable: false),
-                        onChanged: c.setSpeciesId,
+                    PetFormSectionCard(
+                      title: 'Основное',
+                      subtitle: 'Кличка, пол, вид и дата рождения.',
+                      child: Column(
+                        children: <Widget>[
+                          PawlyTextField(
+                            controller: _nameCtrl,
+                            label: 'Кличка',
+                            onChanged: c.setName,
+                          ),
+                          const SizedBox(height: PawlySpacing.md),
+                          PetFormTwoOptionCardPicker<String>(
+                            title: 'Пол',
+                            value: state.sex,
+                            options: const <PetFormCardPickerOption<String>>[
+                              PetFormCardPickerOption<String>(
+                                value: 'MALE',
+                                label: 'Самец',
+                                icon: Icons.male_rounded,
+                                accent: Color(0xFF3D87D8),
+                              ),
+                              PetFormCardPickerOption<String>(
+                                value: 'FEMALE',
+                                label: 'Самка',
+                                icon: Icons.female_rounded,
+                                accent: Color(0xFFE86A9A),
+                              ),
+                            ],
+                            onChanged: c.setSex,
+                          ),
+                          const SizedBox(height: PawlySpacing.md),
+                          PetFormModeToggle<CatalogPickMode>(
+                            title: 'Вид',
+                            value: state.speciesMode,
+                            catalogValue: CatalogPickMode.catalog,
+                            customValue: CatalogPickMode.custom,
+                            onChanged: c.setSpeciesMode,
+                          ),
+                          const SizedBox(height: PawlySpacing.sm),
+                          if (state.speciesMode == CatalogPickMode.catalog)
+                            PetFormSpeciesGridPicker(
+                              species: species,
+                              selectedId: state.speciesId,
+                              onChanged: c.setSpeciesId,
+                            ),
+                          if (state.speciesMode == CatalogPickMode.custom)
+                            PawlyTextField(
+                              controller: _customSpeciesCtrl,
+                              label: 'Свой вид',
+                              onChanged: c.setCustomSpeciesName,
+                            ),
+                          const SizedBox(height: PawlySpacing.md),
+                          PetFormDateButton(
+                            label: 'Дата рождения',
+                            value: _dateLabel(state.birthDate),
+                            onPressed: () => _pickDate(
+                              c.setBirthDate,
+                              initial: state.birthDate,
+                            ),
+                          ),
+                        ],
                       ),
-                    if (state.speciesMode == CatalogPickMode.custom)
-                      PawlyTextField(
-                        controller: _customSpeciesCtrl,
-                        label: 'Свой вид',
-                        onChanged: c.setCustomSpeciesName,
-                      ),
-                    const SizedBox(height: PawlySpacing.lg),
-                    PawlyButton(label: 'Далее', onPressed: c.nextStep),
+                    ),
+                    const SizedBox(height: PawlySpacing.md),
+                    PawlyButton(
+                      label: 'Далее',
+                      onPressed: () => c.nextStep(catalog),
+                    ),
                   ],
                   if (state.step == PetCreateStep.breed) ...[
-                    _ModeChips(
+                    PetFormSectionCard(
                       title: 'Порода',
-                      mode: state.breedMode,
-                      onChanged: c.setBreedMode,
+                      subtitle: state.speciesMode == CatalogPickMode.custom
+                          ? 'Для своего вида укажите породу вручную.'
+                          : 'Выберите породу из каталога или укажите свою.',
+                      child: Column(
+                        children: <Widget>[
+                          if (state.speciesMode == CatalogPickMode.catalog) ...[
+                            PetFormModeToggle<CatalogPickMode>(
+                              title: 'Порода',
+                              value: state.breedMode,
+                              catalogValue: CatalogPickMode.catalog,
+                              customValue: CatalogPickMode.custom,
+                              onChanged: c.setBreedMode,
+                            ),
+                            const SizedBox(height: PawlySpacing.sm),
+                          ],
+                          if (state.speciesMode == CatalogPickMode.catalog &&
+                              state.breedMode == CatalogPickMode.catalog)
+                            PetFormBreedSearchPicker(
+                              controller: _breedSearchCtrl,
+                              query: _breedSearchQuery,
+                              breeds: filteredBreeds,
+                              totalCount: breedsForSpecies.length,
+                              selectedId: state.breedId,
+                              onQueryChanged: (value) {
+                                setState(() {
+                                  _breedSearchQuery = value;
+                                });
+                              },
+                              onChanged: c.setBreedId,
+                            ),
+                          if (state.speciesMode == CatalogPickMode.custom ||
+                              state.breedMode == CatalogPickMode.custom)
+                            PawlyTextField(
+                              controller: _customBreedCtrl,
+                              label: 'Своя порода',
+                              onChanged: c.setCustomBreedName,
+                            ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    if (state.breedMode == CatalogPickMode.catalog)
-                      DropdownButtonFormField<String>(
-                        value: state.breedId,
-                        decoration:
-                            const InputDecoration(labelText: 'Выберите породу'),
-                        items: breedsForSpecies
-                            .map((e) => DropdownMenuItem<String>(
-                                value: e.id, child: Text(e.name)))
-                            .toList(growable: false),
-                        onChanged: c.setBreedId,
-                      ),
-                    if (state.breedMode == CatalogPickMode.custom)
-                      PawlyTextField(
-                        controller: _customBreedCtrl,
-                        label: 'Своя порода',
-                        onChanged: c.setCustomBreedName,
-                      ),
-                    const SizedBox(height: PawlySpacing.lg),
-                    PawlyButton(label: 'Далее', onPressed: c.nextStep),
+                    const SizedBox(height: PawlySpacing.md),
+                    PawlyButton(
+                      label: 'Далее',
+                      onPressed: () => c.nextStep(catalog),
+                    ),
                   ],
                   if (state.step == PetCreateStep.appearance) ...[
-                    _ModeChips(
-                      title: 'Паттерн',
-                      mode: state.patternMode,
-                      onChanged: c.setPatternMode,
+                    PetFormSectionCard(
+                      title: 'Внешность',
+                      subtitle: 'Окрас шерсти и основные цвета.',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          PetFormModeToggle<CatalogPickMode>(
+                            title: 'Окрас',
+                            value: state.patternMode,
+                            catalogValue: CatalogPickMode.catalog,
+                            customValue: CatalogPickMode.custom,
+                            onChanged: c.setPatternMode,
+                          ),
+                          const SizedBox(height: PawlySpacing.sm),
+                          if (state.patternMode == CatalogPickMode.catalog)
+                            DropdownButtonFormField<String>(
+                              initialValue: state.patternId,
+                              decoration: const InputDecoration(
+                                  labelText: 'Выберите окрас'),
+                              items: patterns
+                                  .map((e) => DropdownMenuItem<String>(
+                                      value: e.id, child: Text(e.name)))
+                                  .toList(growable: false),
+                              onChanged: c.setPatternId,
+                            ),
+                          if (state.patternMode == CatalogPickMode.custom)
+                            PawlyTextField(
+                              controller: _customPatternCtrl,
+                              label: 'Свой окрас',
+                              onChanged: c.setCustomPatternName,
+                            ),
+                          const SizedBox(height: PawlySpacing.md),
+                          Text(
+                            'Цвета · $selectedColorCount/$petCreateMaxColors',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: PawlySpacing.xs),
+                          Wrap(
+                            spacing: PawlySpacing.xs,
+                            runSpacing: PawlySpacing.xs,
+                            children: colors.map((e) {
+                              final selected = state.colorIds.contains(e.id);
+                              return PetFormCatalogColorChip(
+                                label: e.name,
+                                hex: e.hex,
+                                selected: selected,
+                                onTap: () => c.toggleColor(e.id),
+                              );
+                            }).toList(growable: false),
+                          ),
+                          const SizedBox(height: PawlySpacing.sm),
+                          Wrap(
+                            spacing: PawlySpacing.xs,
+                            runSpacing: PawlySpacing.xs,
+                            children: <Widget>[
+                              ...state.customColorsHex
+                                  .asMap()
+                                  .entries
+                                  .map((entry) {
+                                return PetFormCustomColorChip(
+                                  color: PetFormCustomColor(
+                                    hex: entry.value.hex,
+                                    name: entry.value.name,
+                                  ),
+                                  onDeleted: () =>
+                                      c.removeCustomColorAt(entry.key),
+                                );
+                              }),
+                              _AddColorButton(
+                                enabled:
+                                    selectedColorCount < petCreateMaxColors,
+                                onPressed: () => _openColorPicker(
+                                  (color) => c.addCustomColor(
+                                    hex: color.hex,
+                                    name: color.name,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    if (state.patternMode == CatalogPickMode.catalog)
-                      DropdownButtonFormField<String>(
-                        value: state.patternId,
-                        decoration: const InputDecoration(
-                            labelText: 'Выберите паттерн'),
-                        items: patterns
-                            .map((e) => DropdownMenuItem<String>(
-                                value: e.id, child: Text(e.name)))
-                            .toList(growable: false),
-                        onChanged: c.setPatternId,
-                      ),
-                    if (state.patternMode == CatalogPickMode.custom)
-                      PawlyTextField(
-                        controller: _customPatternCtrl,
-                        label: 'Свой паттерн',
-                        onChanged: c.setCustomPatternName,
-                      ),
                     const SizedBox(height: PawlySpacing.md),
-                    Text('Цвета',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: PawlySpacing.xs),
-                    Wrap(
-                      spacing: PawlySpacing.xs,
-                      runSpacing: PawlySpacing.xs,
-                      children: colors.map((e) {
-                        final selected = state.colorIds.contains(e.id);
-                        return FilterChip(
-                          label: Text(e.name),
-                          selected: selected,
-                          onSelected: (_) => c.toggleColor(e.id),
-                        );
-                      }).toList(growable: false),
+                    PawlyButton(
+                      label: 'Далее',
+                      onPressed: () => c.nextStep(catalog),
                     ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    Wrap(
-                      spacing: PawlySpacing.xs,
-                      runSpacing: PawlySpacing.xs,
-                      children: <Widget>[
-                        ...state.customColorsHex.asMap().entries.map((entry) {
-                          return InputChip(
-                            label: Text(entry.value),
-                            onDeleted: () => c.removeCustomColorAt(entry.key),
-                          );
-                        }),
-                        ActionChip(
-                          label: const Text('Свой цвет'),
-                          avatar: const Icon(Icons.palette_outlined, size: 18),
-                          onPressed: () =>
-                              _openColorPicker((hex) => c.addCustomColor(hex)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: PawlySpacing.lg),
-                    PawlyButton(label: 'Далее', onPressed: c.nextStep),
                   ],
                   if (state.step == PetCreateStep.optional) ...[
-                    Text('Необязательные поля',
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: PawlySpacing.sm),
-                    PawlyButton(
-                      label: state.birthDate == null
-                          ? 'Дата рождения (опционально)'
-                          : 'Дата рождения: ${state.birthDate!.toLocal().toString().split(' ').first}',
-                      variant: PawlyButtonVariant.secondary,
-                      onPressed: () =>
-                          _pickDate(c.setBirthDate, initial: state.birthDate),
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    DropdownButtonFormField<String>(
-                      value: state.isNeutered,
-                      decoration:
-                          const InputDecoration(labelText: 'Стерилизация'),
-                      items: const <DropdownMenuItem<String>>[
-                        DropdownMenuItem(
-                            value: 'UNKNOWN', child: Text('Неизвестно')),
-                        DropdownMenuItem(value: 'YES', child: Text('Да')),
-                        DropdownMenuItem(value: 'NO', child: Text('Нет')),
-                      ],
-                      onChanged: (v) => c.setIsNeutered(v ?? 'UNKNOWN'),
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    SwitchListTile.adaptive(
-                      title: const Text('Уличный/свободный выгул'),
-                      value: state.isOutdoor,
-                      onChanged: c.setIsOutdoor,
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    PawlyTextField(
-                      controller: _microchipCtrl,
-                      label: 'ID микрочипа (опционально)',
-                      onChanged: c.setMicrochipId,
-                    ),
-                    const SizedBox(height: PawlySpacing.sm),
-                    PawlyButton(
-                      label: state.microchipInstalledAt == null
-                          ? 'Дата установки чипа (опционально)'
-                          : 'Дата установки: ${state.microchipInstalledAt!.toLocal().toString().split(' ').first}',
-                      variant: PawlyButtonVariant.secondary,
-                      onPressed: () => _pickDate(
-                        c.setMicrochipInstalledAt,
-                        initial: state.microchipInstalledAt,
+                    PetFormSectionCard(
+                      title: 'Дополнительно',
+                      subtitle: 'Можно заполнить сейчас или пропустить.',
+                      child: Column(
+                        children: <Widget>[
+                          DropdownButtonFormField<String>(
+                            initialValue: state.isNeutered,
+                            decoration: const InputDecoration(
+                                labelText: 'Стерилизация'),
+                            items: const <DropdownMenuItem<String>>[
+                              DropdownMenuItem(
+                                  value: 'UNKNOWN', child: Text('Неизвестно')),
+                              DropdownMenuItem(value: 'YES', child: Text('Да')),
+                              DropdownMenuItem(value: 'NO', child: Text('Нет')),
+                            ],
+                            onChanged: (v) => c.setIsNeutered(v ?? 'UNKNOWN'),
+                          ),
+                          const SizedBox(height: PawlySpacing.sm),
+                          PetFormTwoOptionCardPicker<bool>(
+                            title: 'Уличный/свободный выгул',
+                            value: state.isOutdoor,
+                            options: const <PetFormCardPickerOption<bool>>[
+                              PetFormCardPickerOption<bool>(
+                                value: false,
+                                label: 'Домашний',
+                                icon: Icons.home_rounded,
+                              ),
+                              PetFormCardPickerOption<bool>(
+                                value: true,
+                                label: 'Свободный выгул',
+                                icon: Icons.park_rounded,
+                                accent: Color(0xFF57A3D9),
+                              ),
+                            ],
+                            onChanged: c.setIsOutdoor,
+                          ),
+                          const SizedBox(height: PawlySpacing.sm),
+                          PawlyTextField(
+                            controller: _microchipCtrl,
+                            label: 'ID микрочипа (опционально)',
+                            onChanged: c.setMicrochipId,
+                          ),
+                          const SizedBox(height: PawlySpacing.sm),
+                          PetFormDateButton(
+                            label: 'Дата установки чипа',
+                            value: _dateLabel(state.microchipInstalledAt),
+                            onPressed: () => _pickDate(
+                              c.setMicrochipInstalledAt,
+                              initial: state.microchipInstalledAt,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: PawlySpacing.lg),
+                    const SizedBox(height: PawlySpacing.md),
                     Row(
                       children: <Widget>[
                         Expanded(
                           child: PawlyButton(
                             label: 'Пропустить',
                             variant: PawlyButtonVariant.ghost,
-                            onPressed: c.nextStep,
+                            onPressed: () => c.nextStep(catalog),
                           ),
                         ),
                         const SizedBox(width: PawlySpacing.sm),
                         Expanded(
                           child: PawlyButton(
-                              label: 'Далее', onPressed: c.nextStep),
+                            label: 'Далее',
+                            onPressed: () => c.nextStep(catalog),
+                          ),
                         ),
                       ],
                     ),
                   ],
                   if (state.step == PetCreateStep.review) ...[
-                    Text(
-                      'Проверьте данные перед созданием',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    _ReviewIntroCard(
+                      title: 'Проверьте данные',
+                      subtitle:
+                          'После создания питомца можно будет дополнить карточку.',
                     ),
                     const SizedBox(height: PawlySpacing.sm),
                     SizedBox(
                       width: double.infinity,
-                      child: PawlyCard(
+                      child: _ReviewCard(
                         title: Text(
                           'Основное',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         child: Column(
                           children: <Widget>[
-                            _ReviewRow(label: 'Имя', value: state.name.trim()),
+                            _ReviewRow(
+                              label: 'Кличка',
+                              value: state.name.trim(),
+                            ),
                             _ReviewRow(
                               label: 'Пол',
                               value: _sexLabel(state.sex),
@@ -346,7 +457,7 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
                             _ReviewRow(label: 'Вид', value: speciesName),
                             _ReviewRow(label: 'Порода', value: breedName),
                             _ReviewRow(
-                              label: 'Паттерн',
+                              label: 'Окрас',
                               value: patternName,
                               isLast: true,
                             ),
@@ -357,7 +468,7 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
                     const SizedBox(height: PawlySpacing.sm),
                     SizedBox(
                       width: double.infinity,
-                      child: PawlyCard(
+                      child: _ReviewCard(
                         title: Text(
                           'Внешность',
                           style: Theme.of(context).textTheme.titleMedium,
@@ -377,15 +488,19 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
                                 runSpacing: PawlySpacing.xs,
                                 children: <Widget>[
                                   ...selectedCatalogColors.map(
-                                    (color) => Chip(label: Text(color.name)),
+                                    (color) => PetFormCatalogColorChip(
+                                      label: color.name,
+                                      hex: color.hex,
+                                      selected: true,
+                                    ),
                                   ),
                                   ...state.customColorsHex.map(
-                                    (hex) => Chip(
-                                      avatar: CircleAvatar(
-                                        backgroundColor:
-                                            _colorFromHex(hex) ?? Colors.grey,
+                                    (color) => PetFormCustomColorChip(
+                                      color: PetFormCustomColor(
+                                        hex: color.hex,
+                                        name: color.name,
                                       ),
-                                      label: Text(hex),
+                                      onDeleted: null,
                                     ),
                                   ),
                                 ],
@@ -402,7 +517,7 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
                     const SizedBox(height: PawlySpacing.sm),
                     SizedBox(
                       width: double.infinity,
-                      child: PawlyCard(
+                      child: _ReviewCard(
                         title: Text(
                           'Дополнительно',
                           style: Theme.of(context).textTheme.titleMedium,
@@ -478,83 +593,118 @@ class _PetCreateFlowPageState extends ConsumerState<PetCreateFlowPage> {
     onPicked(date);
   }
 
-  Future<void> _openColorPicker(ValueChanged<String> onPicked) async {
-    Color current = Colors.orange;
-    var confirmed = false;
-
-    await showDialog<void>(
+  Future<void> _openColorPicker(
+    ValueChanged<CustomPetColorDraft> onPicked,
+  ) async {
+    final picked = await showDialog<PetFormCustomColor>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Выберите цвет'),
-          content: SingleChildScrollView(
-            child: BlockPicker(
-              pickerColor: current,
-              onColorChanged: (color) => current = color,
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Отмена')),
-            FilledButton(
-              onPressed: () {
-                confirmed = true;
-                Navigator.pop(context);
-              },
-              child: const Text('Выбрать'),
-            ),
-          ],
-        );
-      },
+      builder: (context) => const PetFormCustomColorPickerDialog(),
     );
 
-    if (confirmed) {
-      final argb = current.toARGB32().toRadixString(16).padLeft(8, '0');
-      final hex = '#${argb.substring(2).toUpperCase()}';
-      onPicked(hex);
-    }
+    if (picked == null || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      onPicked(
+        CustomPetColorDraft(
+          hex: picked.hex,
+          name: picked.name,
+        ),
+      );
+    });
   }
 }
 
-class _ModeChips extends StatelessWidget {
-  const _ModeChips({
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({
     required this.title,
-    required this.mode,
-    required this.onChanged,
+    required this.child,
   });
 
-  final String title;
-  final CatalogPickMode mode;
-  final ValueChanged<CatalogPickMode> onChanged;
+  final Widget title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(PawlySpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
           title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: PawlySpacing.xs),
-        Wrap(
-          spacing: PawlySpacing.xs,
-          runSpacing: PawlySpacing.xs,
-          children: <Widget>[
-            ChoiceChip(
-              label: const Text('Из каталога'),
-              selected: mode == CatalogPickMode.catalog,
-              onSelected: (_) => onChanged(CatalogPickMode.catalog),
+          const SizedBox(height: PawlySpacing.sm),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewIntroCard extends StatelessWidget {
+  const _ReviewIntroCard({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PawlySpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-            ChoiceChip(
-              label: const Text('Свой вариант'),
-              selected: mode == CatalogPickMode.custom,
-              onSelected: (_) => onChanged(CatalogPickMode.custom),
+          ),
+          const SizedBox(height: PawlySpacing.xxs),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddColorButton extends StatelessWidget {
+  const _AddColorButton({
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: const Text('Свой цвет'),
+      avatar: const Icon(Icons.add_rounded, size: 18),
+      onPressed: enabled ? onPressed : null,
     );
   }
 }
@@ -599,52 +749,6 @@ class _ReviewRow extends StatelessWidget {
   }
 }
 
-class _StepPills extends StatelessWidget {
-  const _StepPills({required this.step});
-  final PetCreateStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    const labels = <String>[
-      'База',
-      'Порода',
-      'Внешность',
-      'Опционально',
-      'Проверка'
-    ];
-
-    return Wrap(
-      spacing: PawlySpacing.xs,
-      runSpacing: PawlySpacing.xs,
-      children: List<Widget>.generate(labels.length, (i) {
-        final active = i == step.index;
-        final done = i < step.index;
-
-        return Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: PawlySpacing.sm,
-            vertical: PawlySpacing.xxs,
-          ),
-          decoration: BoxDecoration(
-            color: active || done
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(PawlyRadius.pill),
-          ),
-          child: Text(
-            '${i + 1}. ${labels[i]}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: active || done
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-          ),
-        );
-      }),
-    );
-  }
-}
-
 String _catalogOptionName(
   List<CatalogOption> options,
   String? id, {
@@ -657,6 +761,21 @@ String _catalogOptionName(
     if (name.isNotEmpty) return name;
   }
   return fallback;
+}
+
+String _createStepLabel(PetCreateStep step) {
+  switch (step) {
+    case PetCreateStep.basic:
+      return 'Основное';
+    case PetCreateStep.breed:
+      return 'Порода';
+    case PetCreateStep.appearance:
+      return 'Внешность';
+    case PetCreateStep.optional:
+      return 'Еще';
+    case PetCreateStep.review:
+      return 'Проверка';
+  }
 }
 
 String _catalogBreedName(
@@ -717,12 +836,4 @@ String _yesNoUnknownLabel(String value) {
 String _dateLabel(DateTime? value) {
   if (value == null) return 'Не заполнено';
   return value.toLocal().toString().split(' ').first;
-}
-
-Color? _colorFromHex(String hex) {
-  final normalized = hex.trim().replaceFirst('#', '');
-  if (normalized.length != 6) return null;
-  final value = int.tryParse(normalized, radix: 16);
-  if (value == null) return null;
-  return Color(0xFF000000 | value);
 }

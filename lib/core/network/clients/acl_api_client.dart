@@ -11,8 +11,6 @@ class AclApiClient {
 
   static const _withToken = ApiRequestOptions(requiresAccessToken: true);
 
-  static const _public = ApiRequestOptions();
-
   Future<AclBootstrapResponse> getBootstrap(String petId) {
     return _apiClient.get<AclBootstrapResponse>(
       ApiEndpoints.aclBootstrap(petId),
@@ -37,11 +35,11 @@ class AclApiClient {
     );
   }
 
-  Future<AclMemberEnvelope> leaveMyAccess(String petId) {
-    return _apiClient.delete<AclMemberEnvelope>(
+  Future<EmptyResponse> leaveMyAccess(String petId) {
+    return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.aclMe(petId),
       requestOptions: _withToken,
-      decoder: AclMemberEnvelope.fromJson,
+      decoder: EmptyResponse.fromJson,
     );
   }
 
@@ -66,11 +64,11 @@ class AclApiClient {
     );
   }
 
-  Future<AclMemberEnvelope> removeMember(String petId, String memberId) {
-    return _apiClient.delete<AclMemberEnvelope>(
+  Future<EmptyResponse> removeMember(String petId, String memberId) {
+    return _apiClient.delete<EmptyResponse>(
       ApiEndpoints.aclMemberById(petId, memberId),
       requestOptions: _withToken,
-      decoder: AclMemberEnvelope.fromJson,
+      decoder: EmptyResponse.fromJson,
     );
   }
 
@@ -85,6 +83,19 @@ class AclApiClient {
   Future<AclRoleEnvelope> createRole(String petId, CreateRolePayload payload) {
     return _apiClient.post<AclRoleEnvelope>(
       ApiEndpoints.aclRoles(petId),
+      data: payload.toJson(),
+      requestOptions: _withToken,
+      decoder: AclRoleEnvelope.fromJson,
+    );
+  }
+
+  Future<AclRoleEnvelope> updateRole(
+    String petId,
+    String roleId,
+    UpdateRolePayload payload,
+  ) {
+    return _apiClient.patch<AclRoleEnvelope>(
+      ApiEndpoints.aclRoleById(petId, roleId),
       data: payload.toJson(),
       requestOptions: _withToken,
       decoder: AclRoleEnvelope.fromJson,
@@ -127,13 +138,24 @@ class AclApiClient {
     );
   }
 
+  Future<AclInviteEnvelope> regenerateInviteLink(
+    String petId,
+    String inviteId,
+  ) {
+    return _apiClient.post<AclInviteEnvelope>(
+      ApiEndpoints.aclInviteRegenerateLink(petId, inviteId),
+      requestOptions: _withToken,
+      decoder: AclInviteEnvelope.fromJson,
+    );
+  }
+
   Future<AclInvitePreviewResponse> previewInviteByToken(
     PreviewInviteByTokenPayload payload,
   ) {
     return _apiClient.post<AclInvitePreviewResponse>(
       ApiEndpoints.aclPreviewInviteByToken,
       data: payload.toJson(),
-      requestOptions: _public,
+      requestOptions: _withToken,
       decoder: AclInvitePreviewResponse.fromJson,
     );
   }

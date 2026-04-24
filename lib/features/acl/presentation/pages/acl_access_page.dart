@@ -11,10 +11,7 @@ import '../models/acl_screen_models.dart';
 import '../providers/acl_controllers.dart';
 
 class AclAccessPage extends ConsumerWidget {
-  const AclAccessPage({
-    required this.petId,
-    super.key,
-  });
+  const AclAccessPage({required this.petId, super.key});
 
   final String petId;
 
@@ -22,8 +19,8 @@ class AclAccessPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final accessState = ref.watch(aclAccessControllerProvider(petId));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Совместный доступ')),
+    return PawlyScreenScaffold(
+      title: 'Участники',
       body: accessState.when(
         data: (state) => _AclAccessContent(
           state: state,
@@ -73,86 +70,155 @@ class _AclAccessContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final members = state.membersForDisplay;
     final invites = state.activeInvites;
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                'Участники',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Text(
-              '${members.length}',
-              style: theme.textTheme.titleMedium,
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.md),
+        _AclSectionHeader(title: 'Участники', count: members.length),
+        const SizedBox(height: PawlySpacing.sm),
         if (members.isEmpty)
-          const Text('У этого питомца пока нет участников.')
+          const _AclEmptyCard(
+            title: 'Участников пока нет',
+            text: 'Здесь появятся люди, у которых есть доступ к питомцу.',
+          )
         else
-          ...members.map((member) => Padding(
-                padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-                child: _AclMemberTile(
-                  member: member,
-                  meUserId: state.me.userId,
-                  onTap: () => onMemberTap(member.id),
-                  onMessageTap: member.userId == state.me.userId
-                      ? null
-                      : () => _openDirectChat(
-                            context: context,
-                            ref: ProviderScope.containerOf(context),
-                            petId: state.me.petId,
-                            otherUserId: member.userId,
-                          ),
-                ),
-              )),
-        const SizedBox(height: PawlySpacing.lg),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                'Активные приглашения',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          ...members.map(
+            (member) => Padding(
+              padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+              child: _AclMemberTile(
+                member: member,
+                meUserId: state.me.userId,
+                onTap: () => onMemberTap(member.id),
+                onMessageTap: member.userId == state.me.userId
+                    ? null
+                    : () => _openDirectChat(
+                          context: context,
+                          ref: ProviderScope.containerOf(context),
+                          petId: state.me.petId,
+                          otherUserId: member.userId,
+                        ),
               ),
             ),
+          ),
+        const SizedBox(height: PawlySpacing.md),
+        _AclSectionHeader(
+          title: 'Приглашения',
+          count: invites.length,
+          actionLabel: onCreateInvite == null ? null : 'Создать',
+          onActionTap: onCreateInvite,
+        ),
+        const SizedBox(height: PawlySpacing.sm),
+        if (invites.isEmpty)
+          const _AclEmptyCard(
+            title: 'Приглашений нет',
+            text: 'Создайте приглашение, чтобы добавить нового участника.',
+          )
+        else
+          ...invites.map(
+            (invite) => Padding(
+              padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+              child: _AclInviteTile(
+                invite: invite,
+                onTap: () => onInviteTap(invite.id),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AclSectionHeader extends StatelessWidget {
+  const _AclSectionHeader({
+    required this.title,
+    required this.count,
+    this.actionLabel,
+    this.onActionTap,
+  });
+
+  final String title;
+  final int count;
+  final String? actionLabel;
+  final VoidCallback? onActionTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        if (actionLabel != null) ...[
+          TextButton(onPressed: onActionTap, child: Text(actionLabel!)),
+          const SizedBox(width: PawlySpacing.xs),
+        ],
+        Text(
+          '$count',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AclEmptyCard extends StatelessWidget {
+  const _AclEmptyCard({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
             Text(
-              '${invites.length}',
-              style: theme.textTheme.titleMedium,
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: PawlySpacing.md),
-        if (invites.isEmpty)
-          const Text('Активных приглашений пока нет.')
-        else
-          ...invites.map((invite) => Padding(
-                padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-                child: _AclInviteTile(
-                  invite: invite,
-                  onTap: () => onInviteTap(invite.id),
-                ),
-              )),
-        if (onCreateInvite != null) ...<Widget>[
-          const SizedBox(height: PawlySpacing.sm),
-          PawlyButton(
-            label: 'Создать приглашение',
-            onPressed: onCreateInvite,
-            icon: Icons.person_add_alt_1_rounded,
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -178,73 +244,79 @@ class _AclMemberTile extends StatelessWidget {
     final profile = member.profile;
     final fullName = _memberName(profile);
 
-    return PawlyCard(
+    return InkWell(
       onTap: onTap,
-      padding: const EdgeInsets.all(PawlySpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          _AclAvatar(
-            userId: member.userId,
-            photoUrl: profile?.avatarDownloadUrl,
-            fallbackLabel: fullName,
-            showCrown: member.isPrimaryOwner,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.72),
           ),
-          const SizedBox(width: PawlySpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  fullName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: PawlySpacing.xs),
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xxs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              _AclAvatar(
+                userId: member.userId,
+                photoUrl: profile?.avatarDownloadUrl,
+                fallbackLabel: fullName,
+                showCrown: member.isPrimaryOwner,
+              ),
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    if (member.isPrimaryOwner)
-                      const PawlyBadge(
-                        label: 'Владелец',
-                        tone: PawlyBadgeTone.warning,
+                    Text(
+                      fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
-                    if (!member.isPrimaryOwner)
-                      PawlyBadge(
-                        label: _localizedRoleTitle(member.role),
-                        tone: PawlyBadgeTone.neutral,
+                    ),
+                    const SizedBox(height: PawlySpacing.xxs),
+                    Text(
+                      member.isPrimaryOwner
+                          ? 'Роль: основной владелец'
+                          : 'Роль: ${_localizedRoleTitle(member.role)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
                       ),
-                    if (isMe)
+                    ),
+                    if (isMe) ...[
+                      const SizedBox(height: PawlySpacing.xxs),
                       Text(
-                        'Вы',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        'Это вы',
+                        style: theme.textTheme.labelMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w300,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ],
                   ],
                 ),
+              ),
+              const SizedBox(width: PawlySpacing.sm),
+              if (onMessageTap != null) ...[
+                _AclMessageButton(onTap: onMessageTap!),
+                const SizedBox(width: PawlySpacing.xs),
               ],
-            ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
-          const SizedBox(width: PawlySpacing.sm),
-          if (onMessageTap != null)
-            IconButton(
-              onPressed: onMessageTap,
-              tooltip: 'Открыть чат',
-              icon: const Icon(Icons.chat_bubble_rounded),
-              color: colorScheme.primary,
-            ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -266,6 +338,38 @@ class _AclMemberTile extends StatelessWidget {
   }
 }
 
+class _AclMessageButton extends StatelessWidget {
+  const _AclMessageButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(PawlyRadius.pill),
+      child: Ink(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+          ),
+        ),
+        child: Icon(
+          Icons.chat_bubble_outline_rounded,
+          size: 19,
+          color: colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> _openDirectChat({
   required BuildContext context,
   required ProviderContainer ref,
@@ -275,10 +379,7 @@ Future<void> _openDirectChat({
   try {
     final conversation =
         await ref.read(chatRepositoryProvider).openConversation(
-              OpenDirectChatInput(
-                petId: petId,
-                otherUserId: otherUserId,
-              ),
+              OpenDirectChatInput(petId: petId, otherUserId: otherUserId),
             );
     if (!context.mounted) {
       return;
@@ -293,17 +394,14 @@ Future<void> _openDirectChat({
     if (!context.mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Не удалось открыть чат.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Не удалось открыть чат.')));
   }
 }
 
 class _AclInviteTile extends StatelessWidget {
-  const _AclInviteTile({
-    required this.invite,
-    required this.onTap,
-  });
+  const _AclInviteTile({required this.invite, required this.onTap});
 
   final AclInvite invite;
   final VoidCallback onTap;
@@ -313,52 +411,72 @@ class _AclInviteTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return PawlyCard(
+    return InkWell(
       onTap: onTap,
-      padding: const EdgeInsets.all(PawlySpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(PawlyRadius.md),
-            ),
-            child: Icon(
-              Icons.mail_outline_rounded,
-              color: colorScheme.primary,
-            ),
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.72),
           ),
-          const SizedBox(width: PawlySpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  _localizedRoleTitle(invite.role),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.48,
+                  ),
+                  borderRadius: BorderRadius.circular(PawlyRadius.lg),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.64),
                   ),
                 ),
-                const SizedBox(height: PawlySpacing.xxs),
-                Text(
-                  'Код: ${invite.code}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                child: Icon(
+                  Icons.mail_outline_rounded,
+                  size: 22,
+                  color: colorScheme.onSurfaceVariant,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: PawlySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _localizedRoleTitle(invite.role),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xxs),
+                    Text(
+                      'Код: ${invite.code}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -384,17 +502,22 @@ class _AclAvatar extends StatelessWidget {
     final resolvedPhotoUrl = hasPhoto ? _normalizeStorageUrl(photoUrl!) : null;
 
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: 56,
+      height: 56,
       child: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
           Container(
-            width: 72,
-            height: 72,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.62,
+              ),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.64),
+              ),
             ),
             clipBehavior: Clip.antiAlias,
             child: hasPhoto
@@ -405,7 +528,7 @@ class _AclAvatar extends StatelessWidget {
                       entityId: userId,
                       imageUrl: resolvedPhotoUrl,
                     ),
-                    targetLogicalSize: 72,
+                    targetLogicalSize: 56,
                     fit: BoxFit.cover,
                     errorWidget: (_) =>
                         _AclAvatarFallback(label: fallbackLabel),
@@ -414,20 +537,22 @@ class _AclAvatar extends StatelessWidget {
           ),
           if (showCrown)
             Positioned(
-              top: -4,
-              right: -2,
+              top: -3,
+              right: -3,
               child: Container(
-                width: 28,
-                height: 28,
+                width: 22,
+                height: 22,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFD54F),
+                  color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(PawlyRadius.pill),
-                  border: Border.all(color: colorScheme.surface, width: 2),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+                  ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.workspace_premium_rounded,
-                  size: 16,
-                  color: Colors.black87,
+                  size: 14,
+                  color: colorScheme.primary,
                 ),
               ),
             ),
@@ -487,18 +612,47 @@ class _AclAccessErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить доступ'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const Text(
-            'Проверьте соединение или попробуйте снова чуть позже.',
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить доступ',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Проверьте соединение или попробуйте снова чуть позже.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
           ),
         ),
       ),

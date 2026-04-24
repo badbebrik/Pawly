@@ -19,19 +19,12 @@ class HealthFileUploadService {
   final HealthRepository _healthRepository;
   final Dio _uploadDio;
 
-  static const supportedExtensions = <String>[
-    'jpg',
-    'jpeg',
-    'png',
-    'webp',
-    'heic',
-    'heif',
-    'pdf',
-  ];
+  static const supportedExtensions = <String>['jpg', 'jpeg', 'png', 'pdf'];
 
   Future<UploadedHealthAttachmentRef> uploadFile(
     String petId, {
     required PlatformFile file,
+    required String entityType,
   }) async {
     final uploadData = await _readUploadData(file);
     final initResponse = await _healthRepository.initAttachmentUpload(
@@ -40,6 +33,7 @@ class HealthFileUploadService {
         mimeType: uploadData.mimeType,
         originalFilename: uploadData.fileName,
         expectedSizeBytes: uploadData.sizeBytes,
+        entityType: entityType,
       ),
     );
 
@@ -66,10 +60,15 @@ class HealthFileUploadService {
   Future<List<UploadedHealthAttachmentRef>> uploadFiles(
     String petId, {
     required List<PlatformFile> files,
+    required String entityType,
   }) async {
     final uploaded = <UploadedHealthAttachmentRef>[];
     for (final file in files) {
-      uploaded.add(await uploadFile(petId, file: file));
+      uploaded.add(await uploadFile(
+        petId,
+        file: file,
+        entityType: entityType,
+      ));
     }
     return uploaded;
   }
@@ -77,6 +76,7 @@ class HealthFileUploadService {
   Future<UploadedHealthAttachmentRef> uploadXFile(
     String petId, {
     required XFile file,
+    required String entityType,
   }) async {
     final uploadData = await _readXFileUploadData(file);
     final initResponse = await _healthRepository.initAttachmentUpload(
@@ -85,6 +85,7 @@ class HealthFileUploadService {
         mimeType: uploadData.mimeType,
         originalFilename: uploadData.fileName,
         expectedSizeBytes: uploadData.sizeBytes,
+        entityType: entityType,
       ),
     );
 
@@ -111,10 +112,15 @@ class HealthFileUploadService {
   Future<List<UploadedHealthAttachmentRef>> uploadXFiles(
     String petId, {
     required List<XFile> files,
+    required String entityType,
   }) async {
     final uploaded = <UploadedHealthAttachmentRef>[];
     for (final file in files) {
-      uploaded.add(await uploadXFile(petId, file: file));
+      uploaded.add(await uploadXFile(
+        petId,
+        file: file,
+        entityType: entityType,
+      ));
     }
     return uploaded;
   }
@@ -123,9 +129,7 @@ class HealthFileUploadService {
     final fileName = file.name.trim().isEmpty ? 'attachment' : file.name.trim();
     final mimeType = _resolveMimeType(fileName);
     if (mimeType == null) {
-      throw StateError(
-        'Поддерживаются файлы JPG, PNG, WEBP, HEIC, HEIF и PDF.',
-      );
+      throw StateError('Поддерживаются файлы PNG, JPEG и PDF.');
     }
 
     if (file.bytes != null) {
@@ -155,9 +159,7 @@ class HealthFileUploadService {
     final fileName = _fileNameFromPath(file.path);
     final mimeType = _resolveMimeType(fileName);
     if (mimeType == null) {
-      throw StateError(
-        'Поддерживаются файлы JPG, PNG, WEBP, HEIC, HEIF и PDF.',
-      );
+      throw StateError('Поддерживаются файлы PNG, JPEG и PDF.');
     }
 
     final bytes = await file.readAsBytes();
@@ -215,15 +217,6 @@ class HealthFileUploadService {
     }
     if (lower.endsWith('.png')) {
       return 'image/png';
-    }
-    if (lower.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    if (lower.endsWith('.heic')) {
-      return 'image/heic';
-    }
-    if (lower.endsWith('.heif')) {
-      return 'image/heif';
     }
     if (lower.endsWith('.pdf')) {
       return 'application/pdf';

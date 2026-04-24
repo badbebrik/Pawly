@@ -13,7 +13,7 @@ class PetDictionariesRepository {
   final PetDictionariesApiClient _api;
   final SharedPreferencesService _sharedPreferences;
 
-  static const _cacheKey = 'catalog_snapshot_v2';
+  static const _cacheKey = 'catalog_snapshot_v3';
 
   Future<CatalogSnapshot?> readCached() async {
     final json = await _sharedPreferences.readJson(_cacheKey);
@@ -25,9 +25,8 @@ class PetDictionariesRepository {
     final cached = await readCached();
 
     try {
-      final locale = await _sharedPreferences.getLocale() ?? 'ru';
       final dictionaries = await _api.getPetDictionaries();
-      final snapshot = _buildSnapshot(dictionaries, locale: locale);
+      final snapshot = _buildSnapshot(dictionaries, locale: 'ru');
 
       await _sharedPreferences.writeJson(_cacheKey, snapshot.toJson());
       return snapshot;

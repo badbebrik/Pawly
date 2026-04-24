@@ -31,7 +31,10 @@ class AclRepository {
     } else {
       createdRole = (await _aclApiClient.createRole(
         input.petId,
-        CreateRolePayload(title: trimmedCustomRoleTitle!),
+        CreateRolePayload(
+          title: trimmedCustomRoleTitle!,
+          policy: input.policy,
+        ),
       ))
           .role;
       roleId = createdRole.id;
@@ -71,19 +74,17 @@ class AclRepository {
     return response.member;
   }
 
-  Future<AclMember> removeMember({
+  Future<void> removeMember({
     required String petId,
     required String memberId,
   }) async {
-    final response = await _aclApiClient.removeMember(petId, memberId);
-    return response.member;
+    await _aclApiClient.removeMember(petId, memberId);
   }
 
-  Future<AclMember> leaveMyAccess({
+  Future<void> leaveMyAccess({
     required String petId,
   }) async {
-    final response = await _aclApiClient.leaveMyAccess(petId);
-    return response.member;
+    await _aclApiClient.leaveMyAccess(petId);
   }
 
   Future<void> revokeInvite({
@@ -93,11 +94,10 @@ class AclRepository {
     await _aclApiClient.revokeInvite(petId, inviteId);
   }
 
-  Future<AclInvite> previewInviteByToken(String token) async {
-    final response = await _aclApiClient.previewInviteByToken(
+  Future<AclInvitePreviewResponse> previewInviteByToken(String token) {
+    return _aclApiClient.previewInviteByToken(
       PreviewInviteByTokenPayload(token: token),
     );
-    return response.invite;
   }
 
   Future<AcceptInviteResponse> acceptInviteByToken(String token) async {

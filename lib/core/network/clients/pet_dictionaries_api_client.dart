@@ -10,7 +10,6 @@ class PetDictionariesApiClient {
 
   static const _options = ApiRequestOptions(
     includeLocale: true,
-    requiresAccessToken: true,
   );
 
   Future<PetDictionariesResponse> getPetDictionaries() {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,7 @@ import '../providers/health_controllers.dart';
 import '../providers/pet_health_home_controllers.dart';
 import '../providers/pet_medical_records_controller.dart';
 import '../widgets/health_attachments_field.dart';
+import '../widgets/health_common_widgets.dart';
 
 class PetMedicalRecordsPage extends ConsumerStatefulWidget {
   const PetMedicalRecordsPage({
@@ -31,7 +34,16 @@ class PetMedicalRecordsPage extends ConsumerStatefulWidget {
 }
 
 class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
   MedicalRecordBucket _selectedBucket = MedicalRecordBucket.active;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,20 +51,22 @@ class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
       petMedicalRecordsControllerProvider(widget.petId),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Медкарта')),
+    return PawlyScreenScaffold(
+      title: 'Медкарта',
       floatingActionButton: stateAsync.asData?.value.canWrite == true
-          ? FloatingActionButton.extended(
-              onPressed: _openCreateSheet,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Новая запись'),
+          ? PawlyAddActionButton(
+              label: 'Новая запись',
+              tooltip: 'Добавить запись медкарты',
+              onTap: _openCreateSheet,
             )
           : null,
       body: stateAsync.when(
         data: (state) => _MedicalRecordsContent(
           petId: widget.petId,
           state: state,
+          searchController: _searchController,
           selectedBucket: _selectedBucket,
+          onSearchChanged: _onSearchChanged,
           onBucketChanged: (bucket) => setState(() => _selectedBucket = bucket),
           onRetry: () => ref
               .read(petMedicalRecordsControllerProvider(widget.petId).notifier)
@@ -71,6 +85,18 @@ class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
     );
   }
 
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) {
+        return;
+      }
+      ref
+          .read(petMedicalRecordsControllerProvider(widget.petId).notifier)
+          .setSearchQuery(value);
+    });
+  }
+
   Future<void> _openCreateSheet() async {
     final state = ref
         .read(petMedicalRecordsControllerProvider(widget.petId))
@@ -85,7 +111,7 @@ class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
         builder: (context) => _MedicalRecordComposerPage(
           petId: widget.petId,
           allowedStatuses: state.bootstrap.enums.medicalRecordStatuses,
-          allowedTypes: state.bootstrap.enums.medicalRecordTypes,
+          allowedTypeItems: state.bootstrap.enums.medicalRecordTypeItems,
         ),
       ),
     );
@@ -127,7 +153,7 @@ class _MedicalRecordComposerPage extends StatelessWidget {
   const _MedicalRecordComposerPage({
     required this.petId,
     required this.allowedStatuses,
-    required this.allowedTypes,
+    required this.allowedTypeItems,
     this.initialRecord,
     this.title = 'Новая запись',
     this.submitLabel = 'Сохранить запись',
@@ -135,19 +161,19 @@ class _MedicalRecordComposerPage extends StatelessWidget {
 
   final String petId;
   final List<String> allowedStatuses;
-  final List<String> allowedTypes;
+  final List<HealthDictionaryItem> allowedTypeItems;
   final MedicalRecord? initialRecord;
   final String title;
   final String submitLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
+    return PawlyScreenScaffold(
+      title: title,
       body: _MedicalRecordComposerSheet(
         petId: petId,
         allowedStatuses: allowedStatuses,
-        allowedTypes: allowedTypes,
+        allowedTypeItems: allowedTypeItems,
         initialRecord: initialRecord,
         title: title,
         submitLabel: submitLabel,
@@ -161,7 +187,9 @@ class _MedicalRecordsContent extends StatelessWidget {
   const _MedicalRecordsContent({
     required this.petId,
     required this.state,
+    required this.searchController,
     required this.selectedBucket,
+    required this.onSearchChanged,
     required this.onBucketChanged,
     required this.onRetry,
     required this.onLoadMore,
@@ -169,9 +197,11 @@ class _MedicalRecordsContent extends StatelessWidget {
 
   final String petId;
   final PetMedicalRecordsState state;
+  final TextEditingController searchController;
   final MedicalRecordBucket selectedBucket;
+  final ValueChanged<String> onSearchChanged;
   final ValueChanged<MedicalRecordBucket> onBucketChanged;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
   final VoidCallback onLoadMore;
 
   @override
@@ -180,125 +210,70 @@ class _MedicalRecordsContent extends StatelessWidget {
       return _MedicalRecordsNoAccessView(onRetry: onRetry);
     }
 
-    final theme = Theme.of(context);
     final items = state.itemsFor(selectedBucket);
+    final isActive = selectedBucket == MedicalRecordBucket.active;
 
-    return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
-      children: <Widget>[
-        Text(
-          state.petName,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
+    return RefreshIndicator(
+      onRefresh: onRetry,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
+        children: <Widget>[
+          PawlyTextField(
+            controller: searchController,
+            hintText: 'Название, описание',
+            textInputAction: TextInputAction.search,
+            prefixIcon: const Icon(Icons.search_rounded),
+            onChanged: onSearchChanged,
           ),
-        ),
-        const SizedBox(height: PawlySpacing.xxs),
-        Text(
-          state.canWrite
-              ? 'Диагнозы, аллергии и клинические записи'
-              : 'Диагнозы, аллергии и клинические записи · только просмотр',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(height: PawlySpacing.md),
+          HealthBucketSegment<MedicalRecordBucket>(
+            selectedValue: selectedBucket,
+            onChanged: onBucketChanged,
+            options: <HealthBucketOption<MedicalRecordBucket>>[
+              HealthBucketOption<MedicalRecordBucket>(
+                value: MedicalRecordBucket.active,
+                label: 'Активные',
+                count: state.activeItems.length,
+              ),
+              HealthBucketOption<MedicalRecordBucket>(
+                value: MedicalRecordBucket.archive,
+                label: 'Архив',
+                count: state.archiveItems.length,
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        Wrap(
-          spacing: PawlySpacing.sm,
-          runSpacing: PawlySpacing.sm,
-          children: <Widget>[
-            _MedicalRecordBucketChip(
-              label: 'Активные',
-              count: state.activeItems.length,
-              selected: selectedBucket == MedicalRecordBucket.active,
-              onTap: () => onBucketChanged(MedicalRecordBucket.active),
-            ),
-            _MedicalRecordBucketChip(
-              label: 'Архив',
-              count: state.archiveItems.length,
-              selected: selectedBucket == MedicalRecordBucket.archive,
-              onTap: () => onBucketChanged(MedicalRecordBucket.archive),
-            ),
-          ],
-        ),
-        const SizedBox(height: PawlySpacing.lg),
-        if (items.isEmpty)
-          PawlyCard(
-            child: Text(
-              selectedBucket == MedicalRecordBucket.active
-                  ? 'Активных записей пока нет.'
-                  : 'Архив медкарты пока пуст.',
-              style: theme.textTheme.bodyLarge,
-            ),
-          )
-        else
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-              child: _MedicalRecordListCard(
+          const SizedBox(height: PawlySpacing.md),
+          if (items.isEmpty)
+            _MedicalRecordsInlineMessage(
+              title: isActive ? 'Активных записей нет' : 'Архив пуст',
+              message: isActive
+                  ? 'Добавьте запись, чтобы важная медицинская информация была под рукой.'
+                  : 'Закрытые записи появятся здесь.',
+            )
+          else
+            ...items.map(
+              (item) => _MedicalRecordListCard(
                 petId: petId,
                 item: item,
               ),
             ),
-          ),
-        if (state.nextCursorFor(selectedBucket) != null) ...<Widget>[
-          const SizedBox(height: PawlySpacing.sm),
-          PawlyButton(
-            label: state.isLoadingMore(selectedBucket)
-                ? 'Загружаем...'
-                : 'Показать еще',
-            onPressed: state.isLoadingMore(selectedBucket) ? null : onLoadMore,
-            variant: PawlyButtonVariant.secondary,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _MedicalRecordBucketChip extends StatelessWidget {
-  const _MedicalRecordBucketChip({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PawlyRadius.pill),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(
-            horizontal: PawlySpacing.md,
-            vertical: PawlySpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: selected ? colorScheme.primary : colorScheme.surface,
-            borderRadius: BorderRadius.circular(PawlyRadius.pill),
-            border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outline,
+          if (state.nextCursorFor(selectedBucket) != null) ...<Widget>[
+            const SizedBox(height: PawlySpacing.md),
+            PawlyButton(
+              label: state.isLoadingMore(selectedBucket)
+                  ? 'Загрузка...'
+                  : 'Загрузить еще',
+              onPressed:
+                  state.isLoadingMore(selectedBucket) ? null : onLoadMore,
+              variant: PawlyButtonVariant.secondary,
             ),
-          ),
-          child: Text(
-            '$label · $count',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: selected
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ),
+          ],
+        ],
       ),
     );
   }
@@ -316,106 +291,115 @@ class _MedicalRecordListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return PawlyCard(
-      onTap: () => context.pushNamed(
-        'petMedicalRecordDetails',
-        pathParameters: <String, String>{
-          'petId': petId,
-          'recordId': item.id,
-        },
+    final colorScheme = theme.colorScheme;
+    final dateLabel = _dateLine(item);
+    final bodyText = _nonEmpty(item.descriptionPreview);
+    final chips = <Widget>[
+      if (item.status != 'ACTIVE')
+        PawlyBadge(
+          label: _medicalRecordStatusLabel(item.status),
+          tone: _medicalRecordStatusTone(item.status),
+        ),
+      PawlyBadge(
+        label: _medicalRecordTypeItemLabel(item.recordTypeItem),
+        tone: PawlyBadgeTone.neutral,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            item.title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
+      child: Material(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: InkWell(
+          onTap: () => context.pushNamed(
+            'petMedicalRecordDetails',
+            pathParameters: <String, String>{
+              'petId': petId,
+              'recordId': item.id,
+            },
+          ),
+          borderRadius: BorderRadius.circular(PawlyRadius.xl),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PawlyRadius.xl),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+              ),
+            ),
+            padding: const EdgeInsets.all(PawlySpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: PawlySpacing.sm),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                if (dateLabel != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.xxs),
+                  Text(
+                    dateLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (bodyText != null) ...<Widget>[
+                  const SizedBox(height: PawlySpacing.sm),
+                  Text(
+                    bodyText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: PawlySpacing.sm),
+                Wrap(
+                  spacing: PawlySpacing.xs,
+                  runSpacing: PawlySpacing.xs,
+                  children: chips,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: PawlySpacing.xs),
-          Wrap(
-            spacing: PawlySpacing.xs,
-            runSpacing: PawlySpacing.xs,
-            children: <Widget>[
-              PawlyBadge(
-                label: _medicalRecordStatusLabel(item.status),
-                tone: _medicalRecordStatusTone(item.status),
-              ),
-              PawlyBadge(
-                label: _medicalRecordTypeLabel(item.recordType),
-                tone: PawlyBadgeTone.neutral,
-              ),
-            ],
-          ),
-          if (_dateLine(item) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            _MedicalRecordInfoLine(
-              icon: Icons.event_rounded,
-              text: value,
-            ),
-          ],
-          if (_nonEmpty(item.descriptionPreview) case final value?) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            Text(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-          if (item.attachmentsCount > 0) ...<Widget>[
-            const SizedBox(height: PawlySpacing.sm),
-            _MedicalRecordInfoLine(
-              icon: Icons.attach_file_rounded,
-              text: '${item.attachmentsCount} влож.',
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
 
   String? _dateLine(MedicalRecordCard item) {
-    final parts = <String>[
-      if (_dateValue(item.startedAt) case final started?) 'С $started',
-      if (_dateValue(item.resolvedAt) case final resolved?) 'Закрыто $resolved',
-    ];
-    if (parts.isEmpty) {
+    final date = switch (item.status) {
+      'RESOLVED' => item.resolvedAt ?? item.startedAt,
+      _ => item.startedAt,
+    };
+    if (date == null) {
       return null;
     }
-    return parts.join(' · ');
-  }
-}
-
-class _MedicalRecordInfoLine extends StatelessWidget {
-  const _MedicalRecordInfoLine({
-    required this.icon,
-    required this.text,
-  });
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-        const SizedBox(width: PawlySpacing.xs),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ),
-      ],
-    );
+    final prefix = switch (item.status) {
+      'RESOLVED' => 'Закрыто',
+      _ => 'С',
+    };
+    return '$prefix ${_formatDate(date)}';
   }
 }
 
@@ -423,7 +407,7 @@ class _MedicalRecordComposerSheet extends ConsumerStatefulWidget {
   const _MedicalRecordComposerSheet({
     required this.petId,
     required this.allowedStatuses,
-    required this.allowedTypes,
+    required this.allowedTypeItems,
     this.initialRecord,
     this.title = 'Новая запись',
     this.submitLabel = 'Сохранить запись',
@@ -432,7 +416,7 @@ class _MedicalRecordComposerSheet extends ConsumerStatefulWidget {
 
   final String petId;
   final List<String> allowedStatuses;
-  final List<String> allowedTypes;
+  final List<HealthDictionaryItem> allowedTypeItems;
   final MedicalRecord? initialRecord;
   final String title;
   final String submitLabel;
@@ -448,10 +432,11 @@ class _MedicalRecordComposerSheetState
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _customRecordTypeController = TextEditingController();
   final List<AttachmentDraftItem> _attachments = <AttachmentDraftItem>[];
 
   late String _status;
-  late String _recordType;
+  late String _recordTypeSelection;
   DateTime? _startedAt;
   DateTime? _resolvedAt;
   bool _isUploadingAttachments = false;
@@ -464,10 +449,7 @@ class _MedicalRecordComposerSheetState
         (widget.allowedStatuses.contains('ACTIVE')
             ? 'ACTIVE'
             : widget.allowedStatuses.first);
-    _recordType = initial?.recordType ??
-        (widget.allowedTypes.contains('CLINICAL_NOTE')
-            ? 'CLINICAL_NOTE'
-            : widget.allowedTypes.first);
+    _recordTypeSelection = _initialRecordTypeSelection(initial);
     _titleController.text = initial?.title ?? '';
     _descriptionController.text = initial?.description ?? '';
     _startedAt = initial?.startedAt;
@@ -482,7 +464,54 @@ class _MedicalRecordComposerSheetState
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _customRecordTypeController.dispose();
     super.dispose();
+  }
+
+  List<DropdownMenuItem<String>> get _recordTypeOptions {
+    final items = <HealthDictionaryItem>[
+      ...widget.allowedTypeItems.where((item) => !item.isArchived),
+    ];
+    final initialItem = widget.initialRecord?.recordTypeItem;
+    if (initialItem != null &&
+        !items.any((item) => item.id == initialItem.id)) {
+      items.add(initialItem);
+    }
+
+    return <DropdownMenuItem<String>>[
+      ...items.map(
+        (item) => DropdownMenuItem<String>(
+          value: 'item:${item.id}',
+          child: Text(item.name),
+        ),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'custom',
+        child: Text('Другой тип'),
+      ),
+    ];
+  }
+
+  String? get _selectedRecordTypeId {
+    if (!_recordTypeSelection.startsWith('item:')) {
+      return null;
+    }
+    return _recordTypeSelection.substring('item:'.length);
+  }
+
+  String _initialRecordTypeSelection(MedicalRecord? initial) {
+    final initialItem = initial?.recordTypeItem;
+    if (initialItem != null) {
+      return 'item:${initialItem.id}';
+    }
+
+    final activeItems =
+        widget.allowedTypeItems.where((item) => !item.isArchived);
+    if (activeItems.isNotEmpty) {
+      return 'item:${activeItems.first.id}';
+    }
+
+    return 'custom';
   }
 
   @override
@@ -515,89 +544,111 @@ class _MedicalRecordComposerSheetState
                 ] else ...<Widget>[
                   const SizedBox(height: PawlySpacing.sm),
                 ],
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xs,
-                  children: widget.allowedStatuses
-                      .map(
-                        (status) => ChoiceChip(
-                          label: Text(_medicalRecordStatusLabel(status)),
-                          selected: _status == status,
-                          onSelected: (_) => setState(() => _status = status),
-                        ),
-                      )
-                      .toList(growable: false),
+                PawlyListSection(
+                  title: 'Статус',
+                  padding: const EdgeInsets.all(PawlySpacing.sm),
+                  children: <Widget>[
+                    HealthBucketSegment<String>(
+                      selectedValue: _status,
+                      onChanged: (status) => setState(() => _status = status),
+                      options: widget.allowedStatuses
+                          .map(
+                            (status) => HealthBucketOption<String>(
+                              value: status,
+                              label: _medicalRecordStatusLabel(status),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: PawlySpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: _recordType,
-                  decoration: const InputDecoration(labelText: 'Тип записи'),
-                  items: widget.allowedTypes
-                      .map(
-                        (type) => DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(_medicalRecordTypeLabel(type)),
+                PawlyListSection(
+                  title: 'Запись',
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    _MedicalRecordTypeField(
+                      value: _recordTypeSelection,
+                      items: _recordTypeOptions,
+                      onChanged: (value) =>
+                          setState(() => _recordTypeSelection = value),
+                    ),
+                    if (_recordTypeSelection == 'custom')
+                      _MedicalRecordFormTextField(
+                        controller: _customRecordTypeController,
+                        label: 'Свой тип записи',
+                        textCapitalization: TextCapitalization.sentences,
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Укажите тип записи.';
+                          }
+                          return null;
+                        },
+                      ),
+                    _MedicalRecordFormTextField(
+                      controller: _titleController,
+                      label: 'Заголовок',
+                      textCapitalization: TextCapitalization.sentences,
+                      validator: (value) {
+                        if ((value ?? '').trim().isEmpty) {
+                          return 'Укажите заголовок.';
+                        }
+                        return null;
+                      },
+                    ),
+                    _MedicalRecordFormTextField(
+                      controller: _descriptionController,
+                      label: 'Описание',
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyListSection(
+                  title: 'Даты',
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  children: <Widget>[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        HealthDateButton(
+                          label: _startedAt == null
+                              ? 'Дата начала'
+                              : 'Дата начала: ${_formatDate(_startedAt!)}',
+                          onTap: () async {
+                            final picked = await _pickDate(
+                              context,
+                              initialDate: _startedAt ?? DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setState(() => _startedAt = picked);
+                            }
+                          },
                         ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _recordType = value);
-                  },
+                        if (_status == 'RESOLVED') ...<Widget>[
+                          const SizedBox(height: PawlySpacing.sm),
+                          HealthDateButton(
+                            label: _resolvedAt == null
+                                ? 'Дата закрытия'
+                                : 'Дата закрытия: ${_formatDate(_resolvedAt!)}',
+                            onTap: () async {
+                              final picked = await _pickDate(
+                                context,
+                                initialDate:
+                                    _resolvedAt ?? _startedAt ?? DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() => _resolvedAt = picked);
+                              }
+                            },
+                            secondary: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _titleController,
-                  label: 'Заголовок',
-                  textCapitalization: TextCapitalization.sentences,
-                  validator: (value) {
-                    if ((value ?? '').trim().isEmpty) {
-                      return 'Укажи заголовок.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: PawlySpacing.sm),
-                PawlyTextField(
-                  controller: _descriptionController,
-                  label: 'Описание',
-                  maxLines: 4,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: PawlySpacing.sm),
-                _DateButton(
-                  label: _startedAt == null
-                      ? 'Дата начала'
-                      : 'Дата начала: ${_formatDate(_startedAt!)}',
-                  onTap: () async {
-                    final picked = await _pickDate(
-                      context,
-                      initialDate: _startedAt ?? DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => _startedAt = picked);
-                    }
-                  },
-                ),
-                if (_status == 'RESOLVED') ...<Widget>[
-                  const SizedBox(height: PawlySpacing.sm),
-                  _DateButton(
-                    label: _resolvedAt == null
-                        ? 'Дата закрытия'
-                        : 'Дата закрытия: ${_formatDate(_resolvedAt!)}',
-                    onTap: () async {
-                      final picked = await _pickDate(
-                        context,
-                        initialDate:
-                            _resolvedAt ?? _startedAt ?? DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => _resolvedAt = picked);
-                      }
-                    },
-                    secondary: true,
-                  ),
-                ],
                 const SizedBox(height: PawlySpacing.lg),
                 HealthAttachmentsField(
                   attachments: _attachments,
@@ -607,6 +658,7 @@ class _MedicalRecordComposerSheetState
                   onAddFromGallery: _pickAndUploadFromGallery,
                   onAddFromCamera: _pickAndUploadFromCamera,
                   onRemove: _removeAttachment,
+                  onRename: _renameAttachment,
                 ),
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
@@ -636,15 +688,16 @@ class _MedicalRecordComposerSheetState
 
     Navigator.of(context).pop(
       UpsertMedicalRecordInput(
-        recordType: _recordType,
+        recordTypeId: _selectedRecordTypeId,
+        recordTypeName: _recordTypeSelection == 'custom'
+            ? _nonEmpty(_customRecordTypeController.text)
+            : null,
         status: _status,
         title: _titleController.text.trim(),
         description: _nonEmpty(_descriptionController.text),
         startedAtIso: _toStoredDate(_startedAt)?.toIso8601String(),
         resolvedAtIso: _toStoredDate(_resolvedAt)?.toIso8601String(),
-        attachmentFileIds: _attachments
-            .map((attachment) => attachment.fileId)
-            .toList(growable: false),
+        attachments: _attachmentInputs(),
         rowVersion: widget.initialRecord?.rowVersion,
       ),
     );
@@ -665,7 +718,8 @@ class _MedicalRecordComposerSheetState
     try {
       final uploaded = await ref
           .read(healthFileUploadServiceProvider)
-          .uploadFiles(widget.petId, files: files);
+          .uploadFiles(widget.petId,
+              files: files, entityType: 'MEDICAL_RECORD');
       if (!mounted) {
         return;
       }
@@ -695,8 +749,9 @@ class _MedicalRecordComposerSheetState
   }
 
   Future<void> _pickAndUploadFromGallery() async {
-    final files =
-        await ref.read(mediaPickerServiceProvider).pickGalleryImages();
+    final files = await ref
+        .read(mediaPickerServiceProvider)
+        .pickAttachmentImagesFromGallery();
     if (files.isEmpty || !mounted) {
       return;
     }
@@ -704,9 +759,8 @@ class _MedicalRecordComposerSheetState
   }
 
   Future<void> _pickAndUploadFromCamera() async {
-    final file = await ref.read(mediaPickerServiceProvider).pickImage(
-          source: ImageSource.camera,
-        );
+    final file =
+        await ref.read(mediaPickerServiceProvider).takeAttachmentPhoto();
     if (file == null || !mounted) {
       return;
     }
@@ -719,9 +773,12 @@ class _MedicalRecordComposerSheetState
     });
 
     try {
-      final uploaded = await ref
-          .read(healthFileUploadServiceProvider)
-          .uploadXFiles(widget.petId, files: files);
+      final uploaded =
+          await ref.read(healthFileUploadServiceProvider).uploadXFiles(
+                widget.petId,
+                files: files,
+                entityType: 'MEDICAL_RECORD',
+              );
       if (!mounted) {
         return;
       }
@@ -756,32 +813,102 @@ class _MedicalRecordComposerSheetState
     });
   }
 
+  void _renameAttachment(String fileId, String fileName) {
+    setState(() {
+      final index = _attachments.indexWhere(
+        (attachment) => attachment.fileId == fileId,
+      );
+      if (index >= 0) {
+        _attachments[index] = _attachments[index].copyWith(fileName: fileName);
+      }
+    });
+  }
+
+  List<AttachmentInput> _attachmentInputs() {
+    return _attachments
+        .map(
+          (attachment) => AttachmentInput(
+            fileId: attachment.fileId,
+            fileName: attachment.fileName,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   DateTime? _toStoredDate(DateTime? value) {
     if (value == null) return null;
     return DateTime(value.year, value.month, value.day, 12);
   }
 }
 
-class _DateButton extends StatelessWidget {
-  const _DateButton({
+class _MedicalRecordFormTextField extends StatelessWidget {
+  const _MedicalRecordFormTextField({
+    required this.controller,
     required this.label,
-    required this.onTap,
-    this.secondary = false,
+    this.maxLines = 1,
+    this.validator,
+    this.textCapitalization = TextCapitalization.none,
   });
 
+  final TextEditingController controller;
   final String label;
-  final VoidCallback onTap;
-  final bool secondary;
+  final int maxLines;
+  final FormFieldValidator<String>? validator;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
-    return PawlyButton(
-      label: label,
-      onPressed: onTap,
-      variant:
-          secondary ? PawlyButtonVariant.secondary : PawlyButtonVariant.ghost,
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      validator: validator,
+      textCapitalization: textCapitalization,
+      decoration: _medicalRecordRowDecoration(label: label),
     );
   }
+}
+
+class _MedicalRecordTypeField extends StatelessWidget {
+  const _MedicalRecordTypeField({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: _medicalRecordRowDecoration(label: 'Тип записи'),
+      items: items,
+      onChanged: (value) {
+        if (value == null) {
+          return;
+        }
+        onChanged(value);
+      },
+    );
+  }
+}
+
+InputDecoration _medicalRecordRowDecoration({required String label}) {
+  return InputDecoration(
+    labelText: label,
+    filled: false,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: PawlySpacing.md,
+      vertical: PawlySpacing.sm,
+    ),
+    border: InputBorder.none,
+    enabledBorder: InputBorder.none,
+    focusedBorder: InputBorder.none,
+    errorBorder: InputBorder.none,
+    focusedErrorBorder: InputBorder.none,
+  );
 }
 
 class PetMedicalRecordDetailsPage extends ConsumerWidget {
@@ -799,26 +926,24 @@ class PetMedicalRecordDetailsPage extends ConsumerWidget {
     final recordRef = PetMedicalRecordRef(petId: petId, recordId: recordId);
     final recordAsync = ref.watch(petMedicalRecordDetailsProvider(recordRef));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Запись медкарты'),
-        actions: recordAsync.maybeWhen(
-          data: (record) => <Widget>[
-            if (record.canEdit)
-              IconButton(
-                onPressed: () => _editRecord(context, ref, record),
-                icon: const Icon(Icons.edit_rounded),
-                tooltip: 'Редактировать',
-              ),
-            if (record.canDelete)
-              IconButton(
-                onPressed: () => _deleteRecord(context, ref, record),
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Удалить',
-              ),
-          ],
-          orElse: () => const <Widget>[],
-        ),
+    return PawlyScreenScaffold(
+      title: 'Запись медкарты',
+      actions: recordAsync.maybeWhen(
+        data: (record) => <Widget>[
+          if (record.canEdit)
+            IconButton(
+              onPressed: () => _editRecord(context, ref, record),
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: 'Редактировать',
+            ),
+          if (record.canDelete)
+            IconButton(
+              onPressed: () => _deleteRecord(context, ref, record),
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Удалить',
+            ),
+        ],
+        orElse: () => const <Widget>[],
       ),
       body: recordAsync.when(
         data: (record) => _MedicalRecordDetailsView(
@@ -850,8 +975,8 @@ class PetMedicalRecordDetailsPage extends ConsumerWidget {
           petId: petId,
           allowedStatuses: state?.bootstrap.enums.medicalRecordStatuses ??
               const <String>['ACTIVE', 'RESOLVED'],
-          allowedTypes: state?.bootstrap.enums.medicalRecordTypes ??
-              const <String>['CLINICAL_NOTE'],
+          allowedTypeItems: state?.bootstrap.enums.medicalRecordTypeItems ??
+              const <HealthDictionaryItem>[],
           initialRecord: record,
           title: 'Редактировать запись',
           submitLabel: 'Сохранить изменения',
@@ -961,67 +1086,82 @@ class _MedicalRecordDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final details = _detailsLines(record);
+    final description = _nonEmpty(record.description);
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
+        padding: const EdgeInsets.fromLTRB(
+          PawlySpacing.md,
+          PawlySpacing.sm,
+          PawlySpacing.md,
+          PawlySpacing.xl,
+        ),
         children: <Widget>[
-          PawlyCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  record.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+          PawlyListSection(
+            children: <Widget>[
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        record.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
+                      const SizedBox(height: PawlySpacing.xs),
+                      Wrap(
+                        spacing: PawlySpacing.xs,
+                        runSpacing: PawlySpacing.xs,
+                        children: <Widget>[
+                          PawlyBadge(
+                            label: _medicalRecordStatusLabel(record.status),
+                            tone: _medicalRecordStatusTone(record.status),
+                          ),
+                          PawlyBadge(
+                            label: _medicalRecordTypeItemLabel(
+                              record.recordTypeItem,
+                            ),
+                            tone: PawlyBadgeTone.neutral,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: PawlySpacing.xs),
-                Wrap(
-                  spacing: PawlySpacing.xs,
-                  runSpacing: PawlySpacing.xs,
-                  children: <Widget>[
-                    PawlyBadge(
-                      label: _medicalRecordStatusLabel(record.status),
-                      tone: _medicalRecordStatusTone(record.status),
-                    ),
-                    PawlyBadge(
-                      label: _medicalRecordTypeLabel(record.recordType),
-                      tone: PawlyBadgeTone.neutral,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          if (_detailsLines(record).isNotEmpty) ...<Widget>[
+          if (details.isNotEmpty) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Основное',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _detailsLines(record)
-                    .map(
-                      (line) => _MedicalRecordDetailsRow(
-                        label: line.$1,
-                        value: line.$2,
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
+            HealthDetailsSection(
+              title: 'Основное',
+              children: details
+                  .map(
+                    (line) => HealthDetailsRow(
+                      label: line.$1,
+                      value: line.$2,
+                    ),
+                  )
+                  .toList(growable: false),
             ),
           ],
-          if (_nonEmpty(record.description) case final value?) ...<Widget>[
+          if (description != null) ...<Widget>[
             const SizedBox(height: PawlySpacing.md),
-            PawlyCard(
-              title: Text(
-                'Описание',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              child: Text(value),
+            PawlyListSection(
+              title: 'Описание',
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(PawlySpacing.md),
+                  child: Text(description, style: theme.textTheme.bodyLarge),
+                ),
+              ],
             ),
           ],
           if (record.attachments.isNotEmpty) ...<Widget>[
@@ -1046,14 +1186,11 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                     )
                     .toList(growable: false);
 
-                return PawlyCard(
-                  title: Text(
-                    'Вложения',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  child: Column(
-                    children: List<Widget>.generate(record.attachments.length,
-                        (index) {
+                return PawlyListSection(
+                  title: 'Вложения',
+                  children: List<Widget>.generate(
+                    record.attachments.length,
+                    (index) {
                       final attachment = record.attachments[index];
                       final viewerItem = viewerItems[index];
                       final imageIndex = imageItems.indexWhere(
@@ -1062,21 +1199,16 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                             item.title == viewerItem.title,
                       );
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          switch (viewerItem.kind) {
-                            AttachmentKind.image => Icons.photo_rounded,
-                            AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
-                            AttachmentKind.other => Icons.description_rounded,
-                          },
-                        ),
-                        title: Text(viewerItem.title),
-                        subtitle: Text(
-                          attachment.addedAt == null
-                              ? attachment.fileType
-                              : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
-                        ),
+                      return PawlyListTile(
+                        title: viewerItem.title,
+                        subtitle: attachment.addedAt == null
+                            ? attachment.fileType
+                            : '${attachment.fileType} • ${_formatDate(attachment.addedAt!)}',
+                        leadingIcon: switch (viewerItem.kind) {
+                          AttachmentKind.image => Icons.photo_rounded,
+                          AttachmentKind.pdf => Icons.picture_as_pdf_rounded,
+                          AttachmentKind.other => Icons.description_rounded,
+                        },
                         onTap: () => openAttachmentUrl(
                           context,
                           fileId: attachment.fileId,
@@ -1089,7 +1221,7 @@ class _MedicalRecordDetailsView extends StatelessWidget {
                               imageIndex >= 0 ? imageIndex : null,
                         ),
                       );
-                    }),
+                    },
                   ),
                 );
               },
@@ -1110,43 +1242,6 @@ class _MedicalRecordDetailsView extends StatelessWidget {
   }
 }
 
-class _MedicalRecordDetailsRow extends StatelessWidget {
-  const _MedicalRecordDetailsRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: PawlySpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-          const SizedBox(width: PawlySpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MedicalRecordsNoAccessView extends StatelessWidget {
   const _MedicalRecordsNoAccessView({required this.onRetry});
 
@@ -1156,28 +1251,14 @@ class _MedicalRecordsNoAccessView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Нет доступа к медкарте',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: PawlySpacing.xs),
-              Text(
-                'У текущей роли нет права health_read для этого питомца.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: PawlySpacing.md),
-              PawlyButton(
-                label: 'Повторить',
-                onPressed: onRetry,
-                variant: PawlyButtonVariant.secondary,
-              ),
-            ],
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: _MedicalRecordsInlineMessage(
+          title: 'Нет доступа',
+          message: 'У вас нет права просмотра медкарты этого питомца.',
+          action: PawlyButton(
+            label: 'Повторить',
+            onPressed: onRetry,
+            variant: PawlyButtonVariant.secondary,
           ),
         ),
       ),
@@ -1194,15 +1275,69 @@ class _MedicalRecordsErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить медкарту'),
-          footer: PawlyButton(
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: _MedicalRecordsInlineMessage(
+          title: 'Не удалось загрузить медкарту',
+          message: 'Попробуйте обновить экран через несколько секунд.',
+          action: PawlyButton(
             label: 'Повторить',
             onPressed: onRetry,
             variant: PawlyButtonVariant.secondary,
           ),
-          child: const Text('Попробуйте обновить экран чуть позже.'),
+        ),
+      ),
+    );
+  }
+}
+
+class _MedicalRecordsInlineMessage extends StatelessWidget {
+  const _MedicalRecordsInlineMessage({
+    required this.title,
+    required this.message,
+    this.action,
+  });
+
+  final String title;
+  final String message;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: PawlySpacing.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (action != null) ...<Widget>[
+              const SizedBox(height: PawlySpacing.md),
+              action!,
+            ],
+          ],
         ),
       ),
     );
@@ -1260,14 +1395,5 @@ PawlyBadgeTone _medicalRecordStatusTone(String status) {
   };
 }
 
-String _medicalRecordTypeLabel(String type) {
-  return switch (type) {
-    'DIAGNOSIS' => 'Диагноз',
-    'ALLERGY' => 'Аллергия',
-    'CHRONIC_CONDITION' => 'Хроническое',
-    'INJURY' => 'Травма',
-    'SURGERY' => 'Операция',
-    'CLINICAL_NOTE' => 'Клиническая запись',
-    _ => type,
-  };
-}
+String _medicalRecordTypeItemLabel(HealthDictionaryItem? item) =>
+    item?.name ?? 'Тип не указан';

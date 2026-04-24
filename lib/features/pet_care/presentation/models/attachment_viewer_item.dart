@@ -5,6 +5,7 @@ class AttachmentViewerItem {
     this.fileId,
     required this.title,
     required this.url,
+    this.downloadUrl,
     required this.kind,
   });
 
@@ -26,6 +27,9 @@ class AttachmentViewerItem {
           ? 'Файл'
           : fileName.trim(),
       url: resolvedUrl,
+      downloadUrl: (downloadUrl == null || downloadUrl.trim().isEmpty)
+          ? resolvedUrl
+          : downloadUrl.trim(),
       kind: detectAttachmentKind(
         fileType: fileType,
         fileName: fileName,
@@ -37,7 +41,19 @@ class AttachmentViewerItem {
   final String? fileId;
   final String title;
   final String? url;
+  final String? downloadUrl;
   final AttachmentKind kind;
+
+  String cacheKeyFor(String variant) {
+    final normalizedVariant = variant.trim().isEmpty ? 'default' : variant;
+    final normalizedFileId = fileId?.trim();
+    if (normalizedFileId != null && normalizedFileId.isNotEmpty) {
+      return 'attachment:$normalizedVariant:$normalizedFileId';
+    }
+
+    final normalizedUrl = _normalizedUrlForCache(url);
+    return 'attachment:$normalizedVariant:$normalizedUrl';
+  }
 
   static String? _resolveAttachmentUrl({
     String? previewUrl,
@@ -50,5 +66,19 @@ class AttachmentViewerItem {
       return downloadUrl.trim();
     }
     return null;
+  }
+
+  static String _normalizedUrlForCache(String? value) {
+    final candidate = value?.trim();
+    if (candidate == null || candidate.isEmpty) {
+      return 'empty';
+    }
+
+    final uri = Uri.tryParse(candidate);
+    if (uri == null) {
+      return candidate;
+    }
+
+    return uri.replace(query: null, fragment: null).toString();
   }
 }

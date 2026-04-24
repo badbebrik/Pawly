@@ -16,6 +16,14 @@ final calendarDayProvider = FutureProvider.autoDispose
       );
 });
 
+final calendarMarkersProvider = FutureProvider.autoDispose
+    .family<CalendarRangeResponse, CalendarMarkersRef>((ref, args) {
+  return ref.read(healthRepositoryProvider).getHealthCalendar(
+        dateFrom: _formatApiDate(args.dateFrom),
+        dateTo: _formatApiDate(args.dateTo),
+      );
+});
+
 class CalendarDayRef {
   const CalendarDayRef({
     required this.date,
@@ -31,6 +39,27 @@ class CalendarDayRef {
 
   @override
   int get hashCode => date.hashCode;
+}
+
+class CalendarMarkersRef {
+  const CalendarMarkersRef({
+    required this.dateFrom,
+    required this.dateTo,
+  });
+
+  final DateTime dateFrom;
+  final DateTime dateTo;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CalendarMarkersRef &&
+            other.dateFrom == dateFrom &&
+            other.dateTo == dateTo;
+  }
+
+  @override
+  int get hashCode => Object.hash(dateFrom, dateTo);
 }
 
 class CalendarSelectedDateController extends Notifier<DateTime> {

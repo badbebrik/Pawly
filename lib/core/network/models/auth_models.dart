@@ -6,11 +6,15 @@ class AuthTokensResponse {
     required this.userId,
     required this.accessToken,
     required this.refreshToken,
+    required this.tokenType,
+    required this.expiresIn,
   });
 
   final String userId;
   final String accessToken;
   final String refreshToken;
+  final String tokenType;
+  final int expiresIn;
 
   factory AuthTokensResponse.fromJson(Object? data) {
     final json = asJsonMap(data);
@@ -18,6 +22,8 @@ class AuthTokensResponse {
       userId: asString(json['user_id']),
       accessToken: asString(json['access_token']),
       refreshToken: asString(json['refresh_token']),
+      tokenType: asString(json['token_type'], fallback: 'Bearer'),
+      expiresIn: asInt(json['expires_in']),
     );
   }
 }
@@ -104,14 +110,23 @@ class LoginEmailRequest {
 }
 
 class LoginOAuthRequest {
-  const LoginOAuthRequest({required this.provider, required this.idToken});
+  const LoginOAuthRequest({
+    required this.provider,
+    required this.idToken,
+    required this.locale,
+    required this.timeZone,
+  });
 
   final String provider;
   final String idToken;
+  final String locale;
+  final String timeZone;
 
   JsonMap toJson() => <String, dynamic>{
         'provider': provider,
         'id_token': idToken,
+        'locale': locale,
+        'time_zone': timeZone,
       };
 }
 

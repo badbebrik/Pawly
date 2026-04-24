@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../../../design_system/design_system.dart';
@@ -14,6 +15,7 @@ class AttachmentViewerPage extends StatelessWidget {
     this.fileId,
     required this.title,
     required this.url,
+    this.downloadUrl,
     required this.kind,
     super.key,
   });
@@ -21,6 +23,7 @@ class AttachmentViewerPage extends StatelessWidget {
   final String? fileId;
   final String title;
   final String url;
+  final String? downloadUrl;
   final AttachmentKind kind;
 
   @override
@@ -29,8 +32,10 @@ class AttachmentViewerPage extends StatelessWidget {
       return AttachmentGalleryPage(
         items: <AttachmentViewerItem>[
           AttachmentViewerItem(
+            fileId: fileId,
             title: title,
             url: url,
+            downloadUrl: downloadUrl ?? url,
             kind: AttachmentKind.image,
           ),
         ],
@@ -38,7 +43,17 @@ class AttachmentViewerPage extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: <Widget>[
+          _DownloadAttachmentButton(
+            url: downloadUrl ?? url,
+            title: title,
+            kind: kind,
+            cacheKey: fileId == null ? null : 'pdf:$fileId',
+          ),
+        ],
+      ),
       body: switch (kind) {
         AttachmentKind.image => const SizedBox.shrink(),
         AttachmentKind.pdf => _CachedPdfViewer(fileId: fileId, url: url),
@@ -49,10 +64,7 @@ class AttachmentViewerPage extends StatelessWidget {
 }
 
 class _CachedPdfViewer extends StatefulWidget {
-  const _CachedPdfViewer({
-    required this.fileId,
-    required this.url,
-  });
+  const _CachedPdfViewer({required this.fileId, required this.url});
 
   final String? fileId;
   final String url;
@@ -159,6 +171,14 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
               ),
           ],
         ),
+        actions: <Widget>[
+          _DownloadAttachmentButton(
+            url: currentItem.downloadUrl ?? currentItem.url,
+            title: currentItem.title,
+            kind: currentItem.kind,
+            cacheKey: currentItem.cacheKeyFor('download'),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -200,6 +220,7 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
                           child: Center(
                             child: PawlyCachedImage(
                               imageUrl: item.url ?? '',
+                              cacheKey: item.cacheKeyFor('viewer'),
                               fit: BoxFit.contain,
                               errorWidget: (_) =>
                                   const _AttachmentViewerError(),
@@ -249,10 +270,12 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
                           color: frameBackground,
                         ),
                         child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(PawlyRadius.lg - 1),
+                          borderRadius: BorderRadius.circular(
+                            PawlyRadius.lg - 1,
+                          ),
                           child: PawlyCachedImage(
                             imageUrl: item.url ?? '',
+                            cacheKey: item.cacheKeyFor('thumb'),
                             fit: BoxFit.cover,
                             errorWidget: (_) => Icon(
                               Icons.broken_image_outlined,
@@ -272,6 +295,81 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
         ),
       ),
     );
+  }
+}
+
+class _DownloadAttachmentButton extends StatelessWidget {
+  const _DownloadAttachmentButton({
+    required this.url,
+    required this.title,
+    required this.kind,
+    this.cacheKey,
+  });
+
+  final String? url;
+  final String title;
+  final AttachmentKind kind;
+  final String? cacheKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Скачать',
+      icon: const Icon(Icons.file_download_outlined),
+      onPressed: () => _downloadAttachment(context),
+    );
+  }
+
+  Future<void> _downloadAttachment(BuildContext context) async {
+    final candidate = url?.trim();
+    final uri =
+        candidate == null || candidate.isEmpty ? null : Uri.tryParse(candidate);
+
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Для этого файла нет ссылки на скачивание.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final file = await DefaultCacheManager().getSingleFile(
+        candidate!,
+        key: cacheKey,
+      );
+      if (!context.mounted) {
+        return;
+      }
+
+      final box = context.findRenderObject() as RenderBox?;
+      await Share.shareXFiles(
+        <XFile>[XFile(file.path, name: title, mimeType: _shareMimeType(kind))],
+        fileNameOverrides: <String>[title],
+        sharePositionOrigin:
+            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      );
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Failed to share attachment: $error');
+      }
+
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось подготовить файл.')),
+      );
+    }
+  }
+
+  String? _shareMimeType(AttachmentKind kind) {
+    return switch (kind) {
+      AttachmentKind.image => 'image/*',
+      AttachmentKind.pdf => 'application/pdf',
+      AttachmentKind.other => null,
+    };
   }
 }
 

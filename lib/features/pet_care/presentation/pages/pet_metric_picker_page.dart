@@ -8,10 +8,7 @@ import '../providers/health_controllers.dart';
 import '../utils/metric_unit_formatter.dart';
 
 class PetMetricPickerPage extends ConsumerStatefulWidget {
-  const PetMetricPickerPage({
-    required this.petId,
-    super.key,
-  });
+  const PetMetricPickerPage({required this.petId, super.key});
 
   final String petId;
 
@@ -42,20 +39,19 @@ class _PetMetricPickerPageState extends ConsumerState<PetMetricPickerPage> {
       petLogComposerBootstrapProvider(widget.petId),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Выбрать метрику')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateMetric,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Новая метрика'),
+    return PawlyScreenScaffold(
+      title: 'Выбрать показатель',
+      floatingActionButton: PawlyAddActionButton(
+        label: 'Новый показатель',
+        tooltip: 'Создать показатель',
+        onTap: _openCreateMetric,
       ),
       body: bootstrapAsync.when(
         data: (bootstrap) => _buildContent(context, bootstrap),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _MetricPickerErrorView(
-          onRetry: () => ref.invalidate(
-            petLogComposerBootstrapProvider(widget.petId),
-          ),
+          onRetry: () =>
+              ref.invalidate(petLogComposerBootstrapProvider(widget.petId)),
         ),
       ),
     );
@@ -69,11 +65,16 @@ class _PetMetricPickerPageState extends ConsumerState<PetMetricPickerPage> {
     final customMetrics = _filterMetrics(bootstrap.customMetrics);
 
     return ListView(
-      padding: const EdgeInsets.all(PawlySpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        PawlySpacing.md,
+        PawlySpacing.sm,
+        PawlySpacing.md,
+        PawlySpacing.xl,
+      ),
       children: <Widget>[
         PawlyTextField(
           controller: _searchController,
-          hintText: 'Поиск по метрикам',
+          hintText: 'Поиск по показателям',
           prefixIcon: const Icon(Icons.search_rounded),
           onChanged: (value) {
             setState(() {
@@ -82,7 +83,7 @@ class _PetMetricPickerPageState extends ConsumerState<PetMetricPickerPage> {
           },
         ),
         if (systemMetrics.isNotEmpty) ...<Widget>[
-          const SizedBox(height: PawlySpacing.lg),
+          const SizedBox(height: PawlySpacing.md),
           _MetricPickerSection(title: 'Системные', metrics: systemMetrics),
         ],
         if (customMetrics.isNotEmpty) ...<Widget>[
@@ -122,10 +123,7 @@ class _PetMetricPickerPageState extends ConsumerState<PetMetricPickerPage> {
 }
 
 class _MetricPickerSection extends StatelessWidget {
-  const _MetricPickerSection({
-    required this.title,
-    required this.metrics,
-  });
+  const _MetricPickerSection({required this.title, required this.metrics});
 
   final String title;
   final List<Metric> metrics;
@@ -137,9 +135,9 @@ class _MetricPickerSection extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: PawlySpacing.sm),
         ...metrics.map(
@@ -160,39 +158,66 @@ class _MetricChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PawlyCard(
-      onTap: () => Navigator.of(context).pop(metric.id),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  metric.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: PawlySpacing.xs),
-                Text(
-                  _metricSubtitle(metric),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(PawlyRadius.xl),
+      child: InkWell(
+        onTap: () => Navigator.of(context).pop(metric.id),
+        borderRadius: BorderRadius.circular(PawlyRadius.xl),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
             ),
           ),
-          const SizedBox(width: PawlySpacing.md),
-          Text(
-            metric.scope == 'SYSTEM' ? 'Системный' : 'Мой',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+          padding: const EdgeInsets.all(PawlySpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      metric.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      _metricSubtitle(metric),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: PawlySpacing.xs),
+                    Text(
+                      metric.scope == 'SYSTEM' ? 'Системная' : 'Моя',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: PawlySpacing.sm),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -205,17 +230,48 @@ class _MetricPickerErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(PawlySpacing.lg),
-        child: PawlyCard(
-          title: const Text('Не удалось загрузить метрики.'),
-          footer: PawlyButton(
-            label: 'Повторить',
-            onPressed: onRetry,
-            variant: PawlyButtonVariant.secondary,
+        padding: const EdgeInsets.all(PawlySpacing.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(PawlyRadius.xl),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
-          child: const SizedBox.shrink(),
+          child: Padding(
+            padding: const EdgeInsets.all(PawlySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Не удалось загрузить показатели',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.xs),
+                Text(
+                  'Попробуйте обновить список через несколько секунд.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: PawlySpacing.md),
+                PawlyButton(
+                  label: 'Повторить',
+                  onPressed: onRetry,
+                  variant: PawlyButtonVariant.secondary,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

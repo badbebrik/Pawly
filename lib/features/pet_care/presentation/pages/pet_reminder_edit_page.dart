@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../pets/presentation/providers/pets_controller.dart';
 import '../../data/health_repository_models.dart';
 import '../providers/health_controllers.dart';
 import 'pet_log_type_picker_page.dart';
@@ -60,6 +61,7 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final accessAsync = ref.watch(petAccessPolicyProvider(widget.petId));
     final itemAsync = ref.watch(
       petScheduledItemProvider(
         PetScheduledItemRef(
@@ -69,11 +71,20 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
       ),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Редактировать напоминание')),
+    return PawlyScreenScaffold(
+      title: 'Редактировать напоминание',
       body: itemAsync.when(
         data: (item) {
           _applyItem(item);
+          final access = accessAsync.asData?.value;
+          if (accessAsync.hasError ||
+              (access != null &&
+                  !access.canWriteScheduledSource(item.sourceType))) {
+            return const _ReminderEditNoAccessView();
+          }
+          if (access == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
           return Form(
             key: _formKey,
             child: ListView(
@@ -94,9 +105,10 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
                     children: <Widget>[
                       Text(
                         'Тип напоминания',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       const SizedBox(height: PawlySpacing.sm),
                       DropdownButtonFormField<String>(
@@ -162,7 +174,7 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
                       return null;
                     }
                     if (value == null || value.trim().isEmpty) {
-                      return 'Укажи название';
+                      return 'Укажите название';
                     }
                     return null;
                   },
@@ -280,9 +292,8 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
                                         child: const Text('Сбросить'),
                                       ),
                                     TextButton(
-                                      onPressed: _isSubmitting
-                                          ? null
-                                          : _pickUntilDate,
+                                      onPressed:
+                                          _isSubmitting ? null : _pickUntilDate,
                                       child: const Text('Выбрать'),
                                     ),
                                   ],
@@ -530,7 +541,7 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
     if (_canEditRule &&
         _sourceType == 'LOG_TYPE' &&
         _selectedLogTypeId == null) {
-      _showError('Выбери тип записи для напоминания.');
+      _showError('Выберите тип записи для напоминания.');
       return;
     }
 
@@ -545,8 +556,7 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
               widget.itemId,
               input: UpsertScheduledItemInput(
                 sourceType: _sourceType,
-                sourceId:
-                    _sourceType == 'LOG_TYPE' ? _selectedLogTypeId : null,
+                sourceId: _sourceType == 'LOG_TYPE' ? _selectedLogTypeId : null,
                 title: _titleController.text.trim(),
                 note: _noteController.text.trim().isEmpty
                     ? null
@@ -566,7 +576,9 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
               ),
             );
       } else {
-        await ref.read(healthRepositoryProvider).updateScheduledItemReminderSettings(
+        await ref
+            .read(healthRepositoryProvider)
+            .updateScheduledItemReminderSettings(
               widget.petId,
               widget.itemId,
               input: UpdateScheduledItemReminderSettingsInput(
@@ -608,6 +620,36 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+}
+
+class _ReminderEditNoAccessView extends StatelessWidget {
+  const _ReminderEditNoAccessView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(PawlySpacing.lg),
+        child: PawlyCard(
+          title: Text(
+            'Нет доступа',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          child: Text(
+            'У вас нет права редактировать это напоминание.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
