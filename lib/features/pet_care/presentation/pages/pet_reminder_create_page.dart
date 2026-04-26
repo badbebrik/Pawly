@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../design_system/design_system.dart';
-import '../../../pets/data/pets_repository.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
+import '../../../pets/models/pet_access_policy.dart';
 import '../../data/health_repository_models.dart';
 import '../providers/health_controllers.dart';
 import 'pet_log_type_picker_page.dart';

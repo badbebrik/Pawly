@@ -16,10 +16,9 @@ import '../../features/calendar/presentation/pages/calendar_page.dart';
 import '../../features/chat/presentation/pages/chat_conversation_page.dart';
 import '../../features/chat/presentation/pages/chat_inbox_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
-import '../../features/pets/presentation/pages/pet_details_page.dart';
+import '../../features/pets/presentation/pages/pet_create_page.dart';
 import '../../features/pets/presentation/pages/pet_edit_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
-import '../../features/pet_create/presentation/pages/pet_create_flow_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
 import '../../features/pet_care/presentation/pages/pet_metric_picker_page.dart';
 import '../../features/pet_care/presentation/pages/pet_analytics_page.dart';
@@ -160,10 +159,12 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                 routes: <RouteBase>[
                   GoRoute(
                     path: ':petId',
-                    name: 'petDetails',
-                    builder: (_, state) => PetDetailsPage(
-                      petId: state.pathParameters['petId']!,
-                    ),
+                    redirect: (_, state) {
+                      if (state.fullPath == '${AppRoutes.pets}/:petId') {
+                        return AppRoutes.pets;
+                      }
+                      return null;
+                    },
                     routes: <RouteBase>[
                       GoRoute(
                         path: 'edit',
@@ -419,7 +420,7 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
       GoRoute(
         path: AppRoutes.petCreate,
         name: "petCreate",
-        builder: (_, __) => const PetCreateFlowPage(),
+        builder: (_, __) => const PetCreatePage(),
       ),
       GoRoute(
         path: AppRoutes.invite,

@@ -6,9 +6,9 @@ import 'package:intl/intl.dart';
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
-import '../../../pets/presentation/providers/active_pet_controller.dart';
-import '../../../pets/presentation/providers/active_pet_details_controller.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/active_pet_controller.dart';
+import '../../../pets/controllers/active_pet_details_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../providers/calendar_controllers.dart';
 
 class CalendarPage extends ConsumerStatefulWidget {

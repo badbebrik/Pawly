@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../../../core/network/models/log_models.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../providers/health_controllers.dart';
 import '../utils/metric_unit_formatter.dart';
 

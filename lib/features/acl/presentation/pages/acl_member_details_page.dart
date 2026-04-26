@@ -7,9 +7,9 @@ import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/data/chat_repository_models.dart';
 import '../../../chat/presentation/providers/chat_providers.dart';
-import '../../../pets/presentation/providers/active_pet_controller.dart';
-import '../../../pets/presentation/providers/active_pet_details_controller.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/active_pet_controller.dart';
+import '../../../pets/controllers/active_pet_details_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../models/acl_screen_models.dart';
 import '../providers/acl_controllers.dart';
 

@@ -1,11 +1,17 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../core/constants/api_constants.dart';
 import '../../../core/network/clients/profile_api_client.dart';
 import '../../../core/network/models/profile_models.dart';
 import '../../../core/network/session/auth_session_store.dart';
+import '../../../core/services/push_notifications_service.dart';
+import '../../../core/services/system_settings_launcher.dart';
 import '../../../core/storage/shared_preferences_service.dart';
+import '../../auth/data/auth_repository.dart';
+import '../models/settings_notification.dart';
+import '../models/settings_profile.dart';
+import '../shared/utils/settings_storage_url.dart';
 
 class SettingsRepository {
   SettingsRepository({
@@ -13,33 +19,44 @@ class SettingsRepository {
     required Dio uploadDio,
     required AuthSessionStore authSessionStore,
     required SharedPreferencesService sharedPreferencesService,
+    required PushNotificationsService pushNotificationsService,
+    required SystemSettingsLauncher systemSettingsLauncher,
+    required AuthRepository authRepository,
   })  : _profileApiClient = profileApiClient,
         _uploadDio = uploadDio,
         _authSessionStore = authSessionStore,
-        _sharedPreferencesService = sharedPreferencesService;
+        _sharedPreferencesService = sharedPreferencesService,
+        _pushNotificationsService = pushNotificationsService,
+        _systemSettingsLauncher = systemSettingsLauncher,
+        _authRepository = authRepository;
 
   final ProfileApiClient _profileApiClient;
   final Dio _uploadDio;
   final AuthSessionStore _authSessionStore;
   final SharedPreferencesService _sharedPreferencesService;
+  final PushNotificationsService _pushNotificationsService;
+  final SystemSettingsLauncher _systemSettingsLauncher;
+  final AuthRepository _authRepository;
 
-  Future<ProfileResponse> getProfile() {
-    return _profileApiClient.getMe();
+  Future<SettingsProfile> getProfile() async {
+    final profile = await _profileApiClient.getMe();
+    return SettingsProfile.fromResponse(profile);
   }
 
-  Future<ProfileResponse> updateProfile({
+  Future<SettingsProfile> updateProfile({
     required String firstName,
     required String lastName,
-  }) {
-    return _profileApiClient.updateMe(
+  }) async {
+    final profile = await _profileApiClient.updateMe(
       UpdateProfilePayload(
         firstName: firstName,
         lastName: lastName,
       ),
     );
+    return SettingsProfile.fromResponse(profile);
   }
 
-  Future<ProfileResponse> updatePreferences({
+  Future<SettingsProfile> updatePreferences({
     required String locale,
     required String timeZone,
   }) async {
@@ -51,7 +68,7 @@ class SettingsRepository {
     );
     await syncStoredPreferences(timeZone: profile.timeZone);
     await _authSessionStore.updateLocale(profile.locale);
-    return profile;
+    return SettingsProfile.fromResponse(profile);
   }
 
   Future<void> syncStoredPreferences({
@@ -63,7 +80,7 @@ class SettingsRepository {
     await _authSessionStore.updateLocale('ru');
   }
 
-  Future<ProfileResponse> uploadAvatar({required XFile file}) async {
+  Future<SettingsProfile> uploadAvatar({required XFile file}) async {
     final mimeType = _resolveImageMimeType(file.path);
     if (mimeType == null) {
       throw StateError('Поддерживаются только JPG и PNG изображения.');
@@ -78,7 +95,7 @@ class SettingsRepository {
     );
 
     await _uploadDio.request<Object?>(
-      _normalizeStorageUrl(initResponse.upload.url),
+      normalizeSettingsStorageUrl(initResponse.upload.url),
       data: bytes,
       options: Options(
         method: initResponse.upload.method,
@@ -106,21 +123,45 @@ class SettingsRepository {
     await syncStoredPreferences(
       timeZone: profile.timeZone,
     );
-    return profile;
+    return SettingsProfile.fromResponse(profile);
   }
 
   Future<void> deleteAvatar() {
     return _profileApiClient.deleteAvatar();
   }
 
-  String _normalizeStorageUrl(String url) {
-    final uri = Uri.tryParse(url);
-    final apiUri = Uri.tryParse(ApiConstants.baseUrl);
-    if (uri == null || apiUri == null || uri.host != 'minio') {
-      return url;
-    }
+  Future<SettingsNotification> getNotificationSettings() async {
+    final settings = await _pushNotificationsService.getNotificationSettings();
+    return SettingsNotification(
+      status: _notificationStatusFromFirebase(settings),
+    );
+  }
 
-    return uri.replace(host: apiUri.host).toString();
+  Future<SettingsNotification> requestNotificationPermissions() async {
+    final granted =
+        await _pushNotificationsService.requestPermissionsIfNeeded();
+    if (granted) {
+      await _pushNotificationsService.syncTokenForCurrentSession();
+    }
+    return getNotificationSettings();
+  }
+
+  Future<bool> openNotificationSettings() {
+    return _systemSettingsLauncher.openNotificationSettings();
+  }
+
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    await _authRepository.changePassword(
+      oldPassword: oldPassword,
+      newPassword: newPassword,
+    );
+  }
+
+  Future<void> logout() {
+    return _authRepository.logout();
   }
 
   String? _resolveImageMimeType(String path) {
@@ -133,4 +174,20 @@ class SettingsRepository {
     }
     return null;
   }
+}
+
+SettingsNotificationStatus _notificationStatusFromFirebase(
+  NotificationSettings? settings,
+) {
+  if (settings == null) {
+    return SettingsNotificationStatus.unavailable;
+  }
+
+  return switch (settings.authorizationStatus) {
+    AuthorizationStatus.authorized => SettingsNotificationStatus.authorized,
+    AuthorizationStatus.provisional => SettingsNotificationStatus.provisional,
+    AuthorizationStatus.denied => SettingsNotificationStatus.denied,
+    AuthorizationStatus.notDetermined =>
+      SettingsNotificationStatus.notDetermined,
+  };
 }

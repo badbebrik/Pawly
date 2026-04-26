@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../core/network/models/pet_models.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../../data/health_repository_models.dart';
 import 'health_controllers.dart';
 

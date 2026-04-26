@@ -41,8 +41,57 @@ class PawlyCachedImage extends StatelessWidget {
       placeholderFadeInDuration: Duration.zero,
       placeholder:
           placeholder == null ? null : (_, __) => placeholder!(context),
-      errorWidget: (_, __, ___) =>
-          errorWidget?.call(context) ?? const SizedBox.shrink(),
+      errorWidget: (_, __, ___) => _PawlyNetworkImageFallback(
+        imageUrl: imageUrl,
+        fit: fit,
+        alignment: alignment,
+        cacheWidth: pixelSize,
+        cacheHeight: pixelSize,
+        placeholder: placeholder,
+        errorWidget: errorWidget,
+      ),
+    );
+  }
+}
+
+class _PawlyNetworkImageFallback extends StatelessWidget {
+  const _PawlyNetworkImageFallback({
+    required this.imageUrl,
+    required this.fit,
+    required this.alignment,
+    required this.cacheWidth,
+    required this.cacheHeight,
+    required this.placeholder,
+    required this.errorWidget,
+  });
+
+  final String imageUrl;
+  final BoxFit? fit;
+  final Alignment alignment;
+  final int? cacheWidth;
+  final int? cacheHeight;
+  final Widget Function(BuildContext context)? placeholder;
+  final Widget Function(BuildContext context)? errorWidget;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      imageUrl,
+      fit: fit,
+      alignment: alignment,
+      cacheWidth: cacheWidth,
+      cacheHeight: cacheHeight,
+      loadingBuilder: placeholder == null
+          ? null
+          : (context, child, loadingProgress) {
+              if (loadingProgress == null) {
+                return child;
+              }
+              return placeholder!(context);
+            },
+      errorBuilder: (context, _, __) {
+        return errorWidget?.call(context) ?? const SizedBox.shrink();
+      },
     );
   }
 }

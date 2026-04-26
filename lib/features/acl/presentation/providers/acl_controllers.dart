@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../core/network/models/pet_models.dart';
 import '../../../../core/providers/core_providers.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../../data/acl_repository.dart';
 import '../../data/acl_repository_models.dart';
 import '../models/acl_screen_models.dart';

@@ -32,7 +32,6 @@ class _PawlyDeepLinkListenerState extends ConsumerState<PawlyDeepLinkListener> {
   @override
   void initState() {
     super.initState();
-    debugPrint('[PawlyDeepLink][stream] init supports=$_supportsDeepLinks');
     if (!_supportsDeepLinks) {
       return;
     }
@@ -52,13 +51,9 @@ class _PawlyDeepLinkListenerState extends ConsumerState<PawlyDeepLinkListener> {
   }
 
   Future<void> _listenForDeepLinks() async {
-    debugPrint('[PawlyDeepLink][stream] subscribe');
     _subscription = _appLinks.uriLinkStream.listen(
       _handleUri,
-      onError: (error, stackTrace) {
-        debugPrint('[PawlyDeepLink][stream] error=$error');
-        debugPrintStack(stackTrace: stackTrace);
-      },
+      onError: (_, __) {},
     );
   }
 
@@ -69,15 +64,12 @@ class _PawlyDeepLinkListenerState extends ConsumerState<PawlyDeepLinkListener> {
   }
 
   void _handleUri(Uri? uri) {
-    debugPrint('[PawlyDeepLink][stream] uri=${describeInviteUri(uri)}');
     if (!mounted || uri == null) {
-      debugPrint('[PawlyDeepLink][stream] skip: not mounted or null uri');
       return;
     }
 
     final token = extractInviteToken(uri);
     if (token == null || token.isEmpty) {
-      debugPrint('[PawlyDeepLink][stream] skip: no invite token');
       return;
     }
 
@@ -85,37 +77,24 @@ class _PawlyDeepLinkListenerState extends ConsumerState<PawlyDeepLinkListener> {
       path: AppRoutes.aclInvitePreview,
       queryParameters: <String, String>{'token': token},
     ).toString();
-    debugPrint('[PawlyDeepLink][stream] token=${_maskToken(token)}');
-    debugPrint('[PawlyDeepLink][stream] target=$target');
     ref.read(pendingDeepLinkTargetProvider.notifier).setPendingTarget(target);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
-        debugPrint('[PawlyDeepLink][stream] skip go: unmounted');
         return;
       }
 
       final currentUri = widget.router.routeInformationProvider.value.uri;
       if (currentUri.path == AppRoutes.splash) {
-        debugPrint('[PawlyDeepLink][stream] defer: app is on splash');
         return;
       }
 
       if (currentUri.path == AppRoutes.aclInvitePreview) {
-        debugPrint('[PawlyDeepLink][stream] replace preview target=$target');
         widget.router.go(target);
       } else {
-        debugPrint('[PawlyDeepLink][stream] push preview target=$target');
         unawaited(widget.router.push(target));
       }
       ref.read(pendingDeepLinkTargetProvider.notifier).clear();
     });
   }
-}
-
-String _maskToken(String token) {
-  if (token.length <= 8) {
-    return '${token.length} chars';
-  }
-  return '${token.substring(0, 4)}...${token.substring(token.length - 4)}';
 }

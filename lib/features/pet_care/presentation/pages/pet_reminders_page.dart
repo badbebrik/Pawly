@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
-import '../../../pets/data/pets_repository.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
+import '../../../pets/models/pet_access_policy.dart';
 import '../providers/health_controllers.dart';
 
 class PetRemindersPage extends ConsumerWidget {

@@ -7,8 +7,8 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/network/models/acl_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
-import '../../../pets/presentation/providers/active_pet_controller.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/active_pet_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../models/acl_screen_models.dart';
 import '../providers/acl_controllers.dart';
 

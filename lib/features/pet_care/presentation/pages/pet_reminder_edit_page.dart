@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/models/health_models.dart';
 import '../../../../design_system/design_system.dart';
-import '../../../pets/presentation/providers/pets_controller.dart';
+import '../../../pets/controllers/pets_controller.dart';
 import '../../data/health_repository_models.dart';
 import '../providers/health_controllers.dart';
 import 'pet_log_type_picker_page.dart';

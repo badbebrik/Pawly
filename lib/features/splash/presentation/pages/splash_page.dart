@@ -8,7 +8,9 @@ import 'package:lottie/lottie.dart';
 import '../../../../app/deep_links/deep_link_navigation_state.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
-import '../providers/app_startup_provider.dart';
+import '../../controllers/app_startup_controller.dart';
+import '../../models/app_startup_destination.dart';
+import '../widgets/splash_status_view.dart';
 
 class SplashPage extends ConsumerWidget {
   const SplashPage({super.key});
@@ -19,10 +21,6 @@ class SplashPage extends ConsumerWidget {
       if (next == null || next.isEmpty) {
         return;
       }
-      debugPrint(
-        '[PawlyDeepLink][splash] pending target received=$next '
-        'matched=${GoRouterState.of(context).matchedLocation}',
-      );
       final destination = ref.read(appStartupProvider).asData?.value;
       if (destination != null) {
         _navigateFromSplash(context, ref, destination);
@@ -90,7 +88,7 @@ class SplashPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: PawlySpacing.xl),
-                    _StartupStatus(
+                    SplashStatusView(
                       startupState: startupState,
                       onRetry: () => ref.invalidate(appStartupProvider),
                     ),
@@ -111,14 +109,8 @@ void _navigateFromSplash(
   AppStartupDestination destination,
 ) {
   final pendingDeepLinkTarget = ref.read(pendingDeepLinkTargetProvider);
-  debugPrint(
-    '[PawlyDeepLink][splash] destination=${destination.kind} '
-    'pendingTarget=$pendingDeepLinkTarget '
-    'matched=${GoRouterState.of(context).matchedLocation}',
-  );
   if (!context.mounted ||
       GoRouterState.of(context).matchedLocation != AppRoutes.splash) {
-    debugPrint('[PawlyDeepLink][splash] skip: not on splash');
     return;
   }
   final target = _resolveInviteTarget(
@@ -127,24 +119,13 @@ void _navigateFromSplash(
   );
   final router = GoRouter.of(context);
   switch (destination.kind) {
-    case AppStartupDestinationKind.invitePreview:
-      debugPrint('[PawlyDeepLink][splash] go invitePreview target=$target');
-      if (target != null) {
-        router.go(target);
-      } else {
-        router.go(AppRoutes.pets);
-      }
     case AppStartupDestinationKind.authenticated:
-      debugPrint('[PawlyDeepLink][splash] go home');
       if (target != null) {
         ref.read(pendingDeepLinkTargetProvider.notifier).clear();
       }
       router.go(AppRoutes.home);
       if (target != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          debugPrint(
-            '[PawlyDeepLink][splash] push invitePreview target=$target',
-          );
           unawaited(router.push(target));
         });
       }
@@ -154,11 +135,9 @@ void _navigateFromSplash(
           path: AppRoutes.login,
           queryParameters: <String, String>{'redirect': target},
         ).toString();
-        debugPrint('[PawlyDeepLink][splash] go login redirect=$target');
         router.go(loginTarget);
         ref.read(pendingDeepLinkTargetProvider.notifier).clear();
       } else {
-        debugPrint('[PawlyDeepLink][splash] go login');
         router.go(AppRoutes.login);
       }
   }
@@ -178,69 +157,4 @@ String? _resolveInviteTarget({
     path: AppRoutes.aclInvitePreview,
     queryParameters: <String, String>{'token': inviteToken},
   ).toString();
-}
-
-class _StartupStatus extends StatelessWidget {
-  const _StartupStatus({required this.startupState, required this.onRetry});
-
-  final AsyncValue<AppStartupDestination> startupState;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return startupState.when(
-      data: (_) => const _SessionCheckStatus(),
-      loading: () => const _SessionCheckStatus(),
-      error: (Object _, StackTrace __) {
-        return Column(
-          children: <Widget>[
-            Text(
-              'Не удалось запустить приложение',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: PawlySpacing.md),
-            PawlyButton(
-              label: 'Повторить',
-              fullWidth: false,
-              onPressed: onRetry,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _SessionCheckStatus extends StatelessWidget {
-  const _SessionCheckStatus();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      children: <Widget>[
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            color: colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: PawlySpacing.md),
-        Text(
-          'Проверяем сессию...',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-        ),
-      ],
-    );
-  }
 }

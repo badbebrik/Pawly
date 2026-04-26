@@ -5,7 +5,12 @@ import '../../../core/network/clients/acl_api_client.dart';
 import '../../../core/network/clients/pets_api_client.dart';
 import '../../../core/network/models/acl_models.dart';
 import '../../../core/network/models/pet_models.dart';
-import '../../catalog/data/catalog_cache_models.dart';
+import '../models/pet_access_policy.dart';
+import '../models/pet_invite_result.dart';
+import '../models/pet_list_entry.dart';
+import '../shared/formatters/pet_access_formatters.dart';
+import '../shared/formatters/pet_catalog_label_formatters.dart';
+import 'pet_catalog_models.dart';
 
 class PetsRepository {
   PetsRepository({
@@ -22,7 +27,7 @@ class PetsRepository {
 
   Future<List<PetListEntry>> listAvailablePets({
     required String currentUserId,
-    required CatalogSnapshot catalog,
+    required PetCatalog catalog,
     bool includeArchived = false,
     int limit = 50,
   }) async {
@@ -33,13 +38,14 @@ class PetsRepository {
 
     return response.items.map((item) {
       final pet = item.pet;
-      final species =
-          catalog.species.where((entry) => entry.id == pet.speciesId);
-      final speciesName = pet.customSpeciesName ??
-          (species.isEmpty ? 'Неизвестный вид' : species.first.name);
-      final roleTitle = item.myAccess?.role.title ??
-          (pet.ownerUserId == currentUserId ? 'Владелец' : 'Участник');
       final isOwnedByMe = pet.ownerUserId == currentUserId;
+      final speciesName = petSpeciesLabelFromValues(
+        catalog,
+        speciesId: pet.speciesId,
+        customSpeciesName: pet.customSpeciesName,
+      );
+      final roleTitle = item.myAccess?.role.title ??
+          petFallbackRoleTitle(isOwner: isOwnedByMe);
 
       return PetListEntry(
         id: pet.id,
@@ -60,6 +66,10 @@ class PetsRepository {
   Future<Pet> getPetById(String petId) async {
     final response = await _petsApiClient.getPet(petId);
     return response.pet;
+  }
+
+  Future<PetEnvelopeResponse> createPet(CreatePetPayload payload) {
+    return _petsApiClient.createPet(payload);
   }
 
   Future<Pet> updatePet({
@@ -87,12 +97,12 @@ class PetsRepository {
     return response.pet;
   }
 
-  Future<PetInviteAcceptResult> acceptInviteByCode(String code) async {
+  Future<PetInviteResult> acceptInviteByCode(String code) async {
     final response = await _aclApiClient.acceptInviteByCode(
       AcceptInviteByCodePayload(code: code),
     );
 
-    return PetInviteAcceptResult(
+    return PetInviteResult(
       petId: response.petId,
       roleTitle: response.member.role.title,
       isPrimaryOwner: response.member.isPrimaryOwner,
@@ -186,94 +196,4 @@ class PetsRepository {
     }
     return null;
   }
-}
-
-class PetListEntry {
-  const PetListEntry({
-    required this.id,
-    required this.pet,
-    required this.name,
-    required this.speciesName,
-    required this.photoUrl,
-    required this.roleTitle,
-    required this.isOwnedByMe,
-    required this.accessPolicy,
-  });
-
-  final String id;
-  final Pet pet;
-  final String name;
-  final String speciesName;
-  final String? photoUrl;
-  final String roleTitle;
-  final bool isOwnedByMe;
-  final PetAccessPolicy accessPolicy;
-}
-
-class PetAccessPolicy {
-  const PetAccessPolicy({required this.permissions});
-
-  factory PetAccessPolicy.fromAclPolicy(
-    AclPolicy? policy, {
-    required bool isOwner,
-  }) {
-    if (policy != null) {
-      return PetAccessPolicy(permissions: policy.permissions);
-    }
-
-    if (isOwner) {
-      return const PetAccessPolicy(permissions: _ownerPermissions);
-    }
-
-    return const PetAccessPolicy(permissions: <String, bool>{});
-  }
-
-  static const Map<String, bool> _ownerPermissions = <String, bool>{
-    'pet_read': true,
-    'pet_write': true,
-    'log_read': true,
-    'log_write': true,
-    'health_read': true,
-    'health_write': true,
-    'members_read': true,
-    'members_write': true,
-  };
-
-  final Map<String, bool> permissions;
-
-  bool can(String permission) => permissions[permission] == true;
-
-  bool get petRead => can('pet_read');
-  bool get petWrite => can('pet_write');
-  bool get logRead => can('log_read');
-  bool get logWrite => can('log_write');
-  bool get healthRead => can('health_read');
-  bool get healthWrite => can('health_write');
-  bool get membersRead => can('members_read');
-  bool get membersWrite => can('members_write');
-
-  bool get remindersRead => petRead || logRead || healthRead;
-  bool get remindersWrite => petWrite || logWrite || healthWrite;
-  bool get documentsRead => healthRead;
-
-  bool canWriteScheduledSource(String sourceType) {
-    return switch (sourceType) {
-      'MANUAL' || 'PET_EVENT' => petWrite,
-      'LOG_TYPE' => logWrite,
-      'VET_VISIT' || 'VACCINATION' || 'PROCEDURE' => healthWrite,
-      _ => false,
-    };
-  }
-}
-
-class PetInviteAcceptResult {
-  const PetInviteAcceptResult({
-    required this.petId,
-    required this.roleTitle,
-    required this.isPrimaryOwner,
-  });
-
-  final String petId;
-  final String roleTitle;
-  final bool isPrimaryOwner;
 }
