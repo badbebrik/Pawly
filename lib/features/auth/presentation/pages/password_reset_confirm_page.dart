@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
-import '../providers/auth_providers.dart';
-import '../utils/auth_error_message.dart';
-import '../utils/auth_validators.dart';
+import '../../controllers/password_reset_controller.dart';
+import '../../shared/validators/auth_validators.dart';
+import '../widgets/password_reset_missing_context.dart';
 
 class PasswordResetConfirmPage extends ConsumerStatefulWidget {
   const PasswordResetConfirmPage({
@@ -29,8 +29,6 @@ class _PasswordResetConfirmPageState
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _isSubmitting = false;
-
   @override
   void dispose() {
     _passwordController.dispose();
@@ -41,7 +39,7 @@ class _PasswordResetConfirmPageState
   @override
   Widget build(BuildContext context) {
     if (widget.resetToken.trim().isEmpty) {
-      return _MissingResetConfirmContext(
+      return PasswordResetMissingContext(
         title: 'Не удалось открыть экран',
         description: 'Сначала подтвердите код из письма.',
         buttonLabel: 'К вводу кода',
@@ -58,6 +56,17 @@ class _PasswordResetConfirmPageState
     }
 
     final colorScheme = Theme.of(context).colorScheme;
+    final resetState = ref.watch(passwordResetControllerProvider);
+    final isSubmitting = resetState.isConfirmingPassword;
+
+    ref.listen(passwordResetControllerProvider, (previous, next) {
+      final error = next.error;
+      if (error == null || error == previous?.error) {
+        return;
+      }
+      _showError(error);
+      ref.read(passwordResetControllerProvider.notifier).clearError();
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Новый пароль')),
@@ -104,8 +113,8 @@ class _PasswordResetConfirmPageState
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
                   label:
-                      _isSubmitting ? 'Сохраняем пароль...' : 'Сменить пароль',
-                  onPressed: _isSubmitting ? null : _submit,
+                      isSubmitting ? 'Сохраняем пароль...' : 'Сменить пароль',
+                  onPressed: isSubmitting ? null : _submit,
                 ),
               ],
             ),
@@ -116,96 +125,32 @@ class _PasswordResetConfirmPageState
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting) {
-      return;
-    }
-
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) {
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      await ref.read(authRepositoryProvider).confirmPasswordReset(
-            resetToken: widget.resetToken,
-            newPassword: _passwordController.text,
-          );
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пароль изменен. Теперь войдите с новым паролем.'),
-        ),
+    final success = await ref
+        .read(passwordResetControllerProvider.notifier)
+        .confirmPassword(
+          resetToken: widget.resetToken,
+          newPassword: _passwordController.text,
+        );
+    if (success && mounted) {
+      showPawlySnackBar(
+        context,
+        message: 'Пароль изменен. Теперь войдите с новым паролем.',
+        tone: PawlySnackBarTone.success,
       );
       context.go(AppRoutes.login);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      final message = authErrorMessage(error);
-      if (message != null) {
-        _showError(message);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
+    showPawlySnackBar(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-}
-
-class _MissingResetConfirmContext extends StatelessWidget {
-  const _MissingResetConfirmContext({
-    required this.title,
-    required this.description,
-    required this.buttonLabel,
-    required this.onPressed,
-  });
-
-  final String title;
-  final String description;
-  final String buttonLabel;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Восстановление пароля')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(PawlySpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const SizedBox(height: PawlySpacing.lg),
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: PawlySpacing.sm),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const Spacer(),
-              PawlyButton(label: buttonLabel, onPressed: onPressed),
-            ],
-          ),
-        ),
-      ),
+      message: message,
+      tone: PawlySnackBarTone.error,
     );
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/core_providers.dart';
 import '../../../core/services/system_settings_launcher.dart';
-import '../../auth/presentation/providers/auth_providers.dart';
+import '../../auth/controllers/auth_dependencies.dart';
 import '../data/settings_repository.dart';
 import '../models/settings_profile.dart';
 import '../states/settings_profile_state.dart';

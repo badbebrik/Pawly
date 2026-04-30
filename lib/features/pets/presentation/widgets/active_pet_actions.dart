@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/models/pet_models.dart';
 import '../../../../design_system/design_system.dart';
 import '../../controllers/active_pet_controller.dart';
 import '../../controllers/active_pet_details_controller.dart';
+import '../../models/pet.dart';
 
 Future<void> showActivePetActionsSheet(
   BuildContext context,
@@ -137,22 +137,20 @@ Future<void> _archiveActivePet(
   try {
     await ref.read(activePetDetailsControllerProvider.notifier).archivePet();
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$petName перемещен в архив.'),
-        ),
+      showPawlySnackBar(
+        context,
+        message: '$petName перемещен в архив.',
+        tone: PawlySnackBarTone.success,
       );
     }
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is StateError
-                ? error.message.toString()
-                : 'Не удалось архивировать питомца.',
-          ),
-        ),
+      showPawlySnackBar(
+        context,
+        message: error is StateError
+            ? error.message.toString()
+            : 'Не удалось архивировать питомца.',
+        tone: PawlySnackBarTone.error,
       );
     }
   }
@@ -168,14 +166,12 @@ Future<void> _uploadPetPhotoFromGallery(
         .uploadPhotoFromGallery();
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is StateError
-                ? error.message.toString()
-                : 'Не удалось установить фото питомца.',
-          ),
-        ),
+      showPawlySnackBar(
+        context,
+        message: error is StateError
+            ? error.message.toString()
+            : 'Не удалось установить фото питомца.',
+        tone: PawlySnackBarTone.error,
       );
     }
   }
@@ -191,14 +187,12 @@ Future<void> _uploadPetPhotoFromCamera(
         .uploadPhotoFromCamera();
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is StateError
-                ? error.message.toString()
-                : 'Не удалось установить фото питомца.',
-          ),
-        ),
+      showPawlySnackBar(
+        context,
+        message: error is StateError
+            ? error.message.toString()
+            : 'Не удалось установить фото питомца.',
+        tone: PawlySnackBarTone.error,
       );
     }
   }
@@ -212,14 +206,12 @@ Future<void> _deletePetPhoto(
     await ref.read(activePetDetailsControllerProvider.notifier).deletePhoto();
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is StateError
-                ? error.message.toString()
-                : 'Не удалось удалить фото питомца.',
-          ),
-        ),
+      showPawlySnackBar(
+        context,
+        message: error is StateError
+            ? error.message.toString()
+            : 'Не удалось удалить фото питомца.',
+        tone: PawlySnackBarTone.error,
       );
     }
   }

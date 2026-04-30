@@ -1,6 +1,7 @@
-import '../../../core/network/models/pet_models.dart';
 import '../data/pet_catalog_models.dart';
+import '../models/pet.dart';
 import '../models/pet_form.dart';
+import '../shared/mappers/pet_form_mapper.dart';
 
 enum PetEditStep { basic, breed, appearance, optional }
 
@@ -22,7 +23,7 @@ class PetEditState {
     return PetEditState(
       pet: pet,
       catalog: catalog,
-      draft: PetForm.fromPet(pet),
+      draft: petFormFromPet(pet),
       step: PetEditStep.basic,
       breedSearchQuery: '',
       isSubmitting: false,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../design_system/design_system.dart';
 import '../../controllers/pets_controller.dart';
 
 class JoinPetByCodeDialog extends ConsumerStatefulWidget {
@@ -55,10 +56,10 @@ class _JoinPetByCodeDialogState extends ConsumerState<JoinPetByCodeDialog> {
   Future<void> _submit() async {
     final code = _controller.text.trim().toUpperCase();
     if (code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Код должен содержать 6 символов.'),
-        ),
+      showPawlySnackBar(
+        context,
+        message: 'Код должен содержать 6 символов.',
+        tone: PawlySnackBarTone.error,
       );
       return;
     }
@@ -80,12 +81,10 @@ class _JoinPetByCodeDialogState extends ConsumerState<JoinPetByCodeDialog> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            acceptInviteByCodeErrorMessage(error),
-          ),
-        ),
+      showPawlySnackBar(
+        context,
+        message: acceptInviteByCodeErrorMessage(error),
+        tone: PawlySnackBarTone.error,
       );
       setState(() {
         _isSubmitting = false;

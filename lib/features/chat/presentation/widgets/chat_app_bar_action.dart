@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../chat/presentation/providers/chat_providers.dart';
+import '../../controllers/chat_unread_controller.dart';
 
 class ChatAppBarAction extends ConsumerWidget {
   const ChatAppBarAction({super.key});

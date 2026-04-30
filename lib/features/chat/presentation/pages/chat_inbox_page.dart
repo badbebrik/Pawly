@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
-import '../../../../core/constants/api_constants.dart';
 import '../../../../design_system/design_system.dart';
-import '../../data/chat_repository_models.dart';
-import '../providers/chat_providers.dart';
+import '../../controllers/chat_inbox_controller.dart';
+import '../../controllers/chat_unread_controller.dart';
+import '../../models/chat_models.dart';
+import '../widgets/chat_inbox_list.dart';
 
 class ChatInboxPage extends ConsumerStatefulWidget {
   const ChatInboxPage({super.key});
@@ -16,9 +16,6 @@ class ChatInboxPage extends ConsumerStatefulWidget {
 }
 
 class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
-  static final DateFormat _timeFormat = DateFormat('HH:mm');
-  static final DateFormat _dateFormat = DateFormat('d MMM', 'ru');
-
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -44,51 +41,12 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
       body: inboxState.when(
         data: (state) => RefreshIndicator(
           onRefresh: _refresh,
-          child: state.items.isEmpty
-              ? ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    PawlySpacing.md,
-                    PawlySpacing.lg,
-                    PawlySpacing.md,
-                    PawlySpacing.xl,
-                  ),
-                  children: const <Widget>[
-                    SizedBox(height: PawlySpacing.xxl),
-                    _EmptyInboxState(),
-                  ],
-                )
-              : ListView.separated(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(
-                    PawlySpacing.md,
-                    PawlySpacing.md,
-                    PawlySpacing.md,
-                    PawlySpacing.xl,
-                  ),
-                  itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: PawlySpacing.sm),
-                  itemBuilder: (context, index) {
-                    if (index >= state.items.length) {
-                      return const Padding(
-                        padding:
-                            EdgeInsets.symmetric(vertical: PawlySpacing.md),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-
-                    final item = state.items[index];
-                    return _InboxConversationTile(
-                      item: item,
-                      onTap: () => context.pushNamed(
-                        'chatConversation',
-                        pathParameters: <String, String>{
-                          'conversationId': item.conversationId,
-                        },
-                      ),
-                    );
-                  },
-                ),
+          child: ChatInboxList(
+            items: state.items,
+            isLoadingMore: state.isLoadingMore,
+            scrollController: _scrollController,
+            onConversationTap: _openConversation,
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(
@@ -130,347 +88,13 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
 
     ref.read(chatInboxControllerProvider(null).notifier).loadMore();
   }
-}
 
-class _InboxConversationTile extends StatelessWidget {
-  const _InboxConversationTile({
-    required this.item,
-    required this.onTap,
-  });
-
-  final ChatListItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final resolvedAvatarUrl =
-        item.peer.avatarUrl == null || item.peer.avatarUrl!.isEmpty
-            ? null
-            : _normalizeStorageUrl(item.peer.avatarUrl!);
-    final preview = item.lastMessagePreview?.trim();
-    final timeLabel = _formatTimestamp(item.lastMessageAt?.toLocal());
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PawlyRadius.xl),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(PawlyRadius.xl),
-            border: Border.all(
-              color: item.hasUnread
-                  ? colorScheme.primary.withValues(alpha: 0.20)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.82),
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.07),
-                blurRadius: 16,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: PawlySpacing.md,
-              vertical: PawlySpacing.md,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _InboxAvatar(
-                  userId: item.peer.userId,
-                  displayName: item.peer.displayName,
-                  avatarUrl: resolvedAvatarUrl,
-                ),
-                const SizedBox(width: PawlySpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              item.peer.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: item.hasUnread
-                                    ? FontWeight.w800
-                                    : FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: PawlySpacing.sm),
-                          Text(
-                            timeLabel,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: item.hasUnread
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                              fontWeight: item.hasUnread
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: PawlySpacing.xxs),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              preview == null || preview.isEmpty
-                                  ? 'Начните диалог'
-                                  : preview,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: item.hasUnread
-                                    ? colorScheme.onSurface
-                                    : colorScheme.onSurfaceVariant,
-                                fontWeight: item.hasUnread
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                          if (item.hasUnread) ...<Widget>[
-                            const SizedBox(width: PawlySpacing.sm),
-                            _UnreadBadge(count: item.unreadCount),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: PawlySpacing.xs),
-                      _PetPill(name: item.pet.name),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  void _openConversation(ChatListItem item) {
+    context.pushNamed(
+      'chatConversation',
+      pathParameters: <String, String>{
+        'conversationId': item.conversationId,
+      },
     );
   }
-
-  String _formatTimestamp(DateTime? value) {
-    if (value == null) {
-      return '';
-    }
-
-    final now = DateTime.now();
-    final sameDay = now.year == value.year &&
-        now.month == value.month &&
-        now.day == value.day;
-
-    return sameDay
-        ? _ChatInboxPageState._timeFormat.format(value)
-        : _ChatInboxPageState._dateFormat.format(value);
-  }
-}
-
-class _PetPill extends StatelessWidget {
-  const _PetPill({required this.name});
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PawlySpacing.xs,
-        vertical: PawlySpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.onSurface.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(PawlyRadius.md),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            Icons.pets_rounded,
-            size: 13,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: PawlySpacing.xxs),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InboxAvatar extends StatelessWidget {
-  const _InboxAvatar({
-    required this.userId,
-    required this.displayName,
-    required this.avatarUrl,
-  });
-
-  final String userId;
-  final String displayName;
-  final String? avatarUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasAvatar = avatarUrl != null && avatarUrl!.isNotEmpty;
-
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surface,
-          width: 2,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: hasAvatar
-          ? PawlyCachedImage(
-              imageUrl: avatarUrl!,
-              cacheKey: pawlyStableImageCacheKey(
-                scope: 'chat-avatar',
-                entityId: userId,
-                imageUrl: avatarUrl!,
-              ),
-              targetLogicalSize: 60,
-              fit: BoxFit.cover,
-              errorWidget: (_) =>
-                  _InboxAvatarFallback(displayName: displayName),
-            )
-          : _InboxAvatarFallback(displayName: displayName),
-    );
-  }
-}
-
-class _InboxAvatarFallback extends StatelessWidget {
-  const _InboxAvatarFallback({required this.displayName});
-
-  final String displayName;
-
-  @override
-  Widget build(BuildContext context) {
-    final trimmed = displayName.trim();
-    final letter = trimmed.isEmpty ? '?' : trimmed.substring(0, 1);
-
-    return Center(
-      child: Text(
-        letter.toUpperCase(),
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-      ),
-    );
-  }
-}
-
-class _UnreadBadge extends StatelessWidget {
-  const _UnreadBadge({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      constraints: const BoxConstraints(minWidth: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(PawlyRadius.pill),
-      ),
-      child: Text(
-        count > 99 ? '99+' : '$count',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: colorScheme.onPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-      ),
-    );
-  }
-}
-
-class _EmptyInboxState extends StatelessWidget {
-  const _EmptyInboxState();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        PawlySpacing.lg,
-        PawlySpacing.xl,
-        PawlySpacing.lg,
-        PawlySpacing.xl,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(PawlyRadius.xl),
-      ),
-      child: Column(
-        children: <Widget>[
-          Icon(
-            Icons.chat_bubble_outline_rounded,
-            size: 38,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
-          ),
-          const SizedBox(height: PawlySpacing.md),
-          Text(
-            'У вас пока нет чатов',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: PawlySpacing.xs),
-          Text(
-            'Откройте диалог из списка участников питомца.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _normalizeStorageUrl(String url) {
-  final uri = Uri.tryParse(url);
-  final apiUri = Uri.tryParse(ApiConstants.baseUrl);
-  if (uri == null || apiUri == null || uri.host != 'minio') {
-    return url;
-  }
-
-  return uri.replace(host: apiUri.host).toString();
 }

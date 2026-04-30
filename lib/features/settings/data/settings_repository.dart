@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/clients/profile_api_client.dart';
@@ -11,6 +10,8 @@ import '../../../core/storage/shared_preferences_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../models/settings_notification.dart';
 import '../models/settings_profile.dart';
+import '../shared/mappers/settings_notification_mapper.dart';
+import '../shared/mappers/settings_profile_mapper.dart';
 import '../shared/utils/settings_storage_url.dart';
 
 class SettingsRepository {
@@ -40,7 +41,7 @@ class SettingsRepository {
 
   Future<SettingsProfile> getProfile() async {
     final profile = await _profileApiClient.getMe();
-    return SettingsProfile.fromResponse(profile);
+    return settingsProfileFromResponse(profile);
   }
 
   Future<SettingsProfile> updateProfile({
@@ -53,7 +54,7 @@ class SettingsRepository {
         lastName: lastName,
       ),
     );
-    return SettingsProfile.fromResponse(profile);
+    return settingsProfileFromResponse(profile);
   }
 
   Future<SettingsProfile> updatePreferences({
@@ -68,7 +69,7 @@ class SettingsRepository {
     );
     await syncStoredPreferences(timeZone: profile.timeZone);
     await _authSessionStore.updateLocale(profile.locale);
-    return SettingsProfile.fromResponse(profile);
+    return settingsProfileFromResponse(profile);
   }
 
   Future<void> syncStoredPreferences({
@@ -123,7 +124,7 @@ class SettingsRepository {
     await syncStoredPreferences(
       timeZone: profile.timeZone,
     );
-    return SettingsProfile.fromResponse(profile);
+    return settingsProfileFromResponse(profile);
   }
 
   Future<void> deleteAvatar() {
@@ -132,9 +133,7 @@ class SettingsRepository {
 
   Future<SettingsNotification> getNotificationSettings() async {
     final settings = await _pushNotificationsService.getNotificationSettings();
-    return SettingsNotification(
-      status: _notificationStatusFromFirebase(settings),
-    );
+    return settingsNotificationFromFirebase(settings);
   }
 
   Future<SettingsNotification> requestNotificationPermissions() async {
@@ -174,20 +173,4 @@ class SettingsRepository {
     }
     return null;
   }
-}
-
-SettingsNotificationStatus _notificationStatusFromFirebase(
-  NotificationSettings? settings,
-) {
-  if (settings == null) {
-    return SettingsNotificationStatus.unavailable;
-  }
-
-  return switch (settings.authorizationStatus) {
-    AuthorizationStatus.authorized => SettingsNotificationStatus.authorized,
-    AuthorizationStatus.provisional => SettingsNotificationStatus.provisional,
-    AuthorizationStatus.denied => SettingsNotificationStatus.denied,
-    AuthorizationStatus.notDetermined =>
-      SettingsNotificationStatus.notDetermined,
-  };
 }

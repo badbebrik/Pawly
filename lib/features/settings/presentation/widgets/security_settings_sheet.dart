@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
-import '../../../auth/presentation/utils/auth_error_message.dart';
-import '../../../auth/presentation/utils/auth_validators.dart';
+import '../../../auth/shared/utils/auth_error_message.dart';
+import '../../../auth/shared/validators/auth_validators.dart';
 import '../../controllers/settings_security_controller.dart';
 
 Future<void> showSecuritySettingsSheet(BuildContext context) async {
@@ -176,10 +176,10 @@ class _SecuritySettingsSheetState
         return;
       }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пароль изменен. Войдите в аккаунт снова.'),
-        ),
+      showPawlySnackBar(
+        context,
+        message: 'Пароль изменен. Войдите в аккаунт снова.',
+        tone: PawlySnackBarTone.success,
       );
       context.go(AppRoutes.login);
     } catch (error) {
@@ -187,8 +187,10 @@ class _SecuritySettingsSheetState
         return;
       }
       final message = authErrorMessage(error) ?? 'Не удалось сменить пароль.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+      showPawlySnackBar(
+        context,
+        message: message,
+        tone: PawlySnackBarTone.error,
       );
     }
   }

@@ -136,10 +136,10 @@ class _ProfileSettingsSheetState extends ConsumerState<_ProfileSettingsSheet> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Не удалось сохранить настройки профиля.'),
-        ),
+      showPawlySnackBar(
+        context,
+        message: 'Не удалось сохранить настройки профиля.',
+        tone: PawlySnackBarTone.error,
       );
     }
   }

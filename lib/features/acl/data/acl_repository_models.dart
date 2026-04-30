@@ -18,10 +18,8 @@ class AclCreateInviteInput {
 
 class AclCreateInviteResult {
   const AclCreateInviteResult({
-    required this.invite,
-    this.createdRole,
+    required this.inviteId,
   });
 
-  final AclInvite invite;
-  final AclRole? createdRole;
+  final String inviteId;
 }

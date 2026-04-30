@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/network/models/pet_models.dart';
 import '../../../../design_system/design_system.dart';
+import '../../models/pet.dart';
 import '../../shared/widgets/pet_avatar_fallback.dart';
 import '../../shared/widgets/pet_avatar_url.dart';
 

@@ -54,8 +54,10 @@ class _PetEditPageState extends ConsumerState<PetEditPage> {
         if (error == null || error.isEmpty || error == previousError) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
+        showPawlySnackBar(
+          context,
+          message: error,
+          tone: PawlySnackBarTone.error,
         );
       },
     );

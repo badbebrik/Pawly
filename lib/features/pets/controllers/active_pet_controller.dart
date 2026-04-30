@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/core_providers.dart';
-import '../../auth/presentation/providers/auth_providers.dart';
+import '../../auth/controllers/auth_dependencies.dart';
 
 final activePetControllerProvider =
     AsyncNotifierProvider<ActivePetController, String?>(

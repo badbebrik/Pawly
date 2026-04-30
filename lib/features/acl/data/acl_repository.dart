@@ -24,12 +24,11 @@ class AclRepository {
       );
     }
 
-    AclRole? createdRole;
     late final String roleId;
     if (hasRoleId) {
       roleId = input.roleId!;
     } else {
-      createdRole = (await _aclApiClient.createRole(
+      final createdRole = (await _aclApiClient.createRole(
         input.petId,
         CreateRolePayload(
           title: trimmedCustomRoleTitle!,
@@ -50,8 +49,7 @@ class AclRepository {
     );
 
     return AclCreateInviteResult(
-      invite: inviteResponse.invite,
-      createdRole: createdRole,
+      inviteId: inviteResponse.invite.id,
     );
   }
 

@@ -1,5 +1,3 @@
-import '../../../core/network/models/profile_models.dart';
-
 class SettingsProfile {
   const SettingsProfile({
     required this.userId,
@@ -9,17 +7,6 @@ class SettingsProfile {
     required this.locale,
     required this.timeZone,
   });
-
-  factory SettingsProfile.fromResponse(ProfileResponse response) {
-    return SettingsProfile(
-      userId: response.userId,
-      firstName: response.firstName,
-      lastName: response.lastName,
-      avatarDownloadUrl: response.avatarDownloadUrl,
-      locale: response.locale,
-      timeZone: response.timeZone,
-    );
-  }
 
   final String userId;
   final String? firstName;

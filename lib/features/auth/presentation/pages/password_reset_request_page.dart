@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
-import '../providers/auth_providers.dart';
-import '../utils/auth_error_message.dart';
-import '../utils/auth_validators.dart';
+import '../../controllers/password_reset_controller.dart';
+import '../../shared/validators/auth_validators.dart';
 
 class PasswordResetRequestPage extends ConsumerStatefulWidget {
   const PasswordResetRequestPage({
@@ -26,8 +25,6 @@ class _PasswordResetRequestPageState
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
 
-  bool _isSubmitting = false;
-
   @override
   void initState() {
     super.initState();
@@ -43,6 +40,17 @@ class _PasswordResetRequestPageState
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final resetState = ref.watch(passwordResetControllerProvider);
+    final isSubmitting = resetState.isRequestingCode;
+
+    ref.listen(passwordResetControllerProvider, (previous, next) {
+      final error = next.error;
+      if (error == null || error == previous?.error) {
+        return;
+      }
+      _showError(error);
+      ref.read(passwordResetControllerProvider.notifier).clearError();
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Восстановление пароля')),
@@ -78,8 +86,8 @@ class _PasswordResetRequestPageState
                 ),
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
-                  label: _isSubmitting ? 'Отправляем код...' : 'Продолжить',
-                  onPressed: _isSubmitting ? null : _submit,
+                  label: isSubmitting ? 'Отправляем код...' : 'Продолжить',
+                  onPressed: isSubmitting ? null : _submit,
                 ),
               ],
             ),
@@ -90,55 +98,31 @@ class _PasswordResetRequestPageState
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting) {
-      return;
-    }
-
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) {
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
-
     final email = _emailController.text.trim();
 
-    try {
-      await ref.read(authRepositoryProvider).requestPasswordReset(email: email);
-
-      if (!mounted) {
-        return;
-      }
-
+    final success = await ref
+        .read(passwordResetControllerProvider.notifier)
+        .requestCode(email: email);
+    if (success && mounted) {
       context.push(
         Uri(
           path: AppRoutes.passwordResetVerify,
           queryParameters: <String, String>{'email': email},
         ).toString(),
       );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      final message = authErrorMessage(error);
-      if (message != null) {
-        _showError(message);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
+    showPawlySnackBar(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      message: message,
+      tone: PawlySnackBarTone.error,
+    );
   }
 }

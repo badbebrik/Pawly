@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/models/pet_models.dart';
 import '../../../core/providers/core_providers.dart';
+import '../models/pet.dart';
 import '../data/pet_catalog_provider.dart';
 import '../shared/formatters/pet_catalog_label_formatters.dart';
 import '../states/active_pet_details_state.dart';
@@ -141,7 +141,7 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
 
     final Pet pet;
     try {
-      pet = await ref.read(petsRepositoryProvider).getPetById(activePetId);
+      pet = await ref.read(petsRepositoryProvider).getPet(activePetId);
     } on ApiException catch (error) {
       if (_isInactiveAccessError(error)) {
         await ref.read(activePetControllerProvider.notifier).clear();

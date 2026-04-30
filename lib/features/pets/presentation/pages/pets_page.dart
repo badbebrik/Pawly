@@ -95,21 +95,19 @@ Future<void> _restorePetFromArchive(
           status: 'ACTIVE',
         );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${entry.name} возвращен в активные.'),
-      ),
+    showPawlySnackBar(
+      context,
+      message: '${entry.name} возвращен в активные.',
+      tone: PawlySnackBarTone.success,
     );
   } catch (error) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error is StateError
-              ? error.message.toString()
-              : 'Не удалось вернуть питомца из архива.',
-        ),
-      ),
+    showPawlySnackBar(
+      context,
+      message: error is StateError
+          ? error.message.toString()
+          : 'Не удалось вернуть питомца из архива.',
+      tone: PawlySnackBarTone.error,
     );
   }
 }
@@ -140,12 +138,10 @@ Future<void> _showJoinByCodeDialog(BuildContext context, WidgetRef ref) async {
     ref.invalidate(activePetDetailsControllerProvider);
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            acceptInviteByCodeErrorMessage(error),
-          ),
-        ),
+      showPawlySnackBar(
+        context,
+        message: acceptInviteByCodeErrorMessage(error),
+        tone: PawlySnackBarTone.error,
       );
     }
   }

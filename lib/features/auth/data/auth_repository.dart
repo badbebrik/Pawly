@@ -70,8 +70,13 @@ class AuthRepository {
     _syncPushTokenInBackground();
   }
 
-  Future<void> loginWithGoogle({required String idToken}) async {
+  Future<void> loginWithGoogle() async {
     final devicePreferences = await _devicePreferencesService.read();
+    final idToken = await _googleSignInService.getIdToken();
+    if (idToken == null || idToken.isEmpty) {
+      throw StateError('Google Sign-In не настроен в этой сборке.');
+    }
+
     final tokens = await _authApiClient.loginByOAuth(
       LoginOAuthRequest(
         provider: 'google',

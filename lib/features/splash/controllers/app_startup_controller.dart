@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/presentation/providers/auth_providers.dart';
+import '../../auth/controllers/auth_dependencies.dart';
+import '../../auth/models/auth_launch_destination.dart';
 import '../../pets/data/pet_catalog_provider.dart';
 import '../data/initial_invite_link_reader.dart';
 import '../models/app_startup_destination.dart';

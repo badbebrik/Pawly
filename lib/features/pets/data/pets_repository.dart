@@ -3,13 +3,17 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/clients/acl_api_client.dart';
 import '../../../core/network/clients/pets_api_client.dart';
-import '../../../core/network/models/acl_models.dart';
-import '../../../core/network/models/pet_models.dart';
-import '../models/pet_access_policy.dart';
+import '../../../core/network/models/acl_models.dart' as acl_network;
+import '../../../core/network/models/pet_models.dart' as network;
+import '../models/pet.dart';
+import '../models/pet_form.dart';
 import '../models/pet_invite_result.dart';
 import '../models/pet_list_entry.dart';
 import '../shared/formatters/pet_access_formatters.dart';
 import '../shared/formatters/pet_catalog_label_formatters.dart';
+import '../shared/mappers/pet_access_policy_mapper.dart';
+import '../shared/mappers/pet_form_payload_mapper.dart';
+import '../shared/mappers/pet_mapper.dart';
 import 'pet_catalog_models.dart';
 
 class PetsRepository {
@@ -49,13 +53,13 @@ class PetsRepository {
 
       return PetListEntry(
         id: pet.id,
-        pet: pet,
+        pet: petFromNetwork(pet),
         name: pet.name,
         speciesName: speciesName,
         photoUrl: pet.profilePhotoDownloadUrl,
         roleTitle: roleTitle,
         isOwnedByMe: isOwnedByMe,
-        accessPolicy: PetAccessPolicy.fromAclPolicy(
+        accessPolicy: petAccessPolicyFromAclPolicy(
           item.myAccess?.policy,
           isOwner: isOwnedByMe,
         ),
@@ -63,21 +67,38 @@ class PetsRepository {
     }).toList(growable: false);
   }
 
-  Future<Pet> getPetById(String petId) async {
+  Future<Pet> getPet(String petId) async {
+    final response = await _petsApiClient.getPet(petId);
+    return petFromNetwork(response.pet);
+  }
+
+  Future<network.Pet> getPetById(String petId) async {
     final response = await _petsApiClient.getPet(petId);
     return response.pet;
   }
 
-  Future<PetEnvelopeResponse> createPet(CreatePetPayload payload) {
-    return _petsApiClient.createPet(payload);
+  Future<Pet> updatePet({
+    required Pet pet,
+    required PetForm draft,
+  }) async {
+    final response = await _petsApiClient.updatePet(
+      pet.id,
+      network.UpdatePetPayload(
+        rowVersion: pet.rowVersion,
+        payload: buildCreatePetPayloadFromDraft(
+          draft,
+          profilePhotoFileId: pet.profilePhotoFileId,
+        ),
+      ),
+    );
+    return petFromNetwork(response.pet);
   }
 
-  Future<Pet> updatePet({
-    required String petId,
-    required UpdatePetPayload payload,
-  }) async {
-    final response = await _petsApiClient.updatePet(petId, payload);
-    return response.pet;
+  Future<Pet> createPet(PetForm draft) async {
+    final response = await _petsApiClient.createPet(
+      buildCreatePetPayloadFromDraft(draft),
+    );
+    return petFromNetwork(response.pet);
   }
 
   Future<Pet> changeStatus({
@@ -88,18 +109,18 @@ class PetsRepository {
   }) async {
     final response = await _petsApiClient.changeStatus(
       petId,
-      ChangePetStatusPayload(
+      network.ChangePetStatusPayload(
         rowVersion: rowVersion,
         status: status,
         missingSince: missingSince,
       ),
     );
-    return response.pet;
+    return petFromNetwork(response.pet);
   }
 
   Future<PetInviteResult> acceptInviteByCode(String code) async {
     final response = await _aclApiClient.acceptInviteByCode(
-      AcceptInviteByCodePayload(code: code),
+      acl_network.AcceptInviteByCodePayload(code: code),
     );
 
     return PetInviteResult(
@@ -109,14 +130,14 @@ class PetsRepository {
     );
   }
 
-  Future<Pet> transferOwnership({
+  Future<network.Pet> transferOwnership({
     required String petId,
     required int rowVersion,
     required String targetMemberId,
   }) async {
     final response = await _petsApiClient.transferOwnership(
       petId,
-      TransferPetOwnershipPayload(
+      network.TransferPetOwnershipPayload(
         rowVersion: rowVersion,
         targetMemberId: targetMemberId,
       ),
@@ -136,7 +157,7 @@ class PetsRepository {
     final bytes = await file.readAsBytes();
     final initResponse = await _petsApiClient.initPhotoUpload(
       pet.id,
-      InitPetPhotoUploadPayload(
+      network.InitPetPhotoUploadPayload(
         mimeType: mimeType,
         originalFilename: _fileNameFromPath(file.path),
         expectedSizeBytes: bytes.length,
@@ -163,22 +184,22 @@ class PetsRepository {
 
     final confirmResponse = await _petsApiClient.confirmPhotoUpload(
       pet.id,
-      ConfirmPetPhotoUploadPayload(
+      network.ConfirmPetPhotoUploadPayload(
         rowVersion: pet.rowVersion,
         fileId: initResponse.fileId,
         sizeBytes: bytes.length,
       ),
     );
 
-    return confirmResponse.pet;
+    return petFromNetwork(confirmResponse.pet);
   }
 
   Future<Pet> deletePetPhoto({required Pet pet}) async {
     final response = await _petsApiClient.deletePhoto(
       pet.id,
-      DeletePetPhotoPayload(rowVersion: pet.rowVersion),
+      network.DeletePetPhotoPayload(rowVersion: pet.rowVersion),
     );
-    return response.pet;
+    return petFromNetwork(response.pet);
   }
 
   String _fileNameFromPath(String path) {

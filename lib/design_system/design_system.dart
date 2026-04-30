@@ -8,6 +8,7 @@ export 'components/pawly_form_layout.dart';
 export 'components/pawly_list_section.dart';
 export 'components/pawly_picker_row.dart';
 export 'components/pawly_screen_scaffold.dart';
+export 'components/pawly_snack_bar.dart';
 export 'components/pawly_text_field.dart';
 export 'components/pawly_top_bar.dart';
 export 'pawly_theme.dart';

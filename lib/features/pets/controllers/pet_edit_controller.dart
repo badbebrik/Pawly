@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/models/pet_models.dart';
 import '../data/pet_catalog_provider.dart';
 import '../models/pet_form.dart';
-import '../shared/mappers/pet_form_payload_mapper.dart';
 import '../shared/utils/pet_color_utils.dart';
 import '../shared/validators/pet_form_validator.dart';
 import '../states/pet_edit_state.dart';
@@ -22,7 +20,7 @@ class PetEditController extends AsyncNotifier<PetEditState> {
 
   @override
   Future<PetEditState> build() async {
-    final pet = await ref.read(petsRepositoryProvider).getPetById(_petId);
+    final pet = await ref.read(petsRepositoryProvider).getPet(_petId);
     final catalog = await ref.read(petCatalogProvider.future);
     return PetEditState.loaded(pet: pet, catalog: catalog);
   }
@@ -207,8 +205,8 @@ class PetEditController extends AsyncNotifier<PetEditState> {
 
     try {
       await ref.read(petsRepositoryProvider).updatePet(
-            petId: current.pet.id,
-            payload: _buildPayload(current),
+            pet: current.pet,
+            draft: current.draft,
           );
       ref.invalidate(activePetDetailsControllerProvider);
       await ref.read(petsControllerProvider.notifier).refreshAfterPetMutation();
@@ -248,17 +246,6 @@ class PetEditController extends AsyncNotifier<PetEditState> {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(error: message));
-  }
-
-  UpdatePetPayload _buildPayload(PetEditState state) {
-    final draft = state.draft;
-    return UpdatePetPayload(
-      rowVersion: state.pet.rowVersion,
-      payload: buildCreatePetPayloadFromDraft(
-        draft,
-        profilePhotoFileId: state.pet.profilePhotoFileId,
-      ),
-    );
   }
 }
 

@@ -51,8 +51,11 @@ class _PetCreatePageState extends ConsumerState<PetCreatePage> {
 
     ref.listen<PetCreateState>(petCreateControllerProvider, (_, next) {
       if (next.error != null && next.error!.isNotEmpty) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(next.error!)));
+        showPawlySnackBar(
+          context,
+          message: next.error!,
+          tone: PawlySnackBarTone.error,
+        );
       }
     });
 

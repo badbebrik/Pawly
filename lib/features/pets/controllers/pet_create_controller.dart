@@ -1,9 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/models/pet_models.dart';
 import '../data/pet_catalog_models.dart';
+import '../models/pet.dart';
 import '../models/pet_form.dart';
-import '../shared/mappers/pet_form_payload_mapper.dart';
 import '../shared/utils/pet_color_utils.dart';
 import '../shared/validators/pet_form_validator.dart';
 import '../states/pet_create_state.dart';
@@ -219,15 +218,12 @@ class PetCreateController extends Notifier<PetCreateState> {
       return null;
     }
 
-    final payload = buildCreatePetPayloadFromDraft(state.draft);
     state = state.copyWith(isSubmitting: true, clearError: true);
 
     try {
-      final response = await ref.read(petsRepositoryProvider).createPet(
-            payload,
-          );
+      final pet = await ref.read(petsRepositoryProvider).createPet(state.draft);
       state = state.copyWith(isSubmitting: false);
-      return response.pet;
+      return pet;
     } catch (_) {
       state = state.copyWith(
         isSubmitting: false,

@@ -101,10 +101,10 @@ class _NotificationSettingsSheet extends ConsumerWidget {
         .read(settingsNotificationControllerProvider.notifier)
         .openDeviceSettings();
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Не удалось открыть настройки устройства'),
-        ),
+      showPawlySnackBar(
+        context,
+        message: 'Не удалось открыть настройки устройства',
+        tone: PawlySnackBarTone.error,
       );
     }
   }

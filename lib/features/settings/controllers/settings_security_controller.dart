@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/presentation/providers/auth_providers.dart';
+import '../../auth/controllers/auth_dependencies.dart';
 import '../../pets/controllers/active_pet_controller.dart';
 import '../../pets/controllers/active_pet_details_controller.dart';
 import '../../pets/controllers/pets_controller.dart';

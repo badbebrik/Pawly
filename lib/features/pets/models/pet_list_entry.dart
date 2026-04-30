@@ -1,4 +1,4 @@
-import '../../../core/network/models/pet_models.dart';
+import 'pet.dart';
 import 'pet_access_policy.dart';
 
 class PetListEntry {

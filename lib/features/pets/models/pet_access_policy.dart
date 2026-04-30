@@ -1,33 +1,5 @@
-import '../../../core/network/models/acl_models.dart';
-
 class PetAccessPolicy {
   const PetAccessPolicy({required this.permissions});
-
-  factory PetAccessPolicy.fromAclPolicy(
-    AclPolicy? policy, {
-    required bool isOwner,
-  }) {
-    if (policy != null) {
-      return PetAccessPolicy(permissions: policy.permissions);
-    }
-
-    if (isOwner) {
-      return const PetAccessPolicy(permissions: _ownerPermissions);
-    }
-
-    return const PetAccessPolicy(permissions: <String, bool>{});
-  }
-
-  static const Map<String, bool> _ownerPermissions = <String, bool>{
-    'pet_read': true,
-    'pet_write': true,
-    'log_read': true,
-    'log_write': true,
-    'health_read': true,
-    'health_write': true,
-    'members_read': true,
-    'members_write': true,
-  };
 
   final Map<String, bool> permissions;
 
@@ -55,3 +27,14 @@ class PetAccessPolicy {
     };
   }
 }
+
+const Map<String, bool> ownerPetPermissions = <String, bool>{
+  'pet_read': true,
+  'pet_write': true,
+  'log_read': true,
+  'log_write': true,
+  'health_read': true,
+  'health_write': true,
+  'members_read': true,
+  'members_write': true,
+};

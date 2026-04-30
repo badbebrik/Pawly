@@ -1,4 +1,4 @@
-import '../../../core/network/models/pet_models.dart';
+import '../models/pet.dart';
 
 class ActivePetDetailsState {
   const ActivePetDetailsState({

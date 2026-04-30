@@ -1,0 +1,1 @@
+enum AppLaunchDestination { authenticated, unauthenticated }

@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/app_routes.dart';
 import '../../../../app/providers/session_state_reset.dart';
-import '../../../../core/providers/core_providers.dart';
+import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
-import '../providers/auth_providers.dart';
-import '../utils/auth_error_message.dart';
-import '../utils/auth_validators.dart';
+import '../../controllers/login_controller.dart';
+import '../../shared/validators/auth_validators.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({
@@ -27,8 +25,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _isSubmitting = false;
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -39,6 +35,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final loginState = ref.watch(loginControllerProvider);
+    final isSubmitting = loginState.isSubmitting;
+
+    ref.listen(loginControllerProvider, (previous, next) {
+      final error = next.error;
+      if (error == null || error == previous?.error) {
+        return;
+      }
+      _showError(error);
+      ref.read(loginControllerProvider.notifier).clearError();
+    });
 
     return Scaffold(
       body: SafeArea(
@@ -82,7 +89,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _isSubmitting
+                    onPressed: isSubmitting
                         ? null
                         : () => context.push(
                               Uri(
@@ -98,20 +105,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: PawlySpacing.lg),
                 PawlyButton(
-                  label: _isSubmitting ? 'Выполняем вход...' : 'Войти',
-                  onPressed: _isSubmitting ? null : _submitEmailLogin,
+                  label: isSubmitting ? 'Выполняем вход...' : 'Войти',
+                  onPressed: isSubmitting ? null : _submitEmailLogin,
                 ),
                 const SizedBox(height: PawlySpacing.sm),
                 PawlyButton(
                   label: 'Войти через Google',
                   variant: PawlyButtonVariant.secondary,
                   icon: Icons.g_mobiledata_rounded,
-                  onPressed: _isSubmitting ? null : _submitGoogleLogin,
+                  onPressed: isSubmitting ? null : _submitGoogleLogin,
                 ),
                 const SizedBox(height: PawlySpacing.md),
                 Center(
                   child: TextButton(
-                    onPressed: _isSubmitting
+                    onPressed: isSubmitting
                         ? null
                         : () => context.push(AppRoutes.register),
                     child: const Text('Нет аккаунта? Зарегистрироваться'),
@@ -126,98 +133,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _submitEmailLogin() async {
-    if (_isSubmitting) {
-      return;
-    }
-
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) {
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    final authRepository = ref.read(authRepositoryProvider);
-
-    try {
-      await authRepository.loginWithEmail(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+    final success =
+        await ref.read(loginControllerProvider.notifier).submitEmail(
+              email: _emailController.text,
+              password: _passwordController.text,
+            );
+    if (success && mounted) {
       resetSessionState(ref);
-
-      if (!mounted) {
-        return;
-      }
-
       _goAfterLogin();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      final message = authErrorMessage(error);
-      if (message != null) {
-        _showError(message);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
     }
   }
 
   Future<void> _submitGoogleLogin() async {
-    if (_isSubmitting) {
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    final googleService = ref.read(googleSignInServiceProvider);
-
-    try {
-      final idToken = await googleService.getIdToken();
-      if (idToken == null || idToken.isEmpty) {
-        throw StateError('Google Sign-In не настроен в этой сборке.');
-      }
-
-      await ref.read(authRepositoryProvider).loginWithGoogle(idToken: idToken);
+    final success =
+        await ref.read(loginControllerProvider.notifier).submitGoogle();
+    if (success && mounted) {
       resetSessionState(ref);
-
-      if (!mounted) {
-        return;
-      }
-
       _goAfterLogin();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      final message = authErrorMessage(error);
-      if (message != null) {
-        _showError(message);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
+    showPawlySnackBar(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      message: message,
+      tone: PawlySnackBarTone.error,
+    );
   }
 
   void _goAfterLogin() {

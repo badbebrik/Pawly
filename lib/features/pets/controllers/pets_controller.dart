@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/models/pet_models.dart';
 import '../../../core/providers/core_providers.dart';
-import '../../auth/presentation/providers/auth_providers.dart';
+import '../../auth/controllers/auth_dependencies.dart';
 import '../data/pet_catalog_provider.dart';
 import '../data/pets_repository.dart';
+import '../models/pet.dart';
 import '../models/pet_access_policy.dart';
 import '../models/pet_list_entry.dart';
+import '../shared/mappers/pet_access_policy_mapper.dart';
 import '../states/pets_state.dart';
 
 final petsRepositoryProvider = Provider<PetsRepository>((ref) {
@@ -38,7 +39,7 @@ final petAccessPolicyProvider =
   return ref
       .read(aclApiClientProvider)
       .getMyAccess(petId)
-      .then((response) => PetAccessPolicy.fromAclPolicy(
+      .then((response) => petAccessPolicyFromAclPolicy(
             response.member.policy,
             isOwner: response.member.isPrimaryOwner,
           ));

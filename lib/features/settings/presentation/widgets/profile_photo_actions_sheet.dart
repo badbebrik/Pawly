@@ -100,12 +100,11 @@ Future<void> _runProfilePhotoAction({
     await action();
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      showPawlySnackBar(
+        context,
+        message:
             error is StateError ? error.message.toString() : fallbackMessage,
-          ),
-        ),
+        tone: PawlySnackBarTone.error,
       );
     }
   }
