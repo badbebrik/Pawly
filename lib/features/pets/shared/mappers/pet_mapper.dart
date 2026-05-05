@@ -8,6 +8,7 @@ Pet petFromNetwork(network.Pet source) {
     rowVersion: source.rowVersion,
     name: source.name,
     speciesId: source.speciesId,
+    speciesName: source.speciesName,
     customSpeciesName: source.customSpeciesName,
     sex: source.sex,
     birthDate: source.birthDate,

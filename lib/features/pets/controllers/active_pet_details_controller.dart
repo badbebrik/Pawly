@@ -4,8 +4,6 @@ import '../../../core/network/api_error.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/core_providers.dart';
 import '../models/pet.dart';
-import '../data/pet_catalog_provider.dart';
-import '../shared/formatters/pet_catalog_label_formatters.dart';
 import '../states/active_pet_details_state.dart';
 import 'active_pet_controller.dart';
 import 'pets_controller.dart';
@@ -55,16 +53,11 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
             pet: current.pet,
             file: file,
           );
-      final catalog = await ref.read(petCatalogProvider.future);
 
       state = AsyncData(
         current.copyWith(
           pet: updatedPet,
-          speciesName: petSpeciesLabelFromValues(
-            catalog,
-            speciesId: updatedPet.speciesId,
-            customSpeciesName: updatedPet.customSpeciesName,
-          ),
+          speciesName: _speciesNameWithoutCatalog(updatedPet),
           isUploadingPhoto: false,
         ),
       );
@@ -90,16 +83,11 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
       final updatedPet = await ref.read(petsRepositoryProvider).deletePetPhoto(
             pet: current.pet,
           );
-      final catalog = await ref.read(petCatalogProvider.future);
 
       state = AsyncData(
         current.copyWith(
           pet: updatedPet,
-          speciesName: petSpeciesLabelFromValues(
-            catalog,
-            speciesId: updatedPet.speciesId,
-            customSpeciesName: updatedPet.customSpeciesName,
-          ),
+          speciesName: _speciesNameWithoutCatalog(updatedPet),
           isUploadingPhoto: false,
         ),
       );
@@ -155,15 +143,9 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
       await ref.read(petsControllerProvider.notifier).reload();
       return null;
     }
-    final catalog = await ref.read(petCatalogProvider.future);
-
     return ActivePetDetailsState(
       pet: pet,
-      speciesName: petSpeciesLabelFromValues(
-        catalog,
-        speciesId: pet.speciesId,
-        customSpeciesName: pet.customSpeciesName,
-      ),
+      speciesName: _speciesNameWithoutCatalog(pet),
       isUploadingPhoto: false,
     );
   }
@@ -171,5 +153,19 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
   bool _isInactiveAccessError(ApiException error) {
     return error.error.type == ApiErrorType.forbidden ||
         error.error.type == ApiErrorType.notFound;
+  }
+
+  String _speciesNameWithoutCatalog(Pet pet) {
+    final customSpeciesName = pet.customSpeciesName?.trim();
+    if (customSpeciesName != null && customSpeciesName.isNotEmpty) {
+      return customSpeciesName;
+    }
+
+    final speciesName = pet.speciesName?.trim();
+    if (speciesName != null && speciesName.isNotEmpty) {
+      return speciesName;
+    }
+
+    return 'Неизвестный вид';
   }
 }

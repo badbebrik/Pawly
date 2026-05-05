@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../features/pet_care/presentation/models/attachment_kind.dart';
-import '../../features/pet_care/presentation/models/attachment_viewer_item.dart';
-import '../../features/pet_care/presentation/pages/attachment_viewer_page.dart';
+import '../../features/shared/attachments/models/attachment_kind.dart';
+import '../../features/shared/attachments/models/attachment_viewer_item.dart';
+import '../../features/shared/attachments/presentation/pages/attachment_viewer_page.dart';
 
 Future<void> openAttachmentUrl(
   BuildContext context, {
@@ -44,12 +44,12 @@ Future<void> openAttachmentUrl(
     final galleryItems = imageGalleryItems == null
         ? <AttachmentViewerItem>[item]
         : imageGalleryItems
-              .where(
-                (galleryItem) =>
-                    galleryItem.kind == AttachmentKind.image &&
-                    galleryItem.url != null,
-              )
-              .toList(growable: false);
+            .where(
+              (galleryItem) =>
+                  galleryItem.kind == AttachmentKind.image &&
+                  galleryItem.url != null,
+            )
+            .toList(growable: false);
     final fallbackIndex = galleryItems.indexWhere(
       (galleryItem) =>
           galleryItem.url == item.url && galleryItem.title == item.title,

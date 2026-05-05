@@ -87,23 +87,23 @@ class SettingsRepository {
       throw StateError('Поддерживаются только JPG и PNG изображения.');
     }
 
-    final bytes = await file.readAsBytes();
+    final sizeBytes = await file.length();
     final initResponse = await _profileApiClient.initAvatarUpload(
       InitAvatarUploadPayload(
         mimeType: mimeType,
-        expectedSizeBytes: bytes.length,
+        expectedSizeBytes: sizeBytes,
       ),
     );
 
     await _uploadDio.request<Object?>(
       normalizeSettingsStorageUrl(initResponse.upload.url),
-      data: bytes,
+      data: file.openRead(),
       options: Options(
         method: initResponse.upload.method,
         contentType: mimeType,
         headers: <String, dynamic>{
           ...initResponse.upload.headers,
-          Headers.contentLengthHeader: bytes.length,
+          Headers.contentLengthHeader: sizeBytes,
           if (!initResponse.upload.headers.containsKey('Content-Type'))
             'Content-Type': mimeType,
         },
@@ -116,7 +116,7 @@ class SettingsRepository {
     final confirmResponse = await _profileApiClient.confirmAvatarUpload(
       ConfirmAvatarUploadPayload(
         fileId: initResponse.fileId,
-        sizeBytes: bytes.length,
+        sizeBytes: sizeBytes,
       ),
     );
 

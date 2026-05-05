@@ -10,11 +10,9 @@ import '../models/pet_form.dart';
 import '../models/pet_invite_result.dart';
 import '../models/pet_list_entry.dart';
 import '../shared/formatters/pet_access_formatters.dart';
-import '../shared/formatters/pet_catalog_label_formatters.dart';
 import '../shared/mappers/pet_access_policy_mapper.dart';
 import '../shared/mappers/pet_form_payload_mapper.dart';
 import '../shared/mappers/pet_mapper.dart';
-import 'pet_catalog_models.dart';
 
 class PetsRepository {
   PetsRepository({
@@ -31,7 +29,6 @@ class PetsRepository {
 
   Future<List<PetListEntry>> listAvailablePets({
     required String currentUserId,
-    required PetCatalog catalog,
     bool includeArchived = false,
     int limit = 50,
   }) async {
@@ -43,11 +40,7 @@ class PetsRepository {
     return response.items.map((item) {
       final pet = item.pet;
       final isOwnedByMe = pet.ownerUserId == currentUserId;
-      final speciesName = petSpeciesLabelFromValues(
-        catalog,
-        speciesId: pet.speciesId,
-        customSpeciesName: pet.customSpeciesName,
-      );
+      final speciesName = _speciesNameWithoutCatalog(pet);
       final roleTitle = item.myAccess?.role.title ??
           petFallbackRoleTitle(isOwner: isOwnedByMe);
 
@@ -154,25 +147,25 @@ class PetsRepository {
       throw StateError('Поддерживаются только JPG и PNG изображения.');
     }
 
-    final bytes = await file.readAsBytes();
+    final sizeBytes = await file.length();
     final initResponse = await _petsApiClient.initPhotoUpload(
       pet.id,
       network.InitPetPhotoUploadPayload(
         mimeType: mimeType,
         originalFilename: _fileNameFromPath(file.path),
-        expectedSizeBytes: bytes.length,
+        expectedSizeBytes: sizeBytes,
       ),
     );
 
     await _uploadDio.request<Object?>(
       initResponse.upload.url,
-      data: bytes,
+      data: file.openRead(),
       options: Options(
         method: initResponse.upload.method,
         contentType: mimeType,
         headers: <String, dynamic>{
           ...initResponse.upload.headers,
-          Headers.contentLengthHeader: bytes.length,
+          Headers.contentLengthHeader: sizeBytes,
           if (!initResponse.upload.headers.containsKey('Content-Type'))
             'Content-Type': mimeType,
         },
@@ -187,7 +180,7 @@ class PetsRepository {
       network.ConfirmPetPhotoUploadPayload(
         rowVersion: pet.rowVersion,
         fileId: initResponse.fileId,
-        sizeBytes: bytes.length,
+        sizeBytes: sizeBytes,
       ),
     );
 
@@ -216,5 +209,19 @@ class PetsRepository {
       return 'image/png';
     }
     return null;
+  }
+
+  String _speciesNameWithoutCatalog(network.Pet pet) {
+    final customSpeciesName = pet.customSpeciesName?.trim();
+    if (customSpeciesName != null && customSpeciesName.isNotEmpty) {
+      return customSpeciesName;
+    }
+
+    final speciesName = pet.speciesName?.trim();
+    if (speciesName != null && speciesName.isNotEmpty) {
+      return speciesName;
+    }
+
+    return 'Неизвестный вид';
   }
 }

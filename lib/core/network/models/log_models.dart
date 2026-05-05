@@ -27,6 +27,16 @@ class LogMetricValue {
       valueNum: (json['value_num'] as num?)?.toDouble() ?? 0,
     );
   }
+}
+
+class UpsertLogMetricValuePayload {
+  const UpsertLogMetricValuePayload({
+    required this.metricId,
+    required this.valueNum,
+  });
+
+  final String metricId;
+  final double valueNum;
 
   JsonMap toJson() => <String, dynamic>{
         'metric_id': metricId,
@@ -625,7 +635,7 @@ class UpsertLogPayload {
     required this.occurredAt,
     this.logTypeId,
     this.description,
-    this.metricValues = const <LogMetricValue>[],
+    this.metricValues = const <UpsertLogMetricValuePayload>[],
     this.attachments,
     this.attachmentFileIds = const <String>[],
     this.rowVersion,
@@ -634,7 +644,7 @@ class UpsertLogPayload {
   final DateTime occurredAt;
   final String? logTypeId;
   final String? description;
-  final List<LogMetricValue> metricValues;
+  final List<UpsertLogMetricValuePayload> metricValues;
   final List<AttachmentPayload>? attachments;
   final List<String> attachmentFileIds;
   final int? rowVersion;
@@ -750,14 +760,6 @@ class UpdateMetricPayload extends CreateMetricPayload {
         ...super.toJson(),
         'row_version': rowVersion,
       };
-}
-
-class DeleteEntityPayload {
-  const DeleteEntityPayload({required this.rowVersion});
-
-  final int rowVersion;
-
-  JsonMap toJson() => <String, dynamic>{'row_version': rowVersion};
 }
 
 class AnalyticsMetricLogTypeRef {
@@ -880,6 +882,7 @@ class MetricSeriesSummary {
     this.maxValueNum,
     this.lastValueNum,
     this.avgValueNum,
+    this.sumValueNum,
     this.deltaFromFirstNum,
   });
 
@@ -888,6 +891,7 @@ class MetricSeriesSummary {
   final double? maxValueNum;
   final double? lastValueNum;
   final double? avgValueNum;
+  final double? sumValueNum;
   final double? deltaFromFirstNum;
 
   factory MetricSeriesSummary.fromJson(Object? data) {
@@ -898,6 +902,7 @@ class MetricSeriesSummary {
       maxValueNum: (json['max_value_num'] as num?)?.toDouble(),
       lastValueNum: (json['last_value_num'] as num?)?.toDouble(),
       avgValueNum: (json['avg_value_num'] as num?)?.toDouble(),
+      sumValueNum: (json['sum_value_num'] as num?)?.toDouble(),
       deltaFromFirstNum: (json['delta_from_first_num'] as num?)?.toDouble(),
     );
   }

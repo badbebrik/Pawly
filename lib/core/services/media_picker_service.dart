@@ -28,7 +28,11 @@ class MediaPickerService {
 
   Future<List<XFile>> _pickGalleryImages() {
     return _guardPickerCall(
-      () => _imagePicker.pickMultiImage(imageQuality: 85),
+      () => _imagePicker.pickMultiImage(
+        imageQuality: 85,
+        maxWidth: 2000,
+        maxHeight: 2000,
+      ),
     );
   }
 
@@ -40,6 +44,8 @@ class MediaPickerService {
     return _pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
+      maxWidth: 2000,
+      maxHeight: 2000,
       preferredCameraDevice: CameraDevice.rear,
     );
   }

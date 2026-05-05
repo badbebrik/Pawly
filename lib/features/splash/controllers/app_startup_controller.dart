@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/controllers/auth_dependencies.dart';
 import '../../auth/models/auth_launch_destination.dart';
-import '../../pets/data/pet_catalog_provider.dart';
 import '../data/initial_invite_link_reader.dart';
 import '../models/app_startup_destination.dart';
 
@@ -21,10 +20,6 @@ final appStartupProvider = FutureProvider<AppStartupDestination>((ref) async {
 
   final launch = await launchFuture;
   final initialInviteToken = await initialInviteTokenFuture;
-
-  if (launch == AppLaunchDestination.authenticated) {
-    await ref.read(petCatalogProvider.future);
-  }
 
   await minimumSplashFuture;
 

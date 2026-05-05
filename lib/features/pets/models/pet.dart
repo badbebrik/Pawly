@@ -43,6 +43,7 @@ class Pet {
     required this.rowVersion,
     required this.name,
     required this.speciesId,
+    required this.speciesName,
     required this.customSpeciesName,
     required this.sex,
     required this.birthDate,
@@ -67,6 +68,7 @@ class Pet {
   final int rowVersion;
   final String name;
   final String? speciesId;
+  final String? speciesName;
   final String? customSpeciesName;
   final String sex;
   final DateTime? birthDate;

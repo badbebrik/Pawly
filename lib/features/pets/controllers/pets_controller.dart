@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/core_providers.dart';
 import '../../auth/controllers/auth_dependencies.dart';
-import '../data/pet_catalog_provider.dart';
 import '../data/pets_repository.dart';
 import '../models/pet.dart';
 import '../models/pet_access_policy.dart';
@@ -102,10 +101,8 @@ class PetsController extends AsyncNotifier<PetsState> {
       return base.copyWith(items: const <PetListEntry>[]);
     }
 
-    final catalog = await ref.read(petCatalogProvider.future);
     final items = await ref.read(petsRepositoryProvider).listAvailablePets(
           currentUserId: currentUserId,
-          catalog: catalog,
           includeArchived: true,
         );
 

@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../pet_care/presentation/providers/health_controllers.dart';
+import '../../health/controllers/health_dependencies.dart';
 import '../data/calendar_repository.dart';
 import '../models/calendar_day.dart';
 import '../models/calendar_keys.dart';
@@ -8,7 +8,7 @@ import '../shared/formatters/calendar_date_formatters.dart';
 import '../states/calendar_state.dart';
 
 final calendarRepositoryProvider = Provider<CalendarRepository>((ref) {
-  final healthRepository = ref.watch(healthRepositoryProvider);
+  final healthRepository = ref.watch(healthScheduleRepositoryProvider);
   return CalendarRepository(healthRepository: healthRepository);
 });
 

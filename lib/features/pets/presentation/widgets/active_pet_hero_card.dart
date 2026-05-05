@@ -68,10 +68,19 @@ class ActivePetHeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: PawlySpacing.xs),
                     Text(
-                      '$speciesName · $ageLabel',
+                      speciesName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ageLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),

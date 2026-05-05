@@ -21,7 +21,7 @@ class PetEditController extends AsyncNotifier<PetEditState> {
   @override
   Future<PetEditState> build() async {
     final pet = await ref.read(petsRepositoryProvider).getPet(_petId);
-    final catalog = await ref.read(petCatalogProvider.future);
+    final catalog = await ref.watch(petCatalogProvider.future);
     return PetEditState.loaded(pet: pet, catalog: catalog);
   }
 

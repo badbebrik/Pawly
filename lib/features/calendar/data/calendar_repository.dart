@@ -1,14 +1,14 @@
-import '../../pet_care/data/health_repository.dart';
+import '../../health/data/schedule/health_schedule_repository.dart';
 import '../models/calendar_day.dart';
 import '../shared/formatters/calendar_date_formatters.dart';
 import '../shared/mappers/calendar_mappers.dart';
 
 class CalendarRepository {
   const CalendarRepository({
-    required HealthRepository healthRepository,
+    required HealthScheduleRepository healthRepository,
   }) : _healthRepository = healthRepository;
 
-  final HealthRepository _healthRepository;
+  final HealthScheduleRepository _healthRepository;
 
   Future<CalendarDay> getDay(DateTime date) async {
     final response = await _healthRepository.getScheduleDay(

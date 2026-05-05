@@ -1,4 +1,5 @@
 import 'json_parsers.dart';
+import 'json_map.dart';
 
 class EmptyResponse {
   const EmptyResponse();
@@ -71,6 +72,14 @@ class AttachmentPayload {
         'file_id': fileId,
         'file_name': fileName,
       }..removeWhere((_, dynamic value) => value == null);
+}
+
+class DeleteEntityPayload {
+  const DeleteEntityPayload({required this.rowVersion});
+
+  final int rowVersion;
+
+  JsonMap toJson() => <String, dynamic>{'row_version': rowVersion};
 }
 
 class PagedItemsResponse<T> {

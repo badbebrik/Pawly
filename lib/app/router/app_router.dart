@@ -15,28 +15,28 @@ import '../../features/auth/presentation/pages/register_flow_page.dart';
 import '../../features/calendar/presentation/pages/calendar_page.dart';
 import '../../features/chat/presentation/pages/chat_conversation_page.dart';
 import '../../features/chat/presentation/pages/chat_inbox_page.dart';
+import '../../features/documents/presentation/pages/documents_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/logs/presentation/pages/pet_metric_create_page.dart';
+import '../../features/logs/presentation/pages/pet_metric_picker_page.dart';
+import '../../features/logs/presentation/pages/pet_analytics_page.dart';
+import '../../features/logs/presentation/pages/pet_log_create_page.dart';
+import '../../features/logs/presentation/pages/pet_log_details_page.dart';
+import '../../features/logs/presentation/pages/pet_log_edit_page.dart';
+import '../../features/logs/presentation/pages/pet_log_type_picker_page.dart';
+import '../../features/logs/presentation/pages/pet_log_type_create_page.dart';
+import '../../features/logs/presentation/pages/pet_logs_page.dart';
 import '../../features/pets/presentation/pages/pet_create_page.dart';
 import '../../features/pets/presentation/pages/pet_edit_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
-import '../../features/pet_care/presentation/pages/pet_metric_create_page.dart';
-import '../../features/pet_care/presentation/pages/pet_metric_picker_page.dart';
-import '../../features/pet_care/presentation/pages/pet_analytics_page.dart';
-import '../../features/pet_care/presentation/pages/pet_health_home_page.dart';
-import '../../features/pet_care/presentation/pages/pet_documents_page.dart';
-import '../../features/pet_care/presentation/pages/pet_medical_records_page.dart';
-import '../../features/pet_care/presentation/pages/pet_procedures_page.dart';
-import '../../features/pet_care/presentation/pages/pet_reminder_create_page.dart';
-import '../../features/pet_care/presentation/pages/pet_reminder_edit_page.dart';
-import '../../features/pet_care/presentation/pages/pet_reminders_page.dart';
-import '../../features/pet_care/presentation/pages/pet_vet_visits_page.dart';
-import '../../features/pet_care/presentation/pages/pet_vaccinations_page.dart';
-import '../../features/pet_care/presentation/pages/pet_log_create_page.dart';
-import '../../features/pet_care/presentation/pages/pet_log_details_page.dart';
-import '../../features/pet_care/presentation/pages/pet_log_edit_page.dart';
-import '../../features/pet_care/presentation/pages/pet_log_type_picker_page.dart';
-import '../../features/pet_care/presentation/pages/pet_log_type_create_page.dart';
-import '../../features/pet_care/presentation/pages/pet_logs_page.dart';
+import '../../features/health/presentation/pages/home/pet_health_home_page.dart';
+import '../../features/health/presentation/pages/medical_records/pet_medical_records_page.dart';
+import '../../features/health/presentation/pages/procedures/pet_procedures_page.dart';
+import '../../features/health/presentation/pages/vaccinations/pet_vaccinations_page.dart';
+import '../../features/health/presentation/pages/vet_visits/pet_vet_visits_page.dart';
+import '../../features/reminders/presentation/pages/pet_reminder_create_page.dart';
+import '../../features/reminders/presentation/pages/pet_reminder_edit_page.dart';
+import '../../features/reminders/presentation/pages/pet_reminders_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import 'app_routes.dart';
@@ -235,7 +235,7 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                           GoRoute(
                             path: 'documents',
                             name: 'petDocuments',
-                            builder: (_, state) => PetDocumentsPage(
+                            builder: (_, state) => DocumentsPage(
                               petId: state.pathParameters['petId']!,
                             ),
                           ),

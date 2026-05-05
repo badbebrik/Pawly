@@ -98,6 +98,7 @@ class Pet {
     required this.rowVersion,
     required this.name,
     this.speciesId,
+    this.speciesName,
     this.customSpeciesName,
     required this.sex,
     this.birthDate,
@@ -122,6 +123,7 @@ class Pet {
   final int rowVersion;
   final String name;
   final String? speciesId;
+  final String? speciesName;
   final String? customSpeciesName;
   final String sex;
   final DateTime? birthDate;
@@ -174,6 +176,7 @@ class Pet {
       rowVersion: asInt(json['row_version']),
       name: asString(json['name']),
       speciesId: asNullableString(json['species_id']),
+      speciesName: asNullableString(json['species_name']),
       customSpeciesName: asNullableString(json['custom_species_name']),
       sex: asString(json['sex']),
       birthDate: asDateTime(json['birth_date']),
