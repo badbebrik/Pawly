@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
@@ -32,7 +33,7 @@ class AclMessageButton extends StatelessWidget {
           ),
         ),
         child: Icon(
-          Icons.chat_bubble_outline_rounded,
+          CupertinoIcons.chat_bubble_text,
           size: iconSize,
           color: colorScheme.primary,
         ),

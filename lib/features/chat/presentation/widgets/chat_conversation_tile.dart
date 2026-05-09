@@ -21,29 +21,32 @@ class ChatConversationTile extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final preview = item.lastMessagePreview?.trim();
     final timeLabel = chatInboxTimestampLabel(item.lastMessageAt);
+    final borderRadius = BorderRadius.circular(PawlyRadius.xl);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PawlyRadius.xl),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(PawlyRadius.xl),
-            border: Border.all(
-              color: item.hasUnread
-                  ? colorScheme.primary.withValues(alpha: 0.20)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.82),
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.07),
-                blurRadius: 16,
-                offset: const Offset(0, 7),
-              ),
-            ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.07),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
+        ],
+      ),
+      child: Material(
+        color: colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: borderRadius,
+          side: BorderSide(
+            color: item.hasUnread
+                ? colorScheme.primary.withValues(alpha: 0.20)
+                : colorScheme.outlineVariant.withValues(alpha: 0.82),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: PawlySpacing.md,

@@ -123,17 +123,17 @@ class _AnalyticsMetricViewState extends State<AnalyticsMetricView> {
           ),
           const SizedBox(height: PawlySpacing.sm),
           _SummaryCard(
+            title: 'Количество измерений',
+            value: formatAnalyticsMetricCount(summary.pointsCount),
+          ),
+          const SizedBox(height: PawlySpacing.sm),
+          _SummaryCard(
             title: 'Сумма',
             value: formatAnalyticsMetricSum(
               summary.sumValueNum,
               inputKind,
               unit,
             ),
-          ),
-          const SizedBox(height: PawlySpacing.sm),
-          _SummaryCard(
-            title: 'Количество измерений',
-            value: formatAnalyticsMetricCount(summary.pointsCount),
           ),
         ],
       ],
