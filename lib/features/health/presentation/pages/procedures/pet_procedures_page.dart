@@ -120,8 +120,8 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
       await ref
           .read(petProceduresControllerProvider(widget.petId).notifier)
           .createProcedure(input: input);
-      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) return;
+      _invalidateHealthDerivedData(ref, widget.petId);
       showPawlySnackBar(
         context,
         message: 'Процедура сохранена.',
@@ -165,10 +165,10 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
             procedureId: card.id,
             performedAt: performedAt,
           );
-      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
+      _invalidateHealthDerivedData(ref, widget.petId);
 
       showPawlySnackBar(
         context,
@@ -185,8 +185,14 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
           initialDate: _defaultNextProcedureDate(performedAt),
         ),
       );
-      if (nextDueAt == null || !mounted) {
+      if (nextDueAt == null) {
+        if (!mounted) {
+          return;
+        }
         setState(() => _selectedBucket = ProcedureBucket.history);
+        return;
+      }
+      if (!mounted) {
         return;
       }
 
@@ -196,10 +202,10 @@ class _PetProceduresPageState extends ConsumerState<PetProceduresPage> {
             procedure: updated,
             nextDueAt: nextDueAt,
           );
-      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
+      _invalidateHealthDerivedData(ref, widget.petId);
 
       showPawlySnackBar(
         context,
@@ -276,7 +282,9 @@ class PetProcedureDetailsPage extends ConsumerWidget {
           procedure: procedure,
           onRefresh: () async {
             ref.invalidate(petProcedureDetailsProvider(procedureRef));
-            await ref.read(petProcedureDetailsProvider(procedureRef).future);
+            try {
+              await ref.read(petProcedureDetailsProvider(procedureRef).future);
+            } catch (_) {}
           },
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -320,13 +328,13 @@ class PetProcedureDetailsPage extends ConsumerWidget {
             procedureId: procedureId,
             input: input,
           );
+      if (!context.mounted) return;
       ref.invalidate(
         petProcedureDetailsProvider(
           PetProcedureRef(petId: petId, procedureId: procedureId),
         ),
       );
       _invalidateHealthDerivedData(ref, petId);
-      if (!context.mounted) return;
       showPawlySnackBar(
         context,
         message: 'Изменения сохранены.',
@@ -379,13 +387,13 @@ class PetProcedureDetailsPage extends ConsumerWidget {
             procedureId: procedure.id,
             rowVersion: procedure.rowVersion,
           );
+      if (!context.mounted) return;
       ref.invalidate(
         petProcedureDetailsProvider(
           PetProcedureRef(petId: petId, procedureId: procedureId),
         ),
       );
       _invalidateHealthDerivedData(ref, petId);
-      if (!context.mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!context.mounted) return;

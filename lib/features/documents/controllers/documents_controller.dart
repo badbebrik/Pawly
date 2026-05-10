@@ -41,7 +41,11 @@ class DocumentsController extends AsyncNotifier<DocumentsState> {
   Future<void> reload() async {
     final current = state.asData?.value ?? DocumentsState.initial();
     state = const AsyncLoading<DocumentsState>();
-    state = AsyncData(await _loadPage(base: current, reset: true));
+    try {
+      state = AsyncData(await _loadPage(base: current, reset: true));
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<void> loadMore() async {
@@ -56,7 +60,6 @@ class DocumentsController extends AsyncNotifier<DocumentsState> {
       state = AsyncData(next.copyWith(isLoadingMore: false));
     } catch (_) {
       state = AsyncData(current.copyWith(isLoadingMore: false));
-      rethrow;
     }
   }
 
@@ -68,12 +71,16 @@ class DocumentsController extends AsyncNotifier<DocumentsState> {
     }
 
     state = const AsyncLoading<DocumentsState>();
-    state = AsyncData(
-      await _loadPage(
-        base: current.copyWith(searchQuery: query, clearNextCursor: true),
-        reset: true,
-      ),
-    );
+    try {
+      state = AsyncData(
+        await _loadPage(
+          base: current.copyWith(searchQuery: query, clearNextCursor: true),
+          reset: true,
+        ),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<void> setEntityFilter(DocumentsEntityFilter value) async {
@@ -83,12 +90,16 @@ class DocumentsController extends AsyncNotifier<DocumentsState> {
     }
 
     state = const AsyncLoading<DocumentsState>();
-    state = AsyncData(
-      await _loadPage(
-        base: current.copyWith(entityFilter: value, clearNextCursor: true),
-        reset: true,
-      ),
-    );
+    try {
+      state = AsyncData(
+        await _loadPage(
+          base: current.copyWith(entityFilter: value, clearNextCursor: true),
+          reset: true,
+        ),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<void> setKindFilter(DocumentsKindFilter value) async {
@@ -98,12 +109,16 @@ class DocumentsController extends AsyncNotifier<DocumentsState> {
     }
 
     state = const AsyncLoading<DocumentsState>();
-    state = AsyncData(
-      await _loadPage(
-        base: current.copyWith(kindFilter: value, clearNextCursor: true),
-        reset: true,
-      ),
-    );
+    try {
+      state = AsyncData(
+        await _loadPage(
+          base: current.copyWith(kindFilter: value, clearNextCursor: true),
+          reset: true,
+        ),
+      );
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<void> renameDocument({

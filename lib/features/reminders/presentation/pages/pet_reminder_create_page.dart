@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../logs/controllers/logs_controller.dart';
 import '../../../logs/models/log_constants.dart';
+import '../../../logs/models/log_models.dart';
 import '../../../pets/controllers/pets_controller.dart';
 import '../../../pets/models/pet_access_policy.dart';
 import '../../controllers/reminder_create_controller.dart';
@@ -129,9 +130,14 @@ class _PetReminderCreatePageState extends ConsumerState<PetReminderCreatePage> {
       return;
     }
 
-    final bootstrap = await ref.read(
-      petLogComposerBootstrapProvider(widget.petId).future,
-    );
+    final LogsBootstrap bootstrap;
+    try {
+      bootstrap = await ref.read(
+        petLogComposerBootstrapProvider(widget.petId).future,
+      );
+    } catch (_) {
+      return;
+    }
     if (!mounted) {
       return;
     }

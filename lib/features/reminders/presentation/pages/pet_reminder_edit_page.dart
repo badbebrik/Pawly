@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../logs/controllers/logs_controller.dart';
 import '../../../logs/models/log_constants.dart';
+import '../../../logs/models/log_models.dart';
 import '../../../pets/controllers/pets_controller.dart';
 import '../../controllers/reminder_edit_controller.dart';
 import '../../controllers/reminders_controller.dart';
@@ -147,9 +148,14 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
     if (selectedId == null) {
       return;
     }
-    final bootstrap = await ref.read(
-      petLogComposerBootstrapProvider(widget.petId).future,
-    );
+    final LogsBootstrap bootstrap;
+    try {
+      bootstrap = await ref.read(
+        petLogComposerBootstrapProvider(widget.petId).future,
+      );
+    } catch (_) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -174,9 +180,14 @@ class _PetReminderEditPageState extends ConsumerState<PetReminderEditPage> {
       return;
     }
 
-    final bootstrap = await ref.read(
-      petLogComposerBootstrapProvider(widget.petId).future,
-    );
+    final LogsBootstrap bootstrap;
+    try {
+      bootstrap = await ref.read(
+        petLogComposerBootstrapProvider(widget.petId).future,
+      );
+    } catch (_) {
+      return;
+    }
     if (!mounted) {
       return;
     }

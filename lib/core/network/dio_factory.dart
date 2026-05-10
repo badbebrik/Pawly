@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../constants/api_constants.dart';
@@ -37,13 +38,16 @@ class DioFactory {
         sessionStore: sessionStore,
       ),
     );
-    dio.interceptors.add(
-      PrettyDioLogger(
-        requestBody: true,
-        requestHeader: false,
-        responseHeader: false,
-      ),
-    );
+    if (kDebugMode) {
+      dio.interceptors.add(
+        PrettyDioLogger(
+          requestBody: false,
+          requestHeader: false,
+          responseBody: false,
+          responseHeader: false,
+        ),
+      );
+    }
 
     refreshDio.interceptors.add(AuthContextInterceptor(sessionStore));
 
@@ -51,7 +55,7 @@ class DioFactory {
   }
 
   static Dio createUploadDio() {
-    return Dio(
+    final dio = Dio(
       BaseOptions(
         connectTimeout: ApiConstants.connectTimeout,
         receiveTimeout: ApiConstants.receiveTimeout,
@@ -59,5 +63,6 @@ class DioFactory {
         responseType: ResponseType.plain,
       ),
     );
+    return dio;
   }
 }

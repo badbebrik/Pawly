@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../../design_system/design_system.dart';
@@ -8,6 +10,11 @@ import 'attachment_rename_dialog.dart';
 
 typedef AttachmentRenameCallback = void Function(
     String fileId, String fileName);
+typedef AttachmentActionCallback = Future<void> Function();
+
+const Duration _attachmentActionStartDelay = Duration(milliseconds: 250);
+
+enum _AttachmentAction { files, gallery, camera }
 
 class AttachmentsField extends StatelessWidget {
   const AttachmentsField({
@@ -25,9 +32,9 @@ class AttachmentsField extends StatelessWidget {
   final List<AttachmentDraftItem> attachments;
   final bool isUploading;
   final bool enabled;
-  final VoidCallback onAddFiles;
-  final VoidCallback onAddFromGallery;
-  final VoidCallback onAddFromCamera;
+  final AttachmentActionCallback onAddFiles;
+  final AttachmentActionCallback onAddFromGallery;
+  final AttachmentActionCallback onAddFromCamera;
   final ValueChanged<String> onRemove;
   final AttachmentRenameCallback? onRename;
 
@@ -48,8 +55,9 @@ class AttachmentsField extends StatelessWidget {
                 ),
               ),
               TextButton.icon(
-                onPressed:
-                    enabled ? () => _showAddAttachmentSheet(context) : null,
+                onPressed: enabled
+                    ? () => unawaited(_showAddAttachmentSheet(context))
+                    : null,
                 icon: isUploading
                     ? const SizedBox(
                         width: 16,
@@ -101,7 +109,9 @@ class AttachmentsField extends StatelessWidget {
                   children: <Widget>[
                     IconButton(
                       onPressed: enabled && onRename != null
-                          ? () => _renameAttachment(context, attachment)
+                          ? () => unawaited(
+                                _renameAttachment(context, attachment),
+                              )
                           : null,
                       icon: const Icon(Icons.edit_rounded),
                       tooltip: 'Переименовать',
@@ -123,57 +133,92 @@ class AttachmentsField extends StatelessWidget {
   }
 
   Future<void> _showAddAttachmentSheet(BuildContext context) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: PawlySpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.folder_rounded),
-                title: const Text('Файлы'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onAddFiles();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('Фото из галереи'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onAddFromGallery();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera_rounded),
-                title: const Text('Сделать фото'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onAddFromCamera();
-                },
-              ),
-            ],
+    try {
+      final action = await showModalBottomSheet<_AttachmentAction>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: PawlySpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                ListTile(
+                  leading: const Icon(Icons.folder_rounded),
+                  title: const Text('Файлы'),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_AttachmentAction.files),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_rounded),
+                  title: const Text('Фото из галереи'),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_AttachmentAction.gallery),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_rounded),
+                  title: const Text('Сделать фото'),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_AttachmentAction.camera),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+      if (action == null || !context.mounted) {
+        return;
+      }
+
+      await Future<void>.delayed(_attachmentActionStartDelay);
+      if (!context.mounted) {
+        return;
+      }
+
+      await _runAttachmentAction(_callbackForAction(action));
+    } catch (error, stackTrace) {
+      _logUnhandledAttachmentError(error, stackTrace);
+    }
+  }
+
+  AttachmentActionCallback _callbackForAction(_AttachmentAction action) {
+    return switch (action) {
+      _AttachmentAction.files => onAddFiles,
+      _AttachmentAction.gallery => onAddFromGallery,
+      _AttachmentAction.camera => onAddFromCamera,
+    };
+  }
+
+  Future<void> _runAttachmentAction(AttachmentActionCallback action) async {
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      _logUnhandledAttachmentError(error, stackTrace);
+    }
   }
 
   Future<void> _renameAttachment(
     BuildContext context,
     AttachmentDraftItem attachment,
   ) async {
-    final newName = await showAttachmentRenameDialog(
-      context,
-      initialName: attachment.fileName,
-    );
-    if (newName == null || newName == attachment.fileName) {
-      return;
+    try {
+      final newName = await showAttachmentRenameDialog(
+        context,
+        initialName: attachment.fileName,
+      );
+      if (!context.mounted ||
+          newName == null ||
+          newName == attachment.fileName) {
+        return;
+      }
+      onRename?.call(attachment.fileId, newName);
+    } catch (error, stackTrace) {
+      _logUnhandledAttachmentError(error, stackTrace);
     }
-    onRename?.call(attachment.fileId, newName);
+  }
+
+  void _logUnhandledAttachmentError(Object error, StackTrace stackTrace) {
+    debugPrint('[attachments] unhandled action error: $error');
+    debugPrintStack(stackTrace: stackTrace);
   }
 }

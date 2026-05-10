@@ -117,8 +117,8 @@ class _PetVetVisitsPageState extends ConsumerState<PetVetVisitsPage> {
           .createVetVisit(
             input: input,
           );
-      ref.invalidate(petHealthHomeProvider(widget.petId));
       if (!mounted) return;
+      ref.invalidate(petHealthHomeProvider(widget.petId));
       showPawlySnackBar(
         context,
         message: _visitCreateSuccessMessage(result),
@@ -185,7 +185,9 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
           visit: visit,
           onRefresh: () async {
             ref.invalidate(petVetVisitDetailsProvider(visitRef));
-            await ref.read(petVetVisitDetailsProvider(visitRef).future);
+            try {
+              await ref.read(petVetVisitDetailsProvider(visitRef).future);
+            } catch (_) {}
           },
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -227,10 +229,10 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
             visitId: visitId,
             input: input,
           );
+      if (!context.mounted) return;
       ref.invalidate(petVetVisitDetailsProvider(
           PetVetVisitRef(petId: petId, visitId: visitId)));
       ref.invalidate(petHealthHomeProvider(petId));
-      if (!context.mounted) return;
       showPawlySnackBar(
         context,
         message: 'Изменения сохранены.',
@@ -283,10 +285,10 @@ class PetVetVisitDetailsPage extends ConsumerWidget {
             visitId: visit.id,
             rowVersion: visit.rowVersion,
           );
+      if (!context.mounted) return;
       ref.invalidate(petVetVisitDetailsProvider(
           PetVetVisitRef(petId: petId, visitId: visitId)));
       ref.invalidate(petHealthHomeProvider(petId));
-      if (!context.mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!context.mounted) return;

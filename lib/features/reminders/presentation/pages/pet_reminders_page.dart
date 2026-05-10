@@ -43,7 +43,7 @@ class PetRemindersPage extends ConsumerWidget {
                     'petReminderCreate',
                     pathParameters: <String, String>{'petId': petId},
                   );
-                  if (created == true) {
+                  if (created == true && context.mounted) {
                     ref.invalidate(petRemindersControllerProvider(petId));
                   }
                 },
@@ -60,7 +60,9 @@ class PetRemindersPage extends ConsumerWidget {
             data: (items) => RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(petRemindersControllerProvider(petId));
-                await ref.read(petRemindersControllerProvider(petId).future);
+                try {
+                  await ref.read(petRemindersControllerProvider(petId).future);
+                } catch (_) {}
               },
               child: RemindersListView(
                 petId: petId,

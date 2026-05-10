@@ -118,9 +118,9 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
       state = AsyncData(
         await _reloadLists(current.copyWith(isCreating: false)),
       );
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(current.copyWith(isCreating: false));
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -175,14 +175,14 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
         ),
       );
       return mapProcedure(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyProcedureIds: Set<String>.from(current.busyProcedureIds)
             ..remove(procedureId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -226,14 +226,14 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
         ),
       );
       return mapProcedure(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyProcedureIds: Set<String>.from(current.busyProcedureIds)
             ..remove(procedureId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -271,14 +271,14 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
         ),
       );
       return mapProcedure(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyProcedureIds: Set<String>.from(current.busyProcedureIds)
             ..remove(procedure.id),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -311,14 +311,14 @@ class PetProceduresController extends AsyncNotifier<PetProceduresState> {
           ),
         ),
       );
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyProcedureIds: Set<String>.from(current.busyProcedureIds)
             ..remove(procedureId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 

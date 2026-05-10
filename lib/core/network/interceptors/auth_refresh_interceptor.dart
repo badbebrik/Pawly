@@ -43,8 +43,15 @@ class AuthRefreshInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    final refreshed = await (_refreshInFlight ??= _refreshAccessToken());
-    _refreshInFlight = null;
+    final refreshFuture = _refreshInFlight ??= _refreshAccessToken();
+    final bool refreshed;
+    try {
+      refreshed = await refreshFuture;
+    } finally {
+      if (identical(_refreshInFlight, refreshFuture)) {
+        _refreshInFlight = null;
+      }
+    }
 
     if (!refreshed) {
       await _sessionStore.clear();
@@ -112,9 +119,7 @@ class AuthRefreshInterceptor extends Interceptor {
       );
 
       return true;
-    } on DioException {
-      return false;
-    } on FormatException {
+    } on Object {
       return false;
     }
   }

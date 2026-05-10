@@ -119,7 +119,9 @@ class _PetMetricPickerPageState extends ConsumerState<PetMetricPickerPage> {
     }
 
     ref.invalidate(petLogComposerBootstrapProvider(widget.petId));
-    await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    try {
+      await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    } catch (_) {}
     if (!mounted) {
       return;
     }

@@ -118,7 +118,7 @@ class LogsFilters extends StatelessWidget {
       },
     );
 
-    if (selectedTypeIds == null) {
+    if (!context.mounted || selectedTypeIds == null) {
       return;
     }
     onApplyTypeFilters(selectedTypeIds);

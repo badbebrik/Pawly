@@ -85,6 +85,9 @@ class _VaccinationComposerSheetState
   final Set<String> _selectedTargetIds = <String>{};
   final List<String> _customTargetNames = <String>[];
 
+  late List<String> _allowedStatuses;
+  late List<HealthBucketOption<String>> _statusOptions;
+  late List<HealthDictionaryItem> _targetItems;
   late String _status;
   DateTime? _scheduledAt;
   DateTime? _administeredAt;
@@ -98,11 +101,16 @@ class _VaccinationComposerSheetState
   void initState() {
     super.initState();
     final initial = widget.initialVaccination;
-    final allowedStatuses = _allowedStatuses;
+    _allowedStatuses = _normalizeAllowedStatuses(widget.allowedStatuses);
+    _statusOptions = _buildStatusOptions(_allowedStatuses);
+    _targetItems = _buildTargetItems(
+      widget.vaccinationTargets,
+      widget.initialVaccination,
+    );
     _status = initial == null
-        ? (allowedStatuses.contains('PLANNED')
+        ? (_allowedStatuses.contains('PLANNED')
             ? 'PLANNED'
-            : allowedStatuses.first)
+            : _allowedStatuses.first)
         : initial.status;
     _nameController.text = initial?.vaccineName ?? '';
     _clinicController.text = initial?.clinicName ?? '';
@@ -127,9 +135,30 @@ class _VaccinationComposerSheetState
     );
   }
 
-  List<String> get _allowedStatuses {
+  @override
+  void didUpdateWidget(covariant _VaccinationComposerSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.allowedStatuses, widget.allowedStatuses)) {
+      _allowedStatuses = _normalizeAllowedStatuses(widget.allowedStatuses);
+      _statusOptions = _buildStatusOptions(_allowedStatuses);
+      if (!_allowedStatuses.contains(_status)) {
+        _status = _allowedStatuses.first;
+      }
+    }
+
+    if (!identical(oldWidget.vaccinationTargets, widget.vaccinationTargets) ||
+        !identical(oldWidget.initialVaccination, widget.initialVaccination)) {
+      _targetItems = _buildTargetItems(
+        widget.vaccinationTargets,
+        widget.initialVaccination,
+      );
+    }
+  }
+
+  static List<String> _normalizeAllowedStatuses(List<String> rawStatuses) {
     final statuses = <String>[];
-    for (final rawStatus in widget.allowedStatuses) {
+    for (final rawStatus in rawStatuses) {
       final status = rawStatus.trim().toUpperCase();
       if (!const <String>{'PLANNED', 'COMPLETED'}.contains(status) ||
           statuses.contains(status)) {
@@ -137,7 +166,41 @@ class _VaccinationComposerSheetState
       }
       statuses.add(status);
     }
-    return statuses.isEmpty ? const <String>['PLANNED', 'COMPLETED'] : statuses;
+    return List<String>.unmodifiable(
+      statuses.isEmpty ? const <String>['PLANNED', 'COMPLETED'] : statuses,
+    );
+  }
+
+  static List<HealthBucketOption<String>> _buildStatusOptions(
+    List<String> statuses,
+  ) {
+    return List<HealthBucketOption<String>>.unmodifiable(
+      statuses.map(
+        (status) => HealthBucketOption<String>(
+          value: status,
+          label: formatVaccinationStatusLabel(status),
+        ),
+      ),
+    );
+  }
+
+  static List<HealthDictionaryItem> _buildTargetItems(
+    List<HealthDictionaryItem> vaccinationTargets,
+    Vaccination? initialVaccination,
+  ) {
+    final byId = <String, HealthDictionaryItem>{};
+    for (final item in vaccinationTargets) {
+      if (!item.isArchived) {
+        byId[item.id] = item;
+      }
+    }
+    for (final item
+        in initialVaccination?.targets ?? const <HealthDictionaryItem>[]) {
+      byId[item.id] = item;
+    }
+    return List<HealthDictionaryItem>.unmodifiable(
+      byId.values.toList()..sort((a, b) => a.name.compareTo(b.name)),
+    );
   }
 
   @override
@@ -147,21 +210,6 @@ class _VaccinationComposerSheetState
     _vetController.dispose();
     _notesController.dispose();
     super.dispose();
-  }
-
-  List<HealthDictionaryItem> get _targetItems {
-    final byId = <String, HealthDictionaryItem>{};
-    for (final item in widget.vaccinationTargets) {
-      if (!item.isArchived) {
-        byId[item.id] = item;
-      }
-    }
-    for (final item in widget.initialVaccination?.targets ??
-        const <HealthDictionaryItem>[]) {
-      byId[item.id] = item;
-    }
-    return byId.values.toList(growable: false)
-      ..sort((a, b) => a.name.compareTo(b.name));
   }
 
   @override
@@ -207,15 +255,8 @@ class _VaccinationComposerSheetState
                   children: <Widget>[
                     HealthBucketSegment<String>(
                       selectedValue: _status,
-                      onChanged: (status) => setState(() => _status = status),
-                      options: _allowedStatuses
-                          .map(
-                            (status) => HealthBucketOption<String>(
-                              value: status,
-                              label: formatVaccinationStatusLabel(status),
-                            ),
-                          )
-                          .toList(growable: false),
+                      onChanged: _setStatus,
+                      options: _statusOptions,
                     ),
                   ],
                 ),
@@ -256,15 +297,7 @@ class _VaccinationComposerSheetState
                             label: _scheduledAt == null
                                 ? 'Дата и время по плану'
                                 : 'Дата и время по плану: ${formatHealthDateTime(_scheduledAt!)}',
-                            onTap: () async {
-                              final picked = await pickHealthDateTime(
-                                context,
-                                initialDate: _scheduledAt ?? DateTime.now(),
-                              );
-                              if (picked != null) {
-                                setState(() => _scheduledAt = picked);
-                              }
-                            },
+                            onTap: _pickScheduledAt,
                           ),
                         if (_status == 'COMPLETED') ...<Widget>[
                           if (_scheduledAt != null) ...<Widget>[
@@ -287,33 +320,14 @@ class _VaccinationComposerSheetState
                             label: _administeredAt == null
                                 ? 'Дата и время выполнения'
                                 : 'Дата и время выполнения: ${formatHealthDateTime(_administeredAt!)}',
-                            onTap: () async {
-                              final picked = await pickHealthDateTime(
-                                context,
-                                initialDate: _administeredAt ??
-                                    _scheduledAt ??
-                                    DateTime.now(),
-                              );
-                              if (picked != null) {
-                                setState(() => _administeredAt = picked);
-                              }
-                            },
+                            onTap: _pickAdministeredAt,
                           ),
                           const SizedBox(height: PawlySpacing.sm),
                           HealthDateButton(
                             label: _nextDueAt == null
                                 ? 'Дата и время ревакцинации'
                                 : 'Дата и время ревакцинации: ${formatHealthDateTime(_nextDueAt!)}',
-                            onTap: () async {
-                              final picked = await pickHealthDateTime(
-                                context,
-                                initialDate: _nextDueAt ?? DateTime.now(),
-                                firstDate: _administeredAt ?? DateTime.now(),
-                              );
-                              if (picked != null) {
-                                setState(() => _nextDueAt = picked);
-                              }
-                            },
+                            onTap: _pickNextDueAt,
                             secondary: true,
                           ),
                         ],
@@ -517,6 +531,9 @@ class _VaccinationComposerSheetState
   }
 
   void _setAttachments(List<AttachmentDraftItem> attachments) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _attachments
         ..clear()
@@ -525,6 +542,9 @@ class _VaccinationComposerSheetState
   }
 
   void _setUploadingAttachments(bool value) {
+    if (!mounted || _isUploadingAttachments == value) {
+      return;
+    }
     setState(() => _isUploadingAttachments = value);
   }
 
@@ -542,5 +562,74 @@ class _VaccinationComposerSheetState
   String? _emptyToNull(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  void _setStatus(String status) {
+    if (status == _status) {
+      return;
+    }
+    setState(() => _status = status);
+  }
+
+  Future<void> _pickScheduledAt() {
+    return _pickDateTime(
+      initialDate: _scheduledAt ?? DateTime.now(),
+      onPicked: (picked) => _scheduledAt = picked,
+    );
+  }
+
+  Future<void> _pickAdministeredAt() {
+    return _pickDateTime(
+      initialDate: _administeredAt ?? _scheduledAt ?? DateTime.now(),
+      onPicked: (picked) => _administeredAt = picked,
+    );
+  }
+
+  Future<void> _pickNextDueAt() {
+    return _pickDateTime(
+      initialDate: _nextDueAt ?? DateTime.now(),
+      firstDate: _administeredAt ?? DateTime.now(),
+      onPicked: (picked) => _nextDueAt = picked,
+    );
+  }
+
+  Future<void> _pickDateTime({
+    required DateTime initialDate,
+    required ValueChanged<DateTime> onPicked,
+    DateTime? firstDate,
+  }) async {
+    final resolvedInitialDate =
+        firstDate != null && initialDate.isBefore(firstDate)
+            ? firstDate
+            : initialDate;
+
+    DateTime? picked;
+    try {
+      picked = await pickHealthDateTime(
+        context,
+        initialDate: resolvedInitialDate,
+        firstDate: firstDate,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      showPawlySnackBar(
+        context,
+        message: 'Не удалось открыть выбор даты.',
+        tone: PawlySnackBarTone.error,
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    if (picked == null) {
+      return;
+    }
+
+    final resolvedPicked = picked;
+    setState(() => onPicked(resolvedPicked));
   }
 }

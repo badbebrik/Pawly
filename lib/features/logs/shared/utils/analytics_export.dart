@@ -9,36 +9,44 @@ String buildAnalyticsMetricSeriesCsv({
   required AnalyticsMetricItem metric,
   required MetricSeries series,
 }) {
-  final buffer = StringBuffer('\uFEFF');
-  final rows = <List<String>>[
-    <String>[
-      'Дата и время',
-      'Показатель',
-      'Тип показателя',
-      'Значение',
-      'Единица',
-      'Тип записи',
-      'Источник',
-      'ID записи',
-    ],
-    ...series.points.map(
-      (point) => <String>[
-        formatAnalyticsExportDateTime(point.occurredAt),
-        metric.metricName,
-        analyticsMetricKindLabel(metric.inputKind),
-        formatAnalyticsExportValue(point.valueNum, metric.inputKind),
-        formatDisplayUnitCode(metric.unitCode),
-        point.logTypeName ?? '',
-        point.source,
-        point.logId,
-      ],
-    ),
-  ];
-
-  for (final row in rows) {
-    buffer.writeln(row.map(_escapeCsvCell).join(','));
-  }
+  final buffer = StringBuffer();
+  writeAnalyticsMetricSeriesCsv(
+    sink: buffer,
+    metric: metric,
+    series: series,
+  );
   return buffer.toString();
+}
+
+void writeAnalyticsMetricSeriesCsv({
+  required StringSink sink,
+  required AnalyticsMetricItem metric,
+  required MetricSeries series,
+}) {
+  sink.write('\uFEFF');
+  _writeCsvRow(sink, const <String>[
+    'Дата и время',
+    'Показатель',
+    'Тип показателя',
+    'Значение',
+    'Единица',
+    'Тип записи',
+    'Источник',
+    'ID записи',
+  ]);
+
+  for (final point in series.points) {
+    _writeCsvRow(sink, <String>[
+      formatAnalyticsExportDateTime(point.occurredAt),
+      metric.metricName,
+      analyticsMetricKindLabel(metric.inputKind),
+      formatAnalyticsExportValue(point.valueNum, metric.inputKind),
+      formatDisplayUnitCode(metric.unitCode),
+      point.logTypeName ?? '',
+      point.source,
+      point.logId,
+    ]);
+  }
 }
 
 String analyticsMetricSeriesExportFileName(AnalyticsMetricItem metric) {
@@ -72,6 +80,19 @@ String formatAnalyticsExportValue(double value, String inputKind) {
     return value == 0 ? 'Нет' : 'Да';
   }
   return value % 1 == 0 ? value.toStringAsFixed(0) : value.toString();
+}
+
+void _writeCsvRow(StringSink sink, Iterable<String> row) {
+  var isFirst = true;
+  for (final cell in row) {
+    if (isFirst) {
+      isFirst = false;
+    } else {
+      sink.write(',');
+    }
+    sink.write(_escapeCsvCell(cell));
+  }
+  sink.writeln();
 }
 
 String _escapeCsvCell(String value) {

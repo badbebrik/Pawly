@@ -176,7 +176,7 @@ class _AnalyticsFiltersSheetState extends State<AnalyticsFiltersSheet> {
       saveText: 'Применить',
       cancelText: 'Отмена',
     );
-    if (pickedRange == null) {
+    if (!mounted || pickedRange == null) {
       return;
     }
 
@@ -211,7 +211,7 @@ class _AnalyticsFiltersSheetState extends State<AnalyticsFiltersSheet> {
         selectedTypeIds: _selectedTypeIds,
       ),
     );
-    if (selectedIds == null) {
+    if (!mounted || selectedIds == null) {
       return;
     }
 

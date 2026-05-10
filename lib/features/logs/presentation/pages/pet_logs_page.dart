@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -40,34 +42,46 @@ class PetLogsPage extends ConsumerWidget {
             data: (state) => LogsListView(
               petId: petId,
               state: state,
-              onRefresh: () =>
-                  ref.read(petLogsControllerProvider(petId).notifier).reload(),
-              onSearchChanged: (value) => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .setSearchQuery(value),
-              onToggleType: (typeId) => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .toggleTypeFilter(typeId),
-              onApplyTypeFilters: (typeIds) => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .setTypeFilters(typeIds),
-              onSetSource: (source) => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .setSourceFilter(source),
-              onSetWithAttachmentsOnly: (value) => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .setWithAttachmentsOnly(value),
-              onSetWithMetricsOnly: (value) => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .setWithMetricsOnly(value),
-              onLoadMore: () => ref
-                  .read(petLogsControllerProvider(petId).notifier)
-                  .loadMore(),
+              onRefresh: () => _refreshLogs(ref, petId),
+              onSearchChanged: (value) => _ignoreControllerError(
+                ref
+                    .read(petLogsControllerProvider(petId).notifier)
+                    .setSearchQuery(value),
+              ),
+              onToggleType: (typeId) => _ignoreControllerError(
+                ref
+                    .read(petLogsControllerProvider(petId).notifier)
+                    .toggleTypeFilter(typeId),
+              ),
+              onApplyTypeFilters: (typeIds) => _ignoreControllerError(
+                ref
+                    .read(petLogsControllerProvider(petId).notifier)
+                    .setTypeFilters(typeIds),
+              ),
+              onSetSource: (source) => _ignoreControllerError(
+                ref
+                    .read(petLogsControllerProvider(petId).notifier)
+                    .setSourceFilter(source),
+              ),
+              onSetWithAttachmentsOnly: (value) => _ignoreControllerError(
+                ref
+                    .read(petLogsControllerProvider(petId).notifier)
+                    .setWithAttachmentsOnly(value),
+              ),
+              onSetWithMetricsOnly: (value) => _ignoreControllerError(
+                ref
+                    .read(petLogsControllerProvider(petId).notifier)
+                    .setWithMetricsOnly(value),
+              ),
+              onLoadMore: () => _safeControllerFuture(
+                ref.read(petLogsControllerProvider(petId).notifier).loadMore(),
+              ),
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => LogsErrorView(
-              onRetry: () =>
-                  ref.read(petLogsControllerProvider(petId).notifier).reload(),
+              onRetry: () => _ignoreControllerError(
+                ref.read(petLogsControllerProvider(petId).notifier).reload(),
+              ),
             ),
           ),
         );
@@ -91,7 +105,23 @@ class PetLogsPage extends ConsumerWidget {
       pathParameters: <String, String>{'petId': petId},
     );
     if (created == true && context.mounted) {
-      await ref.read(petLogsControllerProvider(petId).notifier).reload();
+      await _refreshLogs(ref, petId);
     }
   }
+}
+
+Future<void> _refreshLogs(WidgetRef ref, String petId) async {
+  try {
+    await ref.read(petLogsControllerProvider(petId).notifier).reload();
+  } catch (_) {}
+}
+
+void _ignoreControllerError(Future<void> future) {
+  unawaited(future.catchError((_) {}));
+}
+
+Future<void> _safeControllerFuture(Future<void> future) async {
+  try {
+    await future;
+  } catch (_) {}
 }

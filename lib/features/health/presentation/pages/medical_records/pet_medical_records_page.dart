@@ -120,8 +120,8 @@ class _PetMedicalRecordsPageState extends ConsumerState<PetMedicalRecordsPage> {
       await ref
           .read(petMedicalRecordsControllerProvider(widget.petId).notifier)
           .createMedicalRecord(input: input);
-      ref.invalidate(petHealthHomeProvider(widget.petId));
       if (!mounted) return;
+      ref.invalidate(petHealthHomeProvider(widget.petId));
       showPawlySnackBar(
         context,
         message: 'Запись медкарты сохранена.',
@@ -185,7 +185,9 @@ class PetMedicalRecordDetailsPage extends ConsumerWidget {
           record: record,
           onRefresh: () async {
             ref.invalidate(petMedicalRecordDetailsProvider(recordRef));
-            await ref.read(petMedicalRecordDetailsProvider(recordRef).future);
+            try {
+              await ref.read(petMedicalRecordDetailsProvider(recordRef).future);
+            } catch (_) {}
           },
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -229,13 +231,13 @@ class PetMedicalRecordDetailsPage extends ConsumerWidget {
             recordId: recordId,
             input: input,
           );
+      if (!context.mounted) return;
       ref.invalidate(
         petMedicalRecordDetailsProvider(
           PetMedicalRecordRef(petId: petId, recordId: recordId),
         ),
       );
       ref.invalidate(petHealthHomeProvider(petId));
-      if (!context.mounted) return;
       showPawlySnackBar(
         context,
         message: 'Изменения сохранены.',
@@ -288,13 +290,13 @@ class PetMedicalRecordDetailsPage extends ConsumerWidget {
             recordId: record.id,
             rowVersion: record.rowVersion,
           );
+      if (!context.mounted) return;
       ref.invalidate(
         petMedicalRecordDetailsProvider(
           PetMedicalRecordRef(petId: petId, recordId: recordId),
         ),
       );
       ref.invalidate(petHealthHomeProvider(petId));
-      if (!context.mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!context.mounted) return;

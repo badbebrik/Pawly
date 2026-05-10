@@ -118,9 +118,9 @@ class PetMedicalRecordsController
       state = AsyncData(
         await _reloadLists(current.copyWith(isCreating: false)),
       );
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(current.copyWith(isCreating: false));
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -175,14 +175,14 @@ class PetMedicalRecordsController
         ),
       );
       return mapMedicalRecord(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyRecordIds: Set<String>.from(current.busyRecordIds)
             ..remove(recordId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -215,14 +215,14 @@ class PetMedicalRecordsController
           ),
         ),
       );
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyRecordIds: Set<String>.from(current.busyRecordIds)
             ..remove(recordId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 

@@ -4,16 +4,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'image_memory_pressure.dart';
+
 class SystemSettingsLauncher {
   const SystemSettingsLauncher();
 
-  static const MethodChannel _channel =
-      MethodChannel('com.hse.pawly/system_settings');
+  static const MethodChannel _channel = MethodChannel(
+    'com.hse.pawly/system_settings',
+  );
 
   Future<bool> openNotificationSettings() async {
     if (kIsWeb) {
       return false;
     }
+
+    trimDecodedImageMemory(includeLiveImages: true);
 
     if (Platform.isAndroid) {
       return await _invokeAndroid('openNotificationSettings');

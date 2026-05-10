@@ -236,6 +236,9 @@ class _PetEditPageState extends ConsumerState<PetEditPage> {
       lastDate: lastDate,
       initialDate: initial ?? DateTime(lastDate.year - 1),
     );
+    if (!mounted) {
+      return;
+    }
     onPicked(picked);
   }
 

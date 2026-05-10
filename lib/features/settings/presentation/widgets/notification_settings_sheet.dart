@@ -15,7 +15,12 @@ Future<void> showNotificationSettingsSheet(
     isScrollControlled: true,
     builder: (context) => const _NotificationSettingsSheet(),
   );
-  await ref.read(settingsNotificationControllerProvider.notifier).reload();
+  if (!context.mounted) {
+    return;
+  }
+  try {
+    await ref.read(settingsNotificationControllerProvider.notifier).reload();
+  } catch (_) {}
 }
 
 class _NotificationSettingsSheet extends ConsumerWidget {

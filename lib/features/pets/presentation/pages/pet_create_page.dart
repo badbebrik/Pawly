@@ -275,6 +275,9 @@ class _PetCreatePageState extends ConsumerState<PetCreatePage> {
       lastDate: now,
       initialDate: initial ?? DateTime(now.year - 1),
     );
+    if (!mounted) {
+      return;
+    }
     onPicked(date);
   }
 

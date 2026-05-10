@@ -222,6 +222,8 @@ class AuthRepository {
   }
 
   void _syncPushTokenInBackground() {
-    unawaited(_pushNotificationsService.syncTokenForCurrentSession());
+    unawaited(
+      _pushNotificationsService.syncTokenForCurrentSession().catchError((_) {}),
+    );
   }
 }

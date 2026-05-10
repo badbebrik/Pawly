@@ -66,6 +66,13 @@ class _ChatSocketLifecycleBinding extends ConsumerStatefulWidget {
 class _ChatSocketLifecycleBindingState
     extends ConsumerState<_ChatSocketLifecycleBinding>
     with WidgetsBindingObserver {
+  static const Duration _backgroundDisconnectDelay = Duration(seconds: 3);
+  static const Duration _resumeConnectDelay = Duration(milliseconds: 600);
+
+  Timer? _pauseTimer;
+  Timer? _resumeTimer;
+  AppLifecycleState? _lastLifecycleState;
+
   @override
   void initState() {
     super.initState();
@@ -75,22 +82,45 @@ class _ChatSocketLifecycleBindingState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pauseTimer?.cancel();
+    _resumeTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_lastLifecycleState == state) {
+      return;
+    }
+    _lastLifecycleState = state;
+
     switch (state) {
       case AppLifecycleState.resumed:
-        _resumeChatSocket();
+        _scheduleChatSocketResume();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
+        _scheduleChatSocketPause();
+        break;
       case AppLifecycleState.detached:
+        _pauseTimer?.cancel();
+        _resumeTimer?.cancel();
         _pauseChatSocket();
         break;
     }
+  }
+
+  void _scheduleChatSocketPause() {
+    _resumeTimer?.cancel();
+    _pauseTimer?.cancel();
+    _pauseTimer = Timer(_backgroundDisconnectDelay, _pauseChatSocket);
+  }
+
+  void _scheduleChatSocketResume() {
+    _pauseTimer?.cancel();
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(_resumeConnectDelay, _resumeChatSocket);
   }
 
   void _pauseChatSocket() {
@@ -131,13 +161,19 @@ class _PushNotificationsBindingState
   void initState() {
     super.initState();
     Future<void>.microtask(() async {
-      final service = ref.read(pushNotificationsServiceProvider);
-      _openedMessagesSubscription = service.openedMessages.listen(
-        _handleOpenedMessage,
-      );
-      await service.initialize();
-      if (!mounted) {
-        return;
+      try {
+        final service = ref.read(pushNotificationsServiceProvider);
+        _openedMessagesSubscription = service.openedMessages.listen(
+          _handleOpenedMessage,
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('[push] opened message stream error: $error');
+            debugPrintStack(stackTrace: stackTrace);
+          },
+        );
+        await service.initialize();
+      } catch (error, stackTrace) {
+        debugPrint('[push] init failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
       }
     });
   }

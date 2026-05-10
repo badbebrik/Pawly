@@ -96,6 +96,9 @@ Future<void> _runProfilePhotoAction({
   required String fallbackMessage,
   required Future<void> Function() action,
 }) async {
+  if (!context.mounted) {
+    return;
+  }
   try {
     await action();
   } catch (error) {

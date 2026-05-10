@@ -133,7 +133,7 @@ final pushNotificationsServiceProvider = Provider<PushNotificationsService>((
     authSessionStore: authSessionStore,
   );
   ref.onDispose(() {
-    unawaited(service.dispose());
+    unawaited(service.dispose().catchError((_) {}));
   });
   return service;
 });

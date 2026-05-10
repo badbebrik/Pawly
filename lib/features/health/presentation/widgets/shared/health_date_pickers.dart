@@ -114,6 +114,9 @@ class _HealthRequiredDateTimeDialogState
       initialDate: _selectedDate,
       firstDate: widget.firstDate,
     );
+    if (!mounted) {
+      return;
+    }
     if (picked != null) {
       setState(() => _selectedDate = picked);
     }
@@ -189,6 +192,9 @@ class _HealthOptionalDateTimeDialogState
       initialDate: _selectedDate ?? widget.initialDate,
       firstDate: widget.firstDate ?? widget.initialDate,
     );
+    if (!mounted) {
+      return;
+    }
     if (picked != null) {
       setState(() => _selectedDate = picked);
     }

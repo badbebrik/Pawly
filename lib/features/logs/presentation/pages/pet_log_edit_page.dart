@@ -152,7 +152,9 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
     }
 
     ref.invalidate(petLogComposerBootstrapProvider(widget.petId));
-    await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    try {
+      await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    } catch (_) {}
     if (!mounted) {
       return;
     }
@@ -208,12 +210,18 @@ class _PetLogEditPageState extends ConsumerState<PetLogEditPage> {
   }
 
   void _setAttachments(List<AttachmentDraftItem> attachments) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _draft.setAttachments(attachments);
     });
   }
 
   void _setUploadingAttachments(bool value) {
+    if (!mounted || _draft.isUploadingAttachments == value) {
+      return;
+    }
     setState(() {
       _draft.setUploadingAttachments(value);
     });

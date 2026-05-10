@@ -123,10 +123,10 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
       await ref
           .read(petVaccinationsControllerProvider(widget.petId).notifier)
           .createVaccination(input: input);
-      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
+      _invalidateHealthDerivedData(ref, widget.petId);
       showPawlySnackBar(
         context,
         message: 'Вакцинация сохранена.',
@@ -169,10 +169,10 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
             vaccinationId: card.id,
             administeredAt: administeredAt,
           );
-      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
+      _invalidateHealthDerivedData(ref, widget.petId);
 
       showPawlySnackBar(
         context,
@@ -189,8 +189,14 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
           initialDate: _defaultRevaccinationDate(administeredAt),
         ),
       );
-      if (nextDueAt == null || !mounted) {
+      if (nextDueAt == null) {
+        if (!mounted) {
+          return;
+        }
         setState(() => _selectedBucket = VaccinationBucket.history);
+        return;
+      }
+      if (!mounted) {
         return;
       }
 
@@ -200,10 +206,10 @@ class _PetVaccinationsPageState extends ConsumerState<PetVaccinationsPage> {
             vaccination: updated,
             nextDueAt: nextDueAt,
           );
-      _invalidateHealthDerivedData(ref, widget.petId);
       if (!mounted) {
         return;
       }
+      _invalidateHealthDerivedData(ref, widget.petId);
 
       showPawlySnackBar(
         context,
@@ -287,8 +293,10 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
           vaccination: vaccination,
           onRefresh: () async {
             ref.invalidate(petVaccinationDetailsProvider(vaccinationRef));
-            await ref
-                .read(petVaccinationDetailsProvider(vaccinationRef).future);
+            try {
+              await ref
+                  .read(petVaccinationDetailsProvider(vaccinationRef).future);
+            } catch (_) {}
           },
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -341,15 +349,15 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
             vaccinationId: vaccinationId,
             input: input,
           );
+      if (!context.mounted) {
+        return;
+      }
       ref.invalidate(
         petVaccinationDetailsProvider(
           PetVaccinationRef(petId: petId, vaccinationId: vaccinationId),
         ),
       );
       _invalidateHealthDerivedData(ref, petId);
-      if (!context.mounted) {
-        return;
-      }
       showPawlySnackBar(
         context,
         message: 'Изменения сохранены.',
@@ -408,15 +416,15 @@ class PetVaccinationDetailsPage extends ConsumerWidget {
             vaccinationId: vaccination.id,
             rowVersion: vaccination.rowVersion,
           );
+      if (!context.mounted) {
+        return;
+      }
       ref.invalidate(
         petVaccinationDetailsProvider(
           PetVaccinationRef(petId: petId, vaccinationId: vaccinationId),
         ),
       );
       _invalidateHealthDerivedData(ref, petId);
-      if (!context.mounted) {
-        return;
-      }
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!context.mounted) {

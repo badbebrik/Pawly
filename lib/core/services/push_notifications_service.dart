@@ -17,7 +17,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> ensureFirebaseInitialized() async {
-  if (!_supportsPushPlatform()) {
+  if (!_supportsFirebasePlatform()) {
     return;
   }
 
@@ -131,13 +131,25 @@ class PushNotificationsService {
     debugPrint('[push] initialize: subscribe onMessageOpenedApp');
     _messageOpenedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
       _emitOpenedMessage,
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('[push] onMessageOpenedApp error: $error');
+      },
     );
     debugPrint('[push] initialize: onMessageOpenedApp subscribed');
 
     debugPrint('[push] initialize: subscribe onTokenRefresh');
-    _tokenRefreshSubscription = messaging.onTokenRefresh.listen((token) async {
-      await _registerTokenIfPossible(token: token, force: true);
-    });
+    _tokenRefreshSubscription = messaging.onTokenRefresh.listen(
+      (token) {
+        unawaited(
+          _registerTokenIfPossible(token: token, force: true).catchError(
+            (_) {},
+          ),
+        );
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('[push] onTokenRefresh error: $error');
+      },
+    );
     debugPrint('[push] initialize: onTokenRefresh subscribed');
 
     debugPrint('[push] initialize: getInitialMessage');
@@ -318,6 +330,17 @@ bool _supportsPushPlatform() {
   return switch (defaultTargetPlatform) {
     TargetPlatform.android => true,
     TargetPlatform.iOS => false,
+    _ => false,
+  };
+}
+
+bool _supportsFirebasePlatform() {
+  if (kIsWeb) {
+    return false;
+  }
+
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.android || TargetPlatform.iOS => true,
     _ => false,
   };
 }

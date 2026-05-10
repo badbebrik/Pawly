@@ -1,10 +1,11 @@
-import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/services/image_memory_pressure.dart';
 import '../../../../design_system/design_system.dart';
 import '../../controllers/analytics_controller.dart';
 import '../../controllers/logs_controller.dart';
@@ -121,8 +122,9 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
             hasTypeFilters: _selectedTypeIds.isNotEmpty,
             hasPeriodFilters: _dateFrom != null || _dateTo != null,
             onClearTypes: _selectedTypeIds.isEmpty ? null : _clearTypeFilters,
-            onShowAllTime:
-                (_dateFrom == null && _dateTo == null) ? null : _showAllTime,
+            onShowAllTime: (_dateFrom == null && _dateTo == null)
+                ? null
+                : _showAllTime,
           ),
         ],
       );
@@ -190,7 +192,7 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
         selectedMetricId: _selectedMetricId ?? metrics.first.metricId,
       ),
     );
-    if (nextMetricId == null) {
+    if (!mounted || nextMetricId == null) {
       return;
     }
 
@@ -215,7 +217,7 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
         typeCatalog: typeCatalog,
       ),
     );
-    if (nextFilters == null) {
+    if (!mounted || nextFilters == null) {
       return;
     }
 
@@ -267,29 +269,52 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
       return;
     }
 
+    Directory? exportDir;
     try {
-      final csv = buildAnalyticsMetricSeriesCsv(
-        metric: metric,
-        series: series,
-      );
       final fileName = analyticsMetricSeriesExportFileName(metric);
-      final bytes = Uint8List.fromList(utf8.encode(csv));
-      final box = context.findRenderObject() as RenderBox?;
-
-      await Share.shareXFiles(
-        <XFile>[
-          XFile.fromData(
-            bytes,
-            name: fileName,
-            mimeType: analyticsCsvMimeType,
-          ),
-        ],
-        fileNameOverrides: <String>[fileName],
-        subject: 'Экспорт показателя ${metric.metricName}',
-        sharePositionOrigin:
-            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      exportDir = await Directory.systemTemp.createTemp('pawly_csv_export_');
+      final exportFile = File(
+        '${exportDir.path}${Platform.pathSeparator}$fileName',
       );
+      final sink = exportFile.openWrite();
+      try {
+        writeAnalyticsMetricSeriesCsv(
+          sink: sink,
+          metric: metric,
+          series: series,
+        );
+      } finally {
+        await sink.close();
+      }
+      if (!mounted) {
+        unawaited(_deleteExportDirectory(exportDir));
+        return;
+      }
+
+      final box = context.findRenderObject() as RenderBox?;
+      trimDecodedImageMemory(includeLiveImages: true);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[
+            XFile(
+              exportFile.path,
+              name: fileName,
+              mimeType: analyticsCsvMimeType,
+            ),
+          ],
+          fileNameOverrides: <String>[fileName],
+          subject: 'Экспорт показателя ${metric.metricName}',
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+      unawaited(_deleteExportDirectoryLater(exportDir));
     } catch (_) {
+      if (exportDir != null) {
+        unawaited(_deleteExportDirectory(exportDir));
+      }
       if (!mounted) {
         return;
       }
@@ -299,5 +324,18 @@ class _PetAnalyticsPageState extends ConsumerState<PetAnalyticsPage> {
         tone: PawlySnackBarTone.error,
       );
     }
+  }
+
+  Future<void> _deleteExportDirectoryLater(Directory directory) async {
+    await Future<void>.delayed(const Duration(minutes: 10));
+    await _deleteExportDirectory(directory);
+  }
+
+  Future<void> _deleteExportDirectory(Directory directory) async {
+    try {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    } catch (_) {}
   }
 }

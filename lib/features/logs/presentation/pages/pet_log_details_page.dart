@@ -40,9 +40,7 @@ class PetLogDetailsPage extends ConsumerWidget {
                   },
                 );
                 if (updated == true && context.mounted) {
-                  await ref
-                      .read(petLogDetailsControllerProvider(logRef).notifier)
-                      .reload();
+                  await _reloadLogDetails(ref, logRef);
                 }
               },
               icon: const Icon(Icons.edit_rounded),
@@ -60,15 +58,11 @@ class PetLogDetailsPage extends ConsumerWidget {
       body: logAsync.when(
         data: (log) => LogDetailsContentView(
           log: log,
-          onRefresh: () => ref
-              .read(petLogDetailsControllerProvider(logRef).notifier)
-              .reload(),
+          onRefresh: () => _reloadLogDetails(ref, logRef),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => LogDetailsErrorView(
-          onRetry: () => ref
-              .read(petLogDetailsControllerProvider(logRef).notifier)
-              .reload(),
+          onRetry: () => _reloadLogDetails(ref, logRef),
         ),
       ),
     );
@@ -131,4 +125,10 @@ class PetLogDetailsPage extends ConsumerWidget {
       );
     }
   }
+}
+
+Future<void> _reloadLogDetails(WidgetRef ref, PetLogRef logRef) async {
+  try {
+    await ref.read(petLogDetailsControllerProvider(logRef).notifier).reload();
+  } catch (_) {}
 }

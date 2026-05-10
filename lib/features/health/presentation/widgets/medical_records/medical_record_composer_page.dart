@@ -90,10 +90,9 @@ class _MedicalRecordComposerSheetState
   void initState() {
     super.initState();
     final initial = widget.initialRecord;
+    final allowedStatuses = _allowedStatuses;
     _status = initial?.status ??
-        (widget.allowedStatuses.contains('ACTIVE')
-            ? 'ACTIVE'
-            : widget.allowedStatuses.first);
+        (allowedStatuses.contains('ACTIVE') ? 'ACTIVE' : allowedStatuses.first);
     _recordTypeSelection = _initialRecordTypeSelection(initial);
     _titleController.text = initial?.title ?? '';
     _descriptionController.text = initial?.description ?? '';
@@ -119,21 +118,50 @@ class _MedicalRecordComposerSheetState
     super.dispose();
   }
 
+  List<String> get _allowedStatuses {
+    final statuses = <String>[];
+    for (final rawStatus in widget.allowedStatuses) {
+      final status = rawStatus.trim().toUpperCase();
+      if (!const <String>{'ACTIVE', 'RESOLVED'}.contains(status) ||
+          statuses.contains(status)) {
+        continue;
+      }
+      statuses.add(status);
+    }
+    return statuses.isEmpty ? const <String>['ACTIVE', 'RESOLVED'] : statuses;
+  }
+
   List<DropdownMenuItem<String>> get _recordTypeOptions {
-    final items = <HealthDictionaryItem>[
-      ...widget.allowedTypeItems.where((item) => !item.isArchived),
-    ];
+    final items = <HealthDictionaryItem>[];
+    final values = <String>{};
+
+    void addItem(HealthDictionaryItem item) {
+      final value = _recordTypeItemValue(item);
+      if (value == null || !values.add(value)) {
+        return;
+      }
+      items.add(item);
+    }
+
+    for (final item in widget.allowedTypeItems) {
+      if (!item.isArchived) {
+        addItem(item);
+      }
+    }
+
     final initialItem = widget.initialRecord?.recordTypeItem;
-    if (initialItem != null &&
-        !items.any((item) => item.id == initialItem.id)) {
-      items.add(initialItem);
+    if (initialItem != null) {
+      addItem(initialItem);
     }
 
     return <DropdownMenuItem<String>>[
       ...items.map(
         (item) => DropdownMenuItem<String>(
-          value: 'item:${item.id}',
-          child: Text(item.name),
+          value: _recordTypeItemValue(item),
+          child: Text(
+            item.name,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ),
       const DropdownMenuItem<String>(
@@ -143,23 +171,46 @@ class _MedicalRecordComposerSheetState
     ];
   }
 
-  String? get _selectedRecordTypeId {
-    if (!_recordTypeSelection.startsWith('item:')) {
+  String? _recordTypeItemValue(HealthDictionaryItem item) {
+    final id = item.id.trim();
+    return id.isEmpty ? null : 'item:$id';
+  }
+
+  String _resolvedRecordTypeSelection(
+    List<DropdownMenuItem<String>> options,
+  ) {
+    final values =
+        options.map((item) => item.value).whereType<String>().toSet();
+    if (values.contains(_recordTypeSelection)) {
+      return _recordTypeSelection;
+    }
+    return 'custom';
+  }
+
+  String? _selectedRecordTypeId(String selection) {
+    if (!selection.startsWith('item:')) {
       return null;
     }
-    return _recordTypeSelection.substring('item:'.length);
+    return selection.substring('item:'.length);
   }
 
   String _initialRecordTypeSelection(MedicalRecord? initial) {
     final initialItem = initial?.recordTypeItem;
     if (initialItem != null) {
-      return 'item:${initialItem.id}';
+      final value = _recordTypeItemValue(initialItem);
+      if (value != null) {
+        return value;
+      }
     }
 
-    final activeItems =
-        widget.allowedTypeItems.where((item) => !item.isArchived);
-    if (activeItems.isNotEmpty) {
-      return 'item:${activeItems.first.id}';
+    for (final item in widget.allowedTypeItems) {
+      if (item.isArchived) {
+        continue;
+      }
+      final value = _recordTypeItemValue(item);
+      if (value != null) {
+        return value;
+      }
     }
 
     return 'custom';
@@ -168,6 +219,8 @@ class _MedicalRecordComposerSheetState
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.of(context).viewInsets;
+    final recordTypeOptions = _recordTypeOptions;
+    final recordTypeSelection = _resolvedRecordTypeSelection(recordTypeOptions);
 
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets.bottom),
@@ -202,7 +255,7 @@ class _MedicalRecordComposerSheetState
                     HealthBucketSegment<String>(
                       selectedValue: _status,
                       onChanged: (status) => setState(() => _status = status),
-                      options: widget.allowedStatuses
+                      options: _allowedStatuses
                           .map(
                             (status) => HealthBucketOption<String>(
                               value: status,
@@ -219,12 +272,12 @@ class _MedicalRecordComposerSheetState
                   padding: EdgeInsets.zero,
                   children: <Widget>[
                     _MedicalRecordTypeField(
-                      value: _recordTypeSelection,
-                      items: _recordTypeOptions,
+                      value: recordTypeSelection,
+                      items: recordTypeOptions,
                       onChanged: (value) =>
                           setState(() => _recordTypeSelection = value),
                     ),
-                    if (_recordTypeSelection == 'custom')
+                    if (recordTypeSelection == 'custom')
                       HealthFormTextField(
                         controller: _customRecordTypeController,
                         label: 'Свой тип записи',
@@ -272,6 +325,9 @@ class _MedicalRecordComposerSheetState
                               context,
                               initialDate: _startedAt ?? DateTime.now(),
                             );
+                            if (!mounted) {
+                              return;
+                            }
                             if (picked != null) {
                               setState(() => _startedAt = picked);
                             }
@@ -289,6 +345,9 @@ class _MedicalRecordComposerSheetState
                                 initialDate:
                                     _resolvedAt ?? _startedAt ?? DateTime.now(),
                               );
+                              if (!mounted) {
+                                return;
+                              }
                               if (picked != null) {
                                 setState(() => _resolvedAt = picked);
                               }
@@ -338,10 +397,13 @@ class _MedicalRecordComposerSheetState
       return;
     }
 
+    final recordTypeSelection =
+        _resolvedRecordTypeSelection(_recordTypeOptions);
+
     Navigator.of(context).pop(
       UpsertMedicalRecordInput(
-        recordTypeId: _selectedRecordTypeId,
-        recordTypeName: _recordTypeSelection == 'custom'
+        recordTypeId: _selectedRecordTypeId(recordTypeSelection),
+        recordTypeName: recordTypeSelection == 'custom'
             ? nonEmptyHealthText(_customRecordTypeController.text)
             : null,
         status: _status,
@@ -356,6 +418,9 @@ class _MedicalRecordComposerSheetState
   }
 
   void _setAttachments(List<AttachmentDraftItem> attachments) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _attachments
         ..clear()
@@ -364,6 +429,9 @@ class _MedicalRecordComposerSheetState
   }
 
   void _setUploadingAttachments(bool value) {
+    if (!mounted || _isUploadingAttachments == value) {
+      return;
+    }
     setState(() => _isUploadingAttachments = value);
   }
 
@@ -398,7 +466,9 @@ class _MedicalRecordTypeField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
+      key: ValueKey<String>(value),
       initialValue: value,
+      isExpanded: true,
       decoration: healthFormRowDecoration(label: 'Тип записи'),
       items: items,
       onChanged: (value) {

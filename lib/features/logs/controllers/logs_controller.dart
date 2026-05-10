@@ -73,7 +73,7 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(searchQuery: value));
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> toggleTypeFilter(String typeId) async {
@@ -86,7 +86,7 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
       next.add(typeId);
     }
     state = AsyncData(current.copyWith(selectedTypeIds: next));
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> setTypeFilters(Set<String> typeIds) async {
@@ -94,7 +94,7 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
     if (current == null) return;
     state =
         AsyncData(current.copyWith(selectedTypeIds: Set<String>.from(typeIds)));
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> setSourceFilter(String? value) async {
@@ -104,28 +104,28 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
       current.copyWith(
           selectedSource: value, clearSelectedSource: value == null),
     );
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> setWithAttachmentsOnly(bool value) async {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(withAttachmentsOnly: value));
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> setWithMetricsOnly(bool value) async {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(withMetricsOnly: value));
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> setSort(String value) async {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(sort: value));
-    await _reloadLogs();
+    await _reloadLogsSafely();
   }
 
   Future<void> loadMore() async {
@@ -174,6 +174,14 @@ class PetLogsController extends AsyncNotifier<PetLogsState> {
         isLoadingMore: false,
       ),
     );
+  }
+
+  Future<void> _reloadLogsSafely() async {
+    try {
+      await _reloadLogs();
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   LogsQuery _query({PetLogsState? base, String? cursor}) {

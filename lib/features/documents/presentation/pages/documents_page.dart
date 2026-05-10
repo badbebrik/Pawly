@@ -56,22 +56,26 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
               searchController: _searchController,
               onSearchChanged: _onSearchChanged,
               onEntityFilterChanged: (value) {
-                ref
-                    .read(documentsControllerProvider(widget.petId).notifier)
-                    .setEntityFilter(value);
+                _ignoreControllerError(
+                  ref
+                      .read(documentsControllerProvider(widget.petId).notifier)
+                      .setEntityFilter(value),
+                );
               },
               onKindFilterChanged: (value) {
-                ref
-                    .read(documentsControllerProvider(widget.petId).notifier)
-                    .setKindFilter(value);
+                _ignoreControllerError(
+                  ref
+                      .read(documentsControllerProvider(widget.petId).notifier)
+                      .setKindFilter(value),
+                );
               },
-              onRefresh: () => ref
-                  .read(documentsControllerProvider(widget.petId).notifier)
-                  .reload(),
+              onRefresh: _refreshDocuments,
               onLoadMore: () {
-                ref
-                    .read(documentsControllerProvider(widget.petId).notifier)
-                    .loadMore();
+                _ignoreControllerError(
+                  ref
+                      .read(documentsControllerProvider(widget.petId).notifier)
+                      .loadMore(),
+                );
               },
               onOpenDocument: _openDocument,
               onRenameDocument: _renameDocument,
@@ -83,9 +87,11 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                 error,
                 'Не удалось загрузить документы.',
               ),
-              onRetry: () => ref
-                  .read(documentsControllerProvider(widget.petId).notifier)
-                  .reload(),
+              onRetry: () => _ignoreControllerError(
+                ref
+                    .read(documentsControllerProvider(widget.petId).notifier)
+                    .reload(),
+              ),
             ),
           );
         },
@@ -104,10 +110,24 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
       if (!mounted) {
         return;
       }
-      ref
-          .read(documentsControllerProvider(widget.petId).notifier)
-          .setSearchQuery(value);
+      _ignoreControllerError(
+        ref
+            .read(documentsControllerProvider(widget.petId).notifier)
+            .setSearchQuery(value),
+      );
     });
+  }
+
+  Future<void> _refreshDocuments() async {
+    try {
+      await ref
+          .read(documentsControllerProvider(widget.petId).notifier)
+          .reload();
+    } catch (_) {}
+  }
+
+  void _ignoreControllerError(Future<void> future) {
+    unawaited(future.catchError((_) {}));
   }
 
   Future<void> _openDocument(DocumentItem document) {

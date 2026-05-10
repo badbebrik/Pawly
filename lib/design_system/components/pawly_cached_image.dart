@@ -1,5 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+const int _maxDecodedImageDimension = 1600;
 
 class PawlyCachedImage extends StatelessWidget {
   const PawlyCachedImage({
@@ -25,7 +29,11 @@ class PawlyCachedImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final pixelSize = targetLogicalSize == null
         ? null
-        : (targetLogicalSize! * MediaQuery.devicePixelRatioOf(context)).round();
+        : math.min(
+            (targetLogicalSize! * MediaQuery.devicePixelRatioOf(context))
+                .round(),
+            _maxDecodedImageDimension,
+          );
 
     return CachedNetworkImage(
       imageUrl: imageUrl,
@@ -39,8 +47,9 @@ class PawlyCachedImage extends StatelessWidget {
       fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
       placeholderFadeInDuration: Duration.zero,
-      placeholder:
-          placeholder == null ? null : (_, __) => placeholder!(context),
+      placeholder: placeholder == null
+          ? null
+          : (_, __) => placeholder!(context),
       errorWidget: (_, __, ___) => _PawlyNetworkImageFallback(
         imageUrl: imageUrl,
         fit: fit,

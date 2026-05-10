@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/services/image_memory_pressure.dart';
 import '../../../../design_system/design_system.dart';
 import '../../models/acl_invite_details.dart';
 import '../../shared/formatters/acl_invite_formatters.dart';
@@ -40,17 +41,18 @@ class AclInviteDetailsContent extends StatelessWidget {
                 isMuted: !hasLink,
                 onCopy: hasLink
                     ? () => _copyText(
-                          context,
-                          deeplinkUrl,
-                          'Ссылка приглашения скопирована.',
-                        )
+                        context,
+                        deeplinkUrl,
+                        'Ссылка приглашения скопирована.',
+                      )
                     : null,
               ),
               const SizedBox(height: PawlySpacing.sm),
               PawlyButton(
                 label: 'Поделиться ссылкой',
-                onPressed:
-                    hasLink ? () => _shareLink(context, deeplinkUrl) : null,
+                onPressed: hasLink
+                    ? () => _shareLink(context, deeplinkUrl)
+                    : null,
                 variant: PawlyButtonVariant.secondary,
                 icon: Icons.ios_share_rounded,
               ),
@@ -94,10 +96,14 @@ class AclInviteDetailsContent extends StatelessWidget {
 
   Future<void> _shareLink(BuildContext context, String url) async {
     final box = context.findRenderObject() as RenderBox?;
-    await Share.share(
-      url,
-      sharePositionOrigin:
-          box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+    trimDecodedImageMemory(includeLiveImages: true);
+    await SharePlus.instance.share(
+      ShareParams(
+        text: url,
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
+      ),
     );
     if (!context.mounted) {
       return;
@@ -197,15 +203,18 @@ class _InviteValueTile extends StatelessWidget {
             Expanded(
               child: SelectableText(
                 value,
-                style: (isCode
-                        ? theme.textTheme.titleMedium
-                        : theme.textTheme.bodyMedium)
-                    ?.copyWith(
-                  color: isMuted
-                      ? colorScheme.onSurfaceVariant
-                      : colorScheme.onSurface,
-                  fontWeight: isCode ? FontWeight.w800 : FontWeight.w600,
-                ),
+                style:
+                    (isCode
+                            ? theme.textTheme.titleMedium
+                            : theme.textTheme.bodyMedium)
+                        ?.copyWith(
+                          color: isMuted
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.onSurface,
+                          fontWeight: isCode
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
               ),
             ),
             const SizedBox(width: PawlySpacing.sm),

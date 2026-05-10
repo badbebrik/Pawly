@@ -305,6 +305,9 @@ class _ProcedureComposerSheetState
                               context,
                               initialDate: _scheduledAt ?? DateTime.now(),
                             );
+                            if (!mounted) {
+                              return;
+                            }
                             if (picked != null) {
                               setState(() => _scheduledAt = picked);
                             }
@@ -323,6 +326,9 @@ class _ProcedureComposerSheetState
                                     _scheduledAt ??
                                     DateTime.now(),
                               );
+                              if (!mounted) {
+                                return;
+                              }
                               if (picked != null) {
                                 setState(() => _performedAt = picked);
                               }
@@ -344,6 +350,9 @@ class _ProcedureComposerSheetState
                                     _scheduledAt ??
                                     DateTime.now(),
                               );
+                              if (!mounted) {
+                                return;
+                              }
                               if (picked != null) {
                                 setState(() => _nextDueAt = picked);
                               }
@@ -491,6 +500,9 @@ class _ProcedureComposerSheetState
   }
 
   void _setAttachments(List<AttachmentDraftItem> attachments) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _attachments
         ..clear()
@@ -499,6 +511,9 @@ class _ProcedureComposerSheetState
   }
 
   void _setUploadingAttachments(bool value) {
+    if (!mounted || _isUploadingAttachments == value) {
+      return;
+    }
     setState(() => _isUploadingAttachments = value);
   }
 

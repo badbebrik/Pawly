@@ -15,6 +15,7 @@ import 'chat_inbox_controller.dart';
 import 'chat_unread_controller.dart';
 
 const _ackTimeout = Duration(seconds: 12);
+const _ackReconnectDebounce = Duration(seconds: 15);
 const _reconnectReloadDebounce = Duration(seconds: 2);
 
 final chatConversationControllerProvider = AsyncNotifierProvider.autoDispose
@@ -27,10 +28,15 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
 
   final String _conversationId;
   final Map<String, Timer> _pendingAckTimers = <String, Timer>{};
+  bool _disposed = false;
+  bool _ackReconnectInFlight = false;
+  bool _reconnectReloadInFlight = false;
+  DateTime? _lastAckReconnectAt;
   DateTime? _lastReconnectReloadAt;
 
   @override
   Future<ChatConversationState> build() async {
+    _disposed = false;
     ref.read(chatSocketConnectionControllerProvider);
     final service = ref.read(chatSocketServiceProvider);
     final repository = ref.read(chatRepositoryProvider);
@@ -61,6 +67,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     });
 
     ref.onDispose(() {
+      _disposed = true;
       for (final timer in _pendingAckTimers.values) {
         timer.cancel();
       }
@@ -83,8 +90,12 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
 
   Future<void> reload() async {
     state = const AsyncLoading();
-    state =
-        AsyncData(await _loadInitialState(ref.read(chatRepositoryProvider)));
+    try {
+      state =
+          AsyncData(await _loadInitialState(ref.read(chatRepositoryProvider)));
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<void> loadOlderMessages() async {
@@ -153,6 +164,9 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
             );
       }
     } catch (error, stackTrace) {
+      if (_disposed) {
+        return;
+      }
       _rollbackLocalReadState(
         current: current,
         hadUnread: hadUnread,
@@ -160,7 +174,7 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
       );
       state = AsyncError(error, stackTrace);
     } finally {
-      final latest = state.asData?.value;
+      final latest = _disposed ? null : state.asData?.value;
       if (latest != null) {
         state = AsyncData(latest.copyWith(isMarkingRead: false));
       }
@@ -209,12 +223,18 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
             clientMessageId: clientMessageId,
             text: normalizedText,
           );
+      if (_disposed) {
+        return;
+      }
       _scheduleAckTimeout(clientMessageId);
       final latest = state.asData?.value;
       if (latest != null) {
         state = AsyncData(latest.copyWith(isSendingMessage: false));
       }
     } catch (error, stackTrace) {
+      if (_disposed) {
+        return;
+      }
       _clearAckTimeout(clientMessageId);
       final latest = state.asData?.value ?? current;
       state = AsyncError(error, stackTrace);
@@ -432,6 +452,9 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
     _pendingAckTimers[clientMessageId] = Timer(
       _ackTimeout,
       () {
+        if (_disposed) {
+          return;
+        }
         _pendingAckTimers.remove(clientMessageId);
         final current = state.asData?.value;
         if (current == null) {
@@ -473,12 +496,32 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
   }
 
   Future<void> _reconnectAfterAckTimeout() async {
+    if (_disposed || _ackReconnectInFlight) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastReconnectAt = _lastAckReconnectAt;
+    if (lastReconnectAt != null &&
+        now.difference(lastReconnectAt) < _ackReconnectDebounce) {
+      return;
+    }
+
+    _ackReconnectInFlight = true;
+    _lastAckReconnectAt = now;
     try {
       await ref.read(chatSocketServiceProvider).reconnect();
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _ackReconnectInFlight = false;
+    }
   }
 
   Future<void> _reloadAfterReconnect(ChatRepository repository) async {
+    if (_disposed || _reconnectReloadInFlight) {
+      return;
+    }
+
     final current = state.asData?.value;
     if (current == null) {
       return;
@@ -491,16 +534,23 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
       return;
     }
     _lastReconnectReloadAt = now;
+    _reconnectReloadInFlight = true;
 
     try {
       final reloaded = await _loadInitialState(repository);
+      if (_disposed) {
+        return;
+      }
       final latest = state.asData?.value;
       if (latest == null) {
         return;
       }
 
       state = AsyncData(_mergeReloadedState(latest, reloaded));
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _reconnectReloadInFlight = false;
+    }
   }
 
   ChatConversationState _mergeReloadedState(

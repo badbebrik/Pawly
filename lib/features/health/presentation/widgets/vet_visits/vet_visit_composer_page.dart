@@ -240,6 +240,9 @@ class _VetVisitComposerSheetState
                               context,
                               initialDate: _scheduledAt ?? DateTime.now(),
                             );
+                            if (!mounted) {
+                              return;
+                            }
                             if (picked != null) {
                               setState(() => _scheduledAt = picked);
                             }
@@ -258,6 +261,9 @@ class _VetVisitComposerSheetState
                                     _scheduledAt ??
                                     DateTime.now(),
                               );
+                              if (!mounted) {
+                                return;
+                              }
                               if (picked != null) {
                                 setState(() => _completedAt = picked);
                               }
@@ -436,6 +442,9 @@ class _VetVisitComposerSheetState
   }
 
   void _setAttachments(List<AttachmentDraftItem> attachments) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _attachments
         ..clear()
@@ -444,6 +453,9 @@ class _VetVisitComposerSheetState
   }
 
   void _setUploadingAttachments(bool value) {
+    if (!mounted || _isUploadingAttachments == value) {
+      return;
+    }
     setState(() => _isUploadingAttachments = value);
   }
 

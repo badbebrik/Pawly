@@ -114,9 +114,9 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
           );
       final refreshed = await _reloadLists(current.copyWith(isCreating: false));
       state = AsyncData(refreshed);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(current.copyWith(isCreating: false));
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -182,14 +182,14 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
       );
       state = AsyncData(refreshed);
       return mapVaccination(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyVaccinationIds: Set<String>.from(current.busyVaccinationIds)
             ..remove(vaccinationId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -229,14 +229,14 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
       );
       state = AsyncData(refreshed);
       return mapVaccination(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyVaccinationIds: Set<String>.from(current.busyVaccinationIds)
             ..remove(vaccination.id),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -273,14 +273,14 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
       );
       state = AsyncData(refreshed);
       return mapVaccination(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyVaccinationIds: Set<String>.from(current.busyVaccinationIds)
             ..remove(vaccinationId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -315,14 +315,14 @@ class PetVaccinationsController extends AsyncNotifier<PetVaccinationsState> {
         ),
       );
       state = AsyncData(refreshed);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyVaccinationIds: Set<String>.from(current.busyVaccinationIds)
             ..remove(vaccinationId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 

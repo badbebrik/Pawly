@@ -12,6 +12,7 @@ Future<void> showActivePetActionsSheet(
   required String petName,
   required bool canArchive,
 }) async {
+  final pageContext = context;
   await showPawlyBottomSheet<void>(
     context: context,
     builder: (sheetContext) {
@@ -25,7 +26,7 @@ Future<void> showActivePetActionsSheet(
             title: const Text('Сменить питомца'),
             onTap: () async {
               Navigator.of(sheetContext).pop();
-              await ref.read(activePetControllerProvider.notifier).clear();
+              await _clearActivePet(pageContext, ref);
             },
           ),
           ListTile(
@@ -47,6 +48,24 @@ Future<void> showActivePetActionsSheet(
       );
     },
   );
+}
+
+Future<void> _clearActivePet(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  try {
+    await ref.read(activePetControllerProvider.notifier).clear();
+  } catch (_) {
+    if (!context.mounted) {
+      return;
+    }
+    showPawlySnackBar(
+      context,
+      message: 'Не удалось сменить питомца.',
+      tone: PawlySnackBarTone.error,
+    );
+  }
 }
 
 Future<void> showPetPhotoActionsSheet(

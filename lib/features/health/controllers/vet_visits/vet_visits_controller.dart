@@ -110,9 +110,9 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
                 input: input,
               );
       visit = mapVetVisit(created);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(current.copyWith(isCreating: false));
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
 
     var relatedLogsLinked = true;
@@ -196,13 +196,13 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
         ),
       );
       return mapVetVisit(updated);
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyVisitIds: Set<String>.from(current.busyVisitIds)..remove(visitId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 
@@ -235,13 +235,13 @@ class PetVetVisitsController extends AsyncNotifier<PetVetVisitsState> {
           ),
         ),
       );
-    } catch (error, stackTrace) {
+    } catch (_) {
       state = AsyncData(
         current.copyWith(
           busyVisitIds: Set<String>.from(current.busyVisitIds)..remove(visitId),
         ),
       );
-      Error.throwWithStackTrace(error, stackTrace);
+      rethrow;
     }
   }
 

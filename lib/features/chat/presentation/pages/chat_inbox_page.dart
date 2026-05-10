@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -70,10 +72,12 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
   }
 
   Future<void> _refresh() async {
-    await Future.wait<void>(<Future<void>>[
-      ref.read(chatInboxControllerProvider(null).notifier).reload(),
-      ref.read(chatUnreadSummaryControllerProvider.notifier).reload(),
-    ]);
+    try {
+      await Future.wait<void>(<Future<void>>[
+        ref.read(chatInboxControllerProvider(null).notifier).reload(),
+        ref.read(chatUnreadSummaryControllerProvider.notifier).reload(),
+      ]);
+    } catch (_) {}
   }
 
   void _onScroll() {
@@ -86,7 +90,12 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
       return;
     }
 
-    ref.read(chatInboxControllerProvider(null).notifier).loadMore();
+    unawaited(
+      ref
+          .read(chatInboxControllerProvider(null).notifier)
+          .loadMore()
+          .catchError((_) {}),
+    );
   }
 
   void _openConversation(ChatListItem item) {

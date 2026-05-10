@@ -145,7 +145,9 @@ class _PetLogTypePickerPageState extends ConsumerState<PetLogTypePickerPage> {
     }
 
     ref.invalidate(petLogComposerBootstrapProvider(widget.petId));
-    await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    try {
+      await ref.read(petLogComposerBootstrapProvider(widget.petId).future);
+    } catch (_) {}
     if (!mounted) {
       return;
     }

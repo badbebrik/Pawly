@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,6 +28,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
   final ScrollController _scrollController = ScrollController();
   bool _sendErrorShown = false;
   String? _lastTailMessageKey;
+  String? _pendingMarkReadMessageId;
   bool _initialScrollDone = false;
 
   @override
@@ -81,7 +84,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
               title: const Text('Не удалось загрузить чат'),
               footer: PawlyButton(
                 label: 'Повторить',
-                onPressed: _reload,
+                onPressed: () => unawaited(_reload()),
                 variant: PawlyButtonVariant.secondary,
               ),
               child: const Text(
@@ -94,11 +97,22 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
     );
   }
 
-  Future<void> _reload() {
-    return ref
-        .read(
-            chatConversationControllerProvider(widget.conversationId).notifier)
-        .reload();
+  Future<void> _reload() async {
+    try {
+      await ref
+          .read(chatConversationControllerProvider(widget.conversationId)
+              .notifier)
+          .reload();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      showPawlySnackBar(
+        context,
+        message: 'Не удалось загрузить чат. Попробуйте еще раз.',
+        tone: PawlySnackBarTone.error,
+      );
+    }
   }
 
   void _loadOlderMessages() {
@@ -123,6 +137,7 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
 
   void _scheduleMarkRead(ChatConversationState state) {
     if (!state.canMarkRead || state.isMarkingRead) {
+      _pendingMarkReadMessageId = null;
       return;
     }
 
@@ -130,15 +145,40 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
     if (lastMessageId == null || lastMessageId.isEmpty) {
       return;
     }
+    if (state.conversation.lastReadMessageId == lastMessageId ||
+        _pendingMarkReadMessageId == lastMessageId) {
+      return;
+    }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _pendingMarkReadMessageId = lastMessageId;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
+        if (_pendingMarkReadMessageId == lastMessageId) {
+          _pendingMarkReadMessageId = null;
+        }
         return;
       }
-      ref
-          .read(chatConversationControllerProvider(widget.conversationId)
-              .notifier)
-          .markReadUpTo(lastMessageId);
+
+      try {
+        final latest = ref
+            .read(chatConversationControllerProvider(widget.conversationId))
+            .asData
+            ?.value;
+        if (latest?.conversation.lastReadMessageId == lastMessageId) {
+          return;
+        }
+        await ref
+            .read(chatConversationControllerProvider(widget.conversationId)
+                .notifier)
+            .markReadUpTo(lastMessageId);
+      } catch (_) {
+        // Mark-read is best-effort; it must not create an unhandled
+        // post-frame exception loop.
+      } finally {
+        if (_pendingMarkReadMessageId == lastMessageId) {
+          _pendingMarkReadMessageId = null;
+        }
+      }
     });
   }
 

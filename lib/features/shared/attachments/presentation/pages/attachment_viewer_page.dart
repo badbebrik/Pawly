@@ -5,9 +5,13 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
+import '../../../../../core/services/image_memory_pressure.dart';
 import '../../../../../design_system/design_system.dart';
 import '../../models/attachment_kind.dart';
 import '../../models/attachment_viewer_item.dart';
+
+const int _maxInlinePdfViewerBytes = 10 * 1024 * 1024;
+const double _maxAttachmentViewerImageLogicalSize = 1200;
 
 class AttachmentViewerPage extends StatelessWidget {
   const AttachmentViewerPage({
@@ -97,9 +101,26 @@ class _CachedPdfViewerState extends State<_CachedPdfViewer> {
           return const _AttachmentViewerError();
         }
 
-        return SfPdfViewer.file(snapshot.data!);
+        final file = snapshot.data!;
+        final fileSize = _safeFileLength(file);
+        if (fileSize != null && fileSize > _maxInlinePdfViewerBytes) {
+          return const _AttachmentViewerError(
+            message:
+                'PDF слишком большой для просмотра внутри приложения. Используйте кнопку скачивания.',
+          );
+        }
+
+        return SfPdfViewer.file(file);
       },
     );
+  }
+
+  int? _safeFileLength(File file) {
+    try {
+      return file.lengthSync();
+    } on FileSystemException {
+      return null;
+    }
   }
 }
 
@@ -131,6 +152,8 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
   @override
   void dispose() {
     _pageController.dispose();
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
     super.dispose();
   }
 
@@ -140,8 +163,9 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
     final currentItem = widget.items[_currentIndex];
     final isDark = theme.brightness == Brightness.dark;
     final pageBackground = isDark ? PawlyColors.gray900 : PawlyColors.gray100;
-    final frameBackground =
-        isDark ? const Color(0xFF17232C) : PawlyColors.white;
+    final frameBackground = isDark
+        ? const Color(0xFF17232C)
+        : PawlyColors.white;
 
     return Scaffold(
       backgroundColor: pageBackground,
@@ -216,7 +240,10 @@ class _AttachmentGalleryPageState extends State<AttachmentGalleryPage> {
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               final targetSize = constraints.biggest.longestSide
-                                  .clamp(320.0, 2400.0);
+                                  .clamp(
+                                    320.0,
+                                    _maxAttachmentViewerImageLogicalSize,
+                                  );
                               return Center(
                                 child: PawlyCachedImage(
                                   imageUrl: item.url ?? '',
@@ -326,8 +353,9 @@ class _DownloadAttachmentButton extends StatelessWidget {
 
   Future<void> _downloadAttachment(BuildContext context) async {
     final candidate = url?.trim();
-    final uri =
-        candidate == null || candidate.isEmpty ? null : Uri.tryParse(candidate);
+    final uri = candidate == null || candidate.isEmpty
+        ? null
+        : Uri.tryParse(candidate);
 
     if (uri == null) {
       showPawlySnackBar(
@@ -348,11 +376,17 @@ class _DownloadAttachmentButton extends StatelessWidget {
       }
 
       final box = context.findRenderObject() as RenderBox?;
-      await Share.shareXFiles(
-        <XFile>[XFile(file.path, name: title, mimeType: _shareMimeType(kind))],
-        fileNameOverrides: <String>[title],
-        sharePositionOrigin:
-            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      trimDecodedImageMemory(includeLiveImages: true);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[
+            XFile(file.path, name: title, mimeType: _shareMimeType(kind)),
+          ],
+          fileNameOverrides: <String>[title],
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
       );
     } catch (_) {
       if (!context.mounted) {
@@ -376,7 +410,11 @@ class _DownloadAttachmentButton extends StatelessWidget {
 }
 
 class _AttachmentViewerError extends StatelessWidget {
-  const _AttachmentViewerError();
+  const _AttachmentViewerError({
+    this.message = 'Не удалось показать вложение.',
+  });
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -384,7 +422,7 @@ class _AttachmentViewerError extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(PawlySpacing.lg),
         child: Text(
-          'Не удалось показать вложение.',
+          message,
           style: Theme.of(context).textTheme.bodyLarge,
           textAlign: TextAlign.center,
         ),

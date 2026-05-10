@@ -42,7 +42,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           ref.invalidate(calendarDayProvider(dayKey));
           ref.invalidate(calendarMarkersProvider);
           ref.invalidate(petsControllerProvider);
-          await ref.read(calendarDayProvider(dayKey).future);
+          try {
+            await ref.read(calendarDayProvider(dayKey).future);
+          } catch (_) {}
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(

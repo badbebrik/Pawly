@@ -84,38 +84,42 @@ class AttachmentUploadService {
     required String entityType,
   }) async {
     final uploadData = await _readXFileUploadData(file);
-    final initResponse = await _healthApiClient.initAttachmentUpload(
-      petId,
-      InitHealthAttachmentUploadPayload(
+    try {
+      final initResponse = await _healthApiClient.initAttachmentUpload(
+        petId,
+        InitHealthAttachmentUploadPayload(
+          mimeType: uploadData.mimeType,
+          originalFilename: uploadData.fileName,
+          expectedSizeBytes: uploadData.sizeBytes,
+          entityType: entityType,
+        ),
+      );
+
+      await _uploadBinary(
+        upload: initResponse.upload,
+        data: uploadData.openRead(),
         mimeType: uploadData.mimeType,
-        originalFilename: uploadData.fileName,
-        expectedSizeBytes: uploadData.sizeBytes,
-        entityType: entityType,
-      ),
-    );
-
-    await _uploadBinary(
-      upload: initResponse.upload,
-      data: uploadData.openRead(),
-      mimeType: uploadData.mimeType,
-      sizeBytes: uploadData.sizeBytes,
-    );
-
-    final confirmedResponse = await _healthApiClient.confirmAttachmentUpload(
-      petId,
-      ConfirmHealthAttachmentUploadPayload(
-        fileId: initResponse.fileId,
         sizeBytes: uploadData.sizeBytes,
-      ),
-    );
-    final confirmedFile = confirmedResponse.file;
+      );
 
-    return UploadedHealthAttachmentRef(
-      fileId: confirmedFile.id,
-      fileName: confirmedFile.originalFilename ?? uploadData.fileName,
-      mimeType: confirmedFile.mimeType,
-      sizeBytes: confirmedFile.sizeBytes,
-    );
+      final confirmedResponse = await _healthApiClient.confirmAttachmentUpload(
+        petId,
+        ConfirmHealthAttachmentUploadPayload(
+          fileId: initResponse.fileId,
+          sizeBytes: uploadData.sizeBytes,
+        ),
+      );
+      final confirmedFile = confirmedResponse.file;
+
+      return UploadedHealthAttachmentRef(
+        fileId: confirmedFile.id,
+        fileName: confirmedFile.originalFilename ?? uploadData.fileName,
+        mimeType: confirmedFile.mimeType,
+        sizeBytes: confirmedFile.sizeBytes,
+      );
+    } finally {
+      unawaited(_deleteTemporaryPickerFile(uploadData.sourcePath));
+    }
   }
 
   Future<List<UploadedHealthAttachmentRef>> uploadXFiles(
@@ -178,6 +182,7 @@ class AttachmentUploadService {
       mimeType: mimeType,
       openRead: file.openRead,
       sizeBytes: sizeBytes,
+      sourcePath: file.path,
     );
   }
 
@@ -234,6 +239,27 @@ class AttachmentUploadService {
     }
     return null;
   }
+
+  Future<void> _deleteTemporaryPickerFile(String? path) async {
+    if (path == null || path.isEmpty || !_isLikelyTemporaryPickerFile(path)) {
+      return;
+    }
+
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
+  bool _isLikelyTemporaryPickerFile(String path) {
+    final normalized = path.replaceAll('\\', '/').toLowerCase();
+    return normalized.contains('/tmp/') ||
+        normalized.contains('/cache/') ||
+        normalized.contains('/caches/') ||
+        normalized.contains('image_picker');
+  }
 }
 
 class UploadedHealthAttachmentRef {
@@ -256,10 +282,12 @@ class _UploadData {
     required this.mimeType,
     required this.openRead,
     required this.sizeBytes,
+    this.sourcePath,
   });
 
   final String fileName;
   final String mimeType;
   final Stream<List<int>> Function() openRead;
   final int sizeBytes;
+  final String? sourcePath;
 }

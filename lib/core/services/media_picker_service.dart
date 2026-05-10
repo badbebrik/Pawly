@@ -2,38 +2,49 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'image_memory_pressure.dart';
+
 class MediaPickerService {
   MediaPickerService(this._imagePicker);
 
   final ImagePicker _imagePicker;
 
+  static const int _avatarImageQuality = 85;
+  static const double _avatarMaxDimension = 1600;
+  static const int _attachmentImageQuality = 72;
+  static const double _attachmentMaxDimension = 1280;
+
   Future<XFile?> pickAvatarFromGallery() {
     return _pickImage(
       source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1600,
-      maxHeight: 1600,
+      imageQuality: _avatarImageQuality,
+      maxWidth: _avatarMaxDimension,
+      maxHeight: _avatarMaxDimension,
+      requestFullMetadata: false,
     );
   }
 
   Future<XFile?> takeAvatarPhoto() {
     return _pickImage(
       source: ImageSource.camera,
-      imageQuality: 85,
-      maxWidth: 1600,
-      maxHeight: 1600,
+      imageQuality: _avatarImageQuality,
+      maxWidth: _avatarMaxDimension,
+      maxHeight: _avatarMaxDimension,
       preferredCameraDevice: CameraDevice.rear,
+      requestFullMetadata: false,
     );
   }
 
   Future<List<XFile>> _pickGalleryImages() {
-    return _guardPickerCall(
-      () => _imagePicker.pickMultiImage(
-        imageQuality: 85,
-        maxWidth: 2000,
-        maxHeight: 2000,
-      ),
-    );
+    return _guardPickerCall(() {
+      trimDecodedImageMemory(includeLiveImages: true);
+      return _imagePicker.pickMultiImage(
+        imageQuality: _attachmentImageQuality,
+        maxWidth: _attachmentMaxDimension,
+        maxHeight: _attachmentMaxDimension,
+        requestFullMetadata: false,
+      );
+    });
   }
 
   Future<List<XFile>> pickAttachmentImagesFromGallery() {
@@ -43,14 +54,16 @@ class MediaPickerService {
   Future<XFile?> takeAttachmentPhoto() {
     return _pickImage(
       source: ImageSource.camera,
-      imageQuality: 85,
-      maxWidth: 2000,
-      maxHeight: 2000,
+      imageQuality: _attachmentImageQuality,
+      maxWidth: _attachmentMaxDimension,
+      maxHeight: _attachmentMaxDimension,
       preferredCameraDevice: CameraDevice.rear,
+      requestFullMetadata: false,
     );
   }
 
   Future<PlatformFile?> pickFile() async {
+    trimDecodedImageMemory(includeLiveImages: true);
     final result = await FilePicker.platform.pickFiles(withData: false);
 
     if (result == null || result.files.isEmpty) {
@@ -64,6 +77,7 @@ class MediaPickerService {
     bool allowMultiple = true,
     List<String>? allowedExtensions,
   }) async {
+    trimDecodedImageMemory(includeLiveImages: true);
     final result = await FilePicker.platform.pickFiles(
       withData: false,
       allowMultiple: allowMultiple,
@@ -86,16 +100,19 @@ class MediaPickerService {
     double? maxWidth,
     double? maxHeight,
     CameraDevice preferredCameraDevice = CameraDevice.rear,
+    bool requestFullMetadata = true,
   }) {
-    return _guardPickerCall(
-      () => _imagePicker.pickImage(
+    return _guardPickerCall(() {
+      trimDecodedImageMemory(includeLiveImages: true);
+      return _imagePicker.pickImage(
         source: source,
         imageQuality: imageQuality,
         maxWidth: maxWidth,
         maxHeight: maxHeight,
         preferredCameraDevice: preferredCameraDevice,
-      ),
-    );
+        requestFullMetadata: requestFullMetadata,
+      );
+    });
   }
 
   Future<T> _guardPickerCall<T>(Future<T> Function() pick) async {
@@ -116,9 +133,10 @@ class MediaPickerService {
         'Нет доступа к галерее. Разрешите доступ к фото в настройках телефона.',
       'photo_access_restricted' =>
         'Доступ к галерее ограничен настройками устройства.',
-      _ => error.message?.trim().isNotEmpty == true
-          ? error.message!
-          : 'Не удалось открыть камеру или галерею.',
+      _ =>
+        error.message?.trim().isNotEmpty == true
+            ? error.message!
+            : 'Не удалось открыть камеру или галерею.',
     };
   }
 }
