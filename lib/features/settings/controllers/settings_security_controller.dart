@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/controllers/auth_dependencies.dart';
+import '../../chat/controllers/chat_connection_controller.dart';
+import '../../chat/controllers/chat_dependencies.dart';
+import '../../chat/controllers/chat_unread_controller.dart';
 import '../../pets/controllers/active_pet_controller.dart';
 import '../../pets/controllers/active_pet_details_controller.dart';
 import '../../pets/controllers/pets_controller.dart';
@@ -61,6 +64,9 @@ class SettingsSecurityController extends Notifier<SettingsSecurityState> {
   void _resetSessionState() {
     ref.invalidate(appLaunchProvider);
     ref.invalidate(currentUserIdProvider);
+    ref.invalidate(chatUnreadSummaryControllerProvider);
+    ref.invalidate(chatSocketConnectionControllerProvider);
+    ref.invalidate(chatSocketServiceProvider);
     ref.invalidate(activePetControllerProvider);
     ref.invalidate(activePetDetailsControllerProvider);
     ref.invalidate(petsControllerProvider);

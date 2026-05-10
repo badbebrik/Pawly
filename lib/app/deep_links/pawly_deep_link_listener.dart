@@ -92,9 +92,15 @@ class _PawlyDeepLinkListenerState extends ConsumerState<PawlyDeepLinkListener> {
       if (currentUri.path == AppRoutes.aclInvitePreview) {
         widget.router.go(target);
       } else {
-        unawaited(widget.router.push(target));
+        unawaited(_pushDeepLinkTarget(target));
       }
       ref.read(pendingDeepLinkTargetProvider.notifier).clear();
     });
+  }
+
+  Future<void> _pushDeepLinkTarget(String target) async {
+    try {
+      await widget.router.push<void>(target);
+    } catch (_) {}
   }
 }

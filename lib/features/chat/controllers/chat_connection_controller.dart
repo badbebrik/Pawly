@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/chat_socket_models.dart';
@@ -28,8 +30,8 @@ class ChatSocketConnectionController
       );
     });
 
-    ref.onDispose(() async {
-      await lifecycleSubscription.cancel();
+    ref.onDispose(() {
+      unawaited(lifecycleSubscription.cancel().catchError((_) {}));
     });
 
     try {

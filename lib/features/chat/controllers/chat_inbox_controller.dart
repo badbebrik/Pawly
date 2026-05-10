@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/chat_socket_models.dart';
@@ -35,7 +37,9 @@ class ChatInboxController extends AsyncNotifier<ChatInboxState> {
 
       upsertConversation(item);
     });
-    ref.onDispose(subscription.cancel);
+    ref.onDispose(() {
+      unawaited(subscription.cancel().catchError((_) {}));
+    });
 
     final base = ChatInboxState.initial(petIdFilter: _petIdFilter);
     return _loadInitial(base);

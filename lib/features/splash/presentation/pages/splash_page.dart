@@ -126,7 +126,7 @@ void _navigateFromSplash(
       router.go(AppRoutes.home);
       if (target != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          unawaited(router.push(target));
+          unawaited(_pushDeepLinkTarget(router, target));
         });
       }
     case AppStartupDestinationKind.unauthenticated:
@@ -141,6 +141,12 @@ void _navigateFromSplash(
         router.go(AppRoutes.login);
       }
   }
+}
+
+Future<void> _pushDeepLinkTarget(GoRouter router, String target) async {
+  try {
+    await router.push<void>(target);
+  } catch (_) {}
 }
 
 String? _resolveInviteTarget({

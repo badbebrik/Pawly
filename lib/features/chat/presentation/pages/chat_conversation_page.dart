@@ -188,18 +188,24 @@ class _ChatConversationPageState extends ConsumerState<ChatConversationPage> {
         return;
       }
 
-      final targetOffset = _scrollController.position.maxScrollExtent;
-      if (shouldInitialScroll) {
-        _initialScrollDone = true;
-        _scrollController.jumpTo(targetOffset);
-        return;
-      }
+      try {
+        final targetOffset = _scrollController.position.maxScrollExtent;
+        if (shouldInitialScroll) {
+          _initialScrollDone = true;
+          _scrollController.jumpTo(targetOffset);
+          return;
+        }
 
-      await _scrollController.animateTo(
-        targetOffset,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
+        if (!mounted || !_scrollController.hasClients) {
+          return;
+        }
+
+        await _scrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      } catch (_) {}
     });
   }
 }

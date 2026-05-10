@@ -26,11 +26,14 @@ class ChatSocketService {
   WebSocket? _socket;
   StreamSubscription<dynamic>? _socketSubscription;
   Future<void>? _connectFuture;
+  Future<void>? _disconnectFuture;
   Timer? _reconnectTimer;
 
+  bool _disposed = false;
   bool _disconnectRequested = false;
   bool _inboxSubscribed = false;
   int _reconnectAttempt = 0;
+  int _connectionGeneration = 0;
   final Set<String> _conversationSubscriptions = <String>{};
 
   Stream<ChatServerEvent> get events => _eventsController.stream;
@@ -41,6 +44,12 @@ class ChatSocketService {
       _socket != null && _socket!.readyState == WebSocket.open;
 
   Future<void> ensureConnected() {
+    if (_disposed) {
+      return Future<void>.error(
+        StateError('Chat socket service has been disposed.'),
+      );
+    }
+
     final pending = _connectFuture;
     if (pending != null) {
       return pending;
@@ -49,12 +58,37 @@ class ChatSocketService {
       return Future<void>.value();
     }
 
-    _connectFuture = _connectInternal();
+    final disconnecting = _disconnectFuture;
+    if (disconnecting != null) {
+      return Future<void>.error(
+        StateError('Chat socket is disconnecting.'),
+      );
+    }
+
+    final generation = ++_connectionGeneration;
+    _connectFuture = _connectInternal(generation);
     return _connectFuture!;
   }
 
-  Future<void> disconnect() async {
+  Future<void> disconnect() {
+    final pending = _disconnectFuture;
+    if (pending != null) {
+      return pending;
+    }
+
+    late final Future<void> future;
+    future = _disconnectInternal().whenComplete(() {
+      if (identical(_disconnectFuture, future)) {
+        _disconnectFuture = null;
+      }
+    });
+    _disconnectFuture = future;
+    return future;
+  }
+
+  Future<void> _disconnectInternal() async {
     _disconnectRequested = true;
+    _connectionGeneration += 1;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _connectFuture = null;
@@ -70,11 +104,13 @@ class ChatSocketService {
           .timeout(_disconnectTimeout, onTimeout: () {});
     }
 
-    _emitLifecycle(
-      const ChatSocketLifecycleEvent(
-        status: ChatSocketLifecycleStatus.disconnected,
-      ),
-    );
+    if (!_disposed) {
+      _emitLifecycle(
+        const ChatSocketLifecycleEvent(
+          status: ChatSocketLifecycleStatus.disconnected,
+        ),
+      );
+    }
   }
 
   Future<void> send(ChatClientEvent event) async {
@@ -120,9 +156,11 @@ class ChatSocketService {
       return;
     }
 
-    await send(
-      UnsubscribeConversationEvent(conversationId: conversationId),
-    );
+    try {
+      await send(
+        UnsubscribeConversationEvent(conversationId: conversationId),
+      );
+    } catch (_) {}
   }
 
   Future<void> sendMessage({
@@ -152,12 +190,24 @@ class ChatSocketService {
   }
 
   Future<void> dispose() async {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
     await disconnect();
     await _eventsController.close();
     await _lifecycleController.close();
   }
 
-  Future<void> _connectInternal() async {
+  Future<void> resumeIfNeeded() async {
+    if (!_inboxSubscribed && _conversationSubscriptions.isEmpty) {
+      return;
+    }
+
+    await ensureConnected();
+  }
+
+  Future<void> _connectInternal(int generation) async {
     _disconnectRequested = false;
     _emitLifecycle(
       ChatSocketLifecycleEvent(
@@ -185,11 +235,19 @@ class ChatSocketService {
       ).timeout(_connectTimeout);
       socket.pingInterval = const Duration(seconds: 20);
 
+      if (_isStaleConnection(generation)) {
+        await socket
+            .close(WebSocketStatus.normalClosure)
+            .timeout(_disconnectTimeout, onTimeout: () {});
+        return;
+      }
+
       _socket = socket;
       _socketSubscription = socket.listen(
         _handleIncomingData,
-        onDone: _handleSocketDone,
-        onError: _handleSocketError,
+        onDone: () => _handleSocketDone(socket, generation),
+        onError: (Object error) =>
+            _handleSocketError(socket, generation, error),
         cancelOnError: false,
       );
 
@@ -201,7 +259,11 @@ class ChatSocketService {
       );
       await _restoreSubscriptions();
     } catch (error) {
-      final isUnauthorized = error.toString().contains('401');
+      if (_isStaleConnection(generation)) {
+        return;
+      }
+
+      final isAuthenticationFailure = _isAuthenticationFailure(error);
       _emitLifecycle(
         ChatSocketLifecycleEvent(
           status: ChatSocketLifecycleStatus.error,
@@ -209,11 +271,13 @@ class ChatSocketService {
           reconnectAttempt: _reconnectAttempt,
         ),
       );
-      if (!isUnauthorized) {
+      if (!isAuthenticationFailure) {
         _scheduleReconnect();
       }
     } finally {
-      _connectFuture = null;
+      if (_connectionGeneration == generation) {
+        _connectFuture = null;
+      }
     }
   }
 
@@ -225,9 +289,9 @@ class ChatSocketService {
     try {
       final decoded = jsonDecode(data);
       final event = ChatServerEvent.fromJson(decoded);
-      _eventsController.add(event);
+      _emitEvent(event);
     } catch (_) {
-      _eventsController.add(
+      _emitEvent(
         const UnknownChatServerEvent(
           type: 'invalid_event',
           payload: <String, dynamic>{},
@@ -236,7 +300,11 @@ class ChatSocketService {
     }
   }
 
-  void _handleSocketDone() {
+  void _handleSocketDone(WebSocket socket, int generation) {
+    if (!_isCurrentConnection(socket, generation)) {
+      return;
+    }
+
     _socketSubscription = null;
     _socket = null;
 
@@ -252,7 +320,11 @@ class ChatSocketService {
     _scheduleReconnect();
   }
 
-  void _handleSocketError(Object error) {
+  void _handleSocketError(WebSocket socket, int generation, Object error) {
+    if (!_isCurrentConnection(socket, generation)) {
+      return;
+    }
+
     _socketSubscription = null;
     _socket = null;
     _emitLifecycle(
@@ -271,7 +343,10 @@ class ChatSocketService {
   }
 
   void _scheduleReconnect() {
-    if (_disconnectRequested || _reconnectTimer != null) {
+    if (_disposed ||
+        _disconnectRequested ||
+        _connectFuture != null ||
+        _reconnectTimer != null) {
       return;
     }
 
@@ -291,13 +366,17 @@ class ChatSocketService {
 
   Future<void> _restoreSubscriptions() async {
     if (_inboxSubscribed) {
-      await send(const SubscribeInboxEvent());
+      try {
+        await send(const SubscribeInboxEvent());
+      } catch (_) {}
     }
 
     for (final conversationId in _conversationSubscriptions) {
-      await send(
-        SubscribeConversationEvent(conversationId: conversationId),
-      );
+      try {
+        await send(
+          SubscribeConversationEvent(conversationId: conversationId),
+        );
+      } catch (_) {}
     }
   }
 
@@ -321,5 +400,28 @@ class ChatSocketService {
     if (!_lifecycleController.isClosed) {
       _lifecycleController.add(event);
     }
+  }
+
+  void _emitEvent(ChatServerEvent event) {
+    if (!_eventsController.isClosed) {
+      _eventsController.add(event);
+    }
+  }
+
+  bool _isStaleConnection(int generation) {
+    return _disposed ||
+        _disconnectRequested ||
+        generation != _connectionGeneration;
+  }
+
+  bool _isCurrentConnection(WebSocket socket, int generation) {
+    return !_disposed &&
+        generation == _connectionGeneration &&
+        identical(_socket, socket);
+  }
+
+  bool _isAuthenticationFailure(Object error) {
+    final message = error.toString();
+    return message.contains('401') || message.contains('authenticated session');
   }
 }

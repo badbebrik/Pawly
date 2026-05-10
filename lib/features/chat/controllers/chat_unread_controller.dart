@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/chat_socket_models.dart';
@@ -24,7 +26,9 @@ class ChatUnreadSummaryController extends AsyncNotifier<ChatUnreadSummary> {
 
       patch(chatUnreadSummaryFromNetwork(event.summary));
     });
-    ref.onDispose(subscription.cancel);
+    ref.onDispose(() {
+      unawaited(subscription.cancel().catchError((_) {}));
+    });
 
     return ref.read(chatRepositoryProvider).getUnreadSummary();
   }

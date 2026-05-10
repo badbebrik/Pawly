@@ -60,14 +60,16 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
       unawaited(_reloadAfterReconnect(repository));
     });
 
-    ref.onDispose(() async {
+    ref.onDispose(() {
       for (final timer in _pendingAckTimers.values) {
         timer.cancel();
       }
       _pendingAckTimers.clear();
-      await subscription.cancel();
-      await lifecycleSubscription.cancel();
-      await service.unsubscribeConversation(_conversationId);
+      unawaited(subscription.cancel().catchError((_) {}));
+      unawaited(lifecycleSubscription.cancel().catchError((_) {}));
+      unawaited(
+        service.unsubscribeConversation(_conversationId).catchError((_) {}),
+      );
     });
 
     Future<void>(() async {
