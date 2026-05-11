@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../config/feature_flags.dart';
 import '../../core/network/session/auth_session_store.dart';
 import '../../features/acl/presentation/pages/acl_access_page.dart';
 import '../../features/acl/presentation/pages/acl_invite_details_page.dart';
@@ -27,6 +28,7 @@ import '../../features/logs/presentation/pages/pet_log_type_picker_page.dart';
 import '../../features/logs/presentation/pages/pet_log_type_create_page.dart';
 import '../../features/logs/presentation/pages/pet_logs_page.dart';
 import '../../features/pets/presentation/pages/pet_create_page.dart';
+import '../../features/pets/presentation/pages/pet_details_page.dart';
 import '../../features/pets/presentation/pages/pet_edit_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
 import '../../features/health/presentation/pages/home/pet_health_home_page.dart';
@@ -121,11 +123,15 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
       GoRoute(
         path: AppRoutes.chatInbox,
         name: 'chatInbox',
+        redirect: (_, __) =>
+            PawlyFeatureFlags.chatEnabled ? null : AppRoutes.pets,
         builder: (_, __) => const ChatInboxPage(),
         routes: <RouteBase>[
           GoRoute(
             path: 'conversations/:conversationId',
             name: 'chatConversation',
+            redirect: (_, __) =>
+                PawlyFeatureFlags.chatEnabled ? null : AppRoutes.pets,
             builder: (_, state) => ChatConversationPage(
               conversationId: state.pathParameters['conversationId']!,
             ),
@@ -159,12 +165,10 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                 routes: <RouteBase>[
                   GoRoute(
                     path: ':petId',
-                    redirect: (_, state) {
-                      if (state.fullPath == '${AppRoutes.pets}/:petId') {
-                        return AppRoutes.pets;
-                      }
-                      return null;
-                    },
+                    name: 'petDetails',
+                    builder: (_, state) => PetDetailsPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
                     routes: <RouteBase>[
                       GoRoute(
                         path: 'edit',

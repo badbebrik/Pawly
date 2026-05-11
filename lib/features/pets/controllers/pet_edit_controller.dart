@@ -208,7 +208,7 @@ class PetEditController extends AsyncNotifier<PetEditState> {
             pet: current.pet,
             draft: current.draft,
           );
-      ref.invalidate(activePetDetailsControllerProvider);
+      ref.invalidate(activePetDetailsControllerProvider(_petId));
       await ref.read(petsControllerProvider.notifier).refreshAfterPetMutation();
       return true;
     } catch (_) {

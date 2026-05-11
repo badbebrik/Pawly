@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/config/feature_flags.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
 import '../../../pets/controllers/active_pet_controller.dart';
@@ -36,7 +37,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
     return PawlyScreenScaffold(
       title: 'Календарь',
-      actions: const <Widget>[ChatAppBarAction()],
+      actions: const <Widget>[
+        if (PawlyFeatureFlags.chatEnabled) ChatAppBarAction(),
+      ],
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(calendarDayProvider(dayKey));
@@ -118,7 +121,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
 
     await ref.read(activePetControllerProvider.notifier).selectPet(petId);
-    ref.invalidate(activePetDetailsControllerProvider);
+    ref.invalidate(activePetDetailsControllerProvider(petId));
 
     if (!mounted) {
       return;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/config/feature_flags.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../chat/presentation/widgets/chat_app_bar_action.dart';
@@ -10,7 +11,6 @@ import '../../controllers/active_pet_details_controller.dart';
 import '../../controllers/pets_controller.dart';
 import '../../models/pet_list_entry.dart';
 import '../../shared/widgets/pets_error_view.dart';
-import '../widgets/active_pet_view.dart';
 import '../widgets/add_pet_actions_sheet.dart';
 import '../widgets/join_pet_by_code_dialog.dart';
 import '../widgets/pets_list_view.dart';
@@ -20,64 +20,44 @@ class PetsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activePetAsync = ref.watch(activePetControllerProvider);
     final petsStateAsync = ref.watch(petsControllerProvider);
-    final activePetId = activePetAsync.asData?.value;
 
     return PawlyScreenScaffold(
       title: 'Питомцы',
       actions: const <Widget>[
-        ChatAppBarAction(),
+        if (PawlyFeatureFlags.chatEnabled) ChatAppBarAction(),
       ],
-      floatingActionButton: activePetId == null || activePetId.isEmpty
-          ? PawlyAddActionButton(
-              label: 'Добавить',
-              tooltip: 'Добавить питомца',
-              onTap: () => showAddPetActionsSheet(
-                context: context,
-                onCreatePet: () => context.push(AppRoutes.petCreate),
-                onJoinByCode: () => _showJoinByCodeDialog(context, ref),
-              ),
-            )
-          : null,
-      body: activePetAsync.when(
-        data: (activePetId) {
-          return petsStateAsync.when(
-            data: (petsState) {
-              if (activePetId == null || activePetId.isEmpty) {
-                return PetsListView(
-                  state: petsState,
-                  onSearchChanged:
-                      ref.read(petsControllerProvider.notifier).setSearchQuery,
-                  onStatusBucketChanged:
-                      ref.read(petsControllerProvider.notifier).setStatusBucket,
-                  onOwnershipFilterChanged: ref
-                      .read(petsControllerProvider.notifier)
-                      .setOwnershipFilter,
-                  onPetSelected: (entry) => ref
-                      .read(activePetControllerProvider.notifier)
-                      .selectPet(entry.id),
-                  onRestorePet: (entry) =>
-                      _restorePetFromArchive(context, ref, entry),
-                );
-              }
-
-              return ActivePetView(
-                entry: _petListEntryById(petsState.items, activePetId),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => PetsErrorView(
-              message: 'Не удалось загрузить питомцев.',
-              onRetry: () => ref.read(petsControllerProvider.notifier).reload(),
+      floatingActionButton: PawlyAddActionButton(
+        label: 'Добавить',
+        tooltip: 'Добавить питомца',
+        onTap: () => showAddPetActionsSheet(
+          context: context,
+          onCreatePet: () => context.push(AppRoutes.petCreate),
+          onJoinByCode: () => _showJoinByCodeDialog(context, ref),
+        ),
+      ),
+      body: petsStateAsync.when(
+        data: (petsState) {
+          return PetsListView(
+            state: petsState,
+            onSearchChanged:
+                ref.read(petsControllerProvider.notifier).setSearchQuery,
+            onStatusBucketChanged:
+                ref.read(petsControllerProvider.notifier).setStatusBucket,
+            onOwnershipFilterChanged:
+                ref.read(petsControllerProvider.notifier).setOwnershipFilter,
+            onPetSelected: (entry) => context.pushNamed(
+              'petDetails',
+              pathParameters: <String, String>{'petId': entry.id},
             ),
+            onRestorePet: (entry) =>
+                _restorePetFromArchive(context, ref, entry),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => PetsErrorView(
-          message: 'Не удалось восстановить активного питомца.',
-          onRetry: () =>
-              ref.read(activePetControllerProvider.notifier).reload(),
+          message: 'Не удалось загрузить питомцев.',
+          onRetry: () => ref.read(petsControllerProvider.notifier).reload(),
         ),
       ),
     );
@@ -112,15 +92,6 @@ Future<void> _restorePetFromArchive(
   }
 }
 
-PetListEntry? _petListEntryById(List<PetListEntry> items, String petId) {
-  for (final item in items) {
-    if (item.id == petId) {
-      return item;
-    }
-  }
-  return null;
-}
-
 Future<void> _showJoinByCodeDialog(BuildContext context, WidgetRef ref) async {
   final acceptedPetId = await showDialog<String>(
     context: context,
@@ -135,7 +106,14 @@ Future<void> _showJoinByCodeDialog(BuildContext context, WidgetRef ref) async {
     await ref.read(activePetControllerProvider.notifier).selectPet(
           acceptedPetId,
         );
-    ref.invalidate(activePetDetailsControllerProvider);
+    ref.invalidate(activePetDetailsControllerProvider(acceptedPetId));
+    if (!context.mounted) {
+      return;
+    }
+    context.pushNamed(
+      'petDetails',
+      pathParameters: <String, String>{'petId': acceptedPetId},
+    );
   } catch (error) {
     if (context.mounted) {
       showPawlySnackBar(

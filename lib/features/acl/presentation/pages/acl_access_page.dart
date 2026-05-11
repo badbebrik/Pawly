@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/config/feature_flags.dart';
 import '../../../../design_system/design_system.dart';
 import '../../controllers/acl_access_controller.dart';
-import '../widgets/acl_access_content.dart';
 import '../../shared/utils/acl_chat_navigation.dart';
 import '../../shared/widgets/acl_error_view.dart';
+import '../widgets/acl_access_content.dart';
 
 class AclAccessPage extends ConsumerWidget {
   const AclAccessPage({required this.petId, super.key});
@@ -42,12 +43,14 @@ class AclAccessPage extends ConsumerWidget {
               'inviteId': inviteId,
             },
           ),
-          onMessageTap: (otherUserId) => openAclDirectChat(
-            context: context,
-            ref: ref,
-            petId: state.me.petId,
-            otherUserId: otherUserId,
-          ),
+          onMessageTap: PawlyFeatureFlags.chatEnabled
+              ? (otherUserId) => openAclDirectChat(
+                    context: context,
+                    ref: ref,
+                    petId: state.me.petId,
+                    otherUserId: otherUserId,
+                  )
+              : null,
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => AclErrorView(

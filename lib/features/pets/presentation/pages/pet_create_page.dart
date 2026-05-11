@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
 import '../../controllers/active_pet_controller.dart';
 import '../../controllers/pet_create_controller.dart';
@@ -233,7 +232,12 @@ class _PetCreatePageState extends ConsumerState<PetCreatePage> {
                             .read(petsControllerProvider.notifier)
                             .refreshAfterPetMutation();
                         if (!context.mounted) return;
-                        context.go(AppRoutes.pets);
+                        context.goNamed(
+                          'petDetails',
+                          pathParameters: <String, String>{
+                            'petId': createdPet.id,
+                          },
+                        );
                       },
                     ),
                 ],

@@ -8,12 +8,16 @@ import '../states/active_pet_details_state.dart';
 import 'active_pet_controller.dart';
 import 'pets_controller.dart';
 
-final activePetDetailsControllerProvider =
-    AsyncNotifierProvider<ActivePetDetailsController, ActivePetDetailsState?>(
+final activePetDetailsControllerProvider = AsyncNotifierProvider.family<
+    ActivePetDetailsController, ActivePetDetailsState?, String>(
   ActivePetDetailsController.new,
 );
 
 class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
+  ActivePetDetailsController(this._petId);
+
+  final String _petId;
+
   @override
   Future<ActivePetDetailsState?> build() async {
     return _load();
@@ -122,14 +126,13 @@ class ActivePetDetailsController extends AsyncNotifier<ActivePetDetailsState?> {
   }
 
   Future<ActivePetDetailsState?> _load() async {
-    final activePetId = await ref.watch(activePetControllerProvider.future);
-    if (activePetId == null || activePetId.isEmpty) {
+    if (_petId.isEmpty) {
       return null;
     }
 
     final Pet pet;
     try {
-      pet = await ref.read(petsRepositoryProvider).getPet(activePetId);
+      pet = await ref.read(petsRepositoryProvider).getPet(_petId);
     } on ApiException catch (error) {
       if (_isInactiveAccessError(error)) {
         await ref.read(activePetControllerProvider.notifier).clear();

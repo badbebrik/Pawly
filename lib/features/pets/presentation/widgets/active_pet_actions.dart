@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
 import '../../controllers/active_pet_controller.dart';
 import '../../controllers/active_pet_details_controller.dart';
@@ -9,6 +11,7 @@ import '../../models/pet.dart';
 Future<void> showActivePetActionsSheet(
   BuildContext context,
   WidgetRef ref, {
+  required String petId,
   required String petName,
   required bool canArchive,
 }) async {
@@ -40,7 +43,7 @@ Future<void> showActivePetActionsSheet(
             onTap: canArchive
                 ? () async {
                     Navigator.of(sheetContext).pop();
-                    await _archiveActivePet(context, ref, petName);
+                    await _archiveActivePet(context, ref, petId, petName);
                   }
                 : null,
           ),
@@ -56,6 +59,9 @@ Future<void> _clearActivePet(
 ) async {
   try {
     await ref.read(activePetControllerProvider.notifier).clear();
+    if (context.mounted) {
+      context.go(AppRoutes.pets);
+    }
   } catch (_) {
     if (!context.mounted) {
       return;
@@ -90,7 +96,7 @@ Future<void> showPetPhotoActionsSheet(
             title: const Text('Выбрать из галереи'),
             onTap: () async {
               Navigator.of(sheetContext).pop();
-              await _uploadPetPhotoFromGallery(pageContext, ref);
+              await _uploadPetPhotoFromGallery(pageContext, ref, pet.id);
             },
           ),
           ListTile(
@@ -98,7 +104,7 @@ Future<void> showPetPhotoActionsSheet(
             title: const Text('Сделать фото'),
             onTap: () async {
               Navigator.of(sheetContext).pop();
-              await _uploadPetPhotoFromCamera(pageContext, ref);
+              await _uploadPetPhotoFromCamera(pageContext, ref, pet.id);
             },
           ),
           if (hasPhoto) ...<Widget>[
@@ -114,7 +120,7 @@ Future<void> showPetPhotoActionsSheet(
               ),
               onTap: () async {
                 Navigator.of(sheetContext).pop();
-                await _deletePetPhoto(pageContext, ref);
+                await _deletePetPhoto(pageContext, ref, pet.id);
               },
             ),
           ],
@@ -127,6 +133,7 @@ Future<void> showPetPhotoActionsSheet(
 Future<void> _archiveActivePet(
   BuildContext context,
   WidgetRef ref,
+  String petId,
   String petName,
 ) async {
   final confirmed = await showDialog<bool>(
@@ -154,13 +161,16 @@ Future<void> _archiveActivePet(
   }
 
   try {
-    await ref.read(activePetDetailsControllerProvider.notifier).archivePet();
+    await ref
+        .read(activePetDetailsControllerProvider(petId).notifier)
+        .archivePet();
     if (context.mounted) {
       showPawlySnackBar(
         context,
         message: '$petName перемещен в архив.',
         tone: PawlySnackBarTone.success,
       );
+      context.go(AppRoutes.pets);
     }
   } catch (error) {
     if (context.mounted) {
@@ -178,10 +188,11 @@ Future<void> _archiveActivePet(
 Future<void> _uploadPetPhotoFromGallery(
   BuildContext context,
   WidgetRef ref,
+  String petId,
 ) async {
   try {
     await ref
-        .read(activePetDetailsControllerProvider.notifier)
+        .read(activePetDetailsControllerProvider(petId).notifier)
         .uploadPhotoFromGallery();
   } catch (error) {
     if (context.mounted) {
@@ -199,10 +210,11 @@ Future<void> _uploadPetPhotoFromGallery(
 Future<void> _uploadPetPhotoFromCamera(
   BuildContext context,
   WidgetRef ref,
+  String petId,
 ) async {
   try {
     await ref
-        .read(activePetDetailsControllerProvider.notifier)
+        .read(activePetDetailsControllerProvider(petId).notifier)
         .uploadPhotoFromCamera();
   } catch (error) {
     if (context.mounted) {
@@ -220,9 +232,12 @@ Future<void> _uploadPetPhotoFromCamera(
 Future<void> _deletePetPhoto(
   BuildContext context,
   WidgetRef ref,
+  String petId,
 ) async {
   try {
-    await ref.read(activePetDetailsControllerProvider.notifier).deletePhoto();
+    await ref
+        .read(activePetDetailsControllerProvider(petId).notifier)
+        .deletePhoto();
   } catch (error) {
     if (context.mounted) {
       showPawlySnackBar(

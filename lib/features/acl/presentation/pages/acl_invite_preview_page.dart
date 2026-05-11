@@ -101,7 +101,10 @@ class AclInvitePreviewPage extends ConsumerWidget {
         message: 'Вы присоединились как ${response.roleTitle}.',
         tone: PawlySnackBarTone.success,
       );
-      context.go(AppRoutes.pets);
+      context.goNamed(
+        'petDetails',
+        pathParameters: <String, String>{'petId': response.petId},
+      );
     } catch (error) {
       if (!context.mounted) {
         return;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
 import '../../controllers/active_pet_controller.dart';
 import '../../controllers/active_pet_details_controller.dart';
@@ -14,21 +15,31 @@ import 'active_pet_feature_card.dart';
 import 'active_pet_hero_card.dart';
 
 class ActivePetView extends ConsumerWidget {
-  const ActivePetView({required this.entry, super.key});
+  const ActivePetView({
+    required this.petId,
+    required this.entry,
+    super.key,
+  });
 
+  final String petId;
   final PetListEntry? entry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final petDetailsAsync = ref.watch(activePetDetailsControllerProvider);
+    final petDetailsAsync =
+        ref.watch(activePetDetailsControllerProvider(petId));
 
     return petDetailsAsync.when(
       data: (details) {
         if (details == null) {
           return PetsErrorView(
             message: 'Активный питомец не найден.',
-            onRetry: () =>
-                ref.read(activePetControllerProvider.notifier).clear(),
+            onRetry: () async {
+              await ref.read(activePetControllerProvider.notifier).clear();
+              if (context.mounted) {
+                context.go(AppRoutes.pets);
+              }
+            },
           );
         }
 
@@ -57,6 +68,7 @@ class ActivePetView extends ConsumerWidget {
               onMore: () => showActivePetActionsSheet(
                 context,
                 ref,
+                petId: pet.id,
                 petName: pet.name,
                 canArchive: access.petWrite,
               ),
@@ -155,8 +167,9 @@ class ActivePetView extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => PetsErrorView(
         message: 'Не удалось загрузить карточку питомца.',
-        onRetry: () =>
-            ref.read(activePetDetailsControllerProvider.notifier).reload(),
+        onRetry: () => ref
+            .read(activePetDetailsControllerProvider(petId).notifier)
+            .reload(),
       ),
     );
   }

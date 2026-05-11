@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'deep_links/pawly_deep_link_listener.dart';
+import 'config/feature_flags.dart';
 import 'providers/theme_mode_controller.dart';
 import '../core/providers/core_providers.dart';
 import '../core/services/push_notifications_service.dart';
 import '../design_system/design_system.dart';
 import '../features/chat/controllers/chat_dependencies.dart';
+import '../features/home/controllers/home_branch_reset_controller.dart';
 import 'router/app_routes.dart';
 
 class PawlyApp extends ConsumerWidget {
@@ -38,14 +40,18 @@ class PawlyApp extends ConsumerWidget {
       ],
       routerConfig: router,
       builder: (context, child) {
-        return _ChatSocketLifecycleBinding(
-          child: _PushNotificationsBinding(
-            child: PawlyDeepLinkListener(
-              router: router,
-              child: child ?? const SizedBox.shrink(),
-            ),
+        final appShell = _PushNotificationsBinding(
+          child: PawlyDeepLinkListener(
+            router: router,
+            child: child ?? const SizedBox.shrink(),
           ),
         );
+
+        if (!PawlyFeatureFlags.chatEnabled) {
+          return appShell;
+        }
+
+        return _ChatSocketLifecycleBinding(child: appShell);
       },
     );
   }
@@ -190,6 +196,9 @@ class _PushNotificationsBindingState
     }
 
     final router = ref.read(appRouterProvider);
+    ref
+        .read(homeBranchResetControllerProvider.notifier)
+        .requestResetAfterExternalNavigation();
     _openScheduledOccurrence(router, payload);
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/config/feature_flags.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../pets/controllers/active_pet_controller.dart';
 import '../../../pets/controllers/active_pet_details_controller.dart';
@@ -58,7 +59,8 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
             onLeave: () => _leaveAccess(params, state.member),
             onOwnerTransferPressed: () =>
                 _showOwnerTransferDialog(params, state.member),
-            onMessageTap: state.member.userId == state.me.userId
+            onMessageTap: !PawlyFeatureFlags.chatEnabled ||
+                    state.member.userId == state.me.userId
                 ? null
                 : () => openAclDirectChat(
                       context: context,
@@ -185,7 +187,7 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
       await ref
           .read(aclMemberDetailsControllerProvider(params).notifier)
           .transferOwnership();
-      ref.invalidate(activePetDetailsControllerProvider);
+      ref.invalidate(activePetDetailsControllerProvider(params.petId));
       await ref.read(petsControllerProvider.notifier).refreshAfterPetMutation();
       if (!mounted) {
         return;
@@ -244,7 +246,7 @@ class _AclMemberDetailsPageState extends ConsumerState<AclMemberDetailsPage> {
           .read(aclMemberDetailsControllerProvider(params).notifier)
           .leaveAccess();
       await ref.read(activePetControllerProvider.notifier).clear();
-      ref.invalidate(activePetDetailsControllerProvider);
+      ref.invalidate(activePetDetailsControllerProvider(params.petId));
       await ref.read(petsControllerProvider.notifier).reload();
       if (!mounted) {
         return;

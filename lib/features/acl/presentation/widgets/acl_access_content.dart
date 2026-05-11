@@ -12,7 +12,7 @@ class AclAccessContent extends StatelessWidget {
     required this.state,
     required this.onMemberTap,
     required this.onInviteTap,
-    required this.onMessageTap,
+    this.onMessageTap,
     this.onCreateInvite,
     super.key,
   });
@@ -21,7 +21,7 @@ class AclAccessContent extends StatelessWidget {
   final VoidCallback? onCreateInvite;
   final ValueChanged<String> onMemberTap;
   final ValueChanged<String> onInviteTap;
-  final ValueChanged<String> onMessageTap;
+  final ValueChanged<String>? onMessageTap;
 
   @override
   Widget build(BuildContext context) {
@@ -51,9 +51,10 @@ class AclAccessContent extends StatelessWidget {
                 member: member,
                 meUserId: state.me.userId,
                 onTap: () => onMemberTap(member.id),
-                onMessageTap: member.userId == state.me.userId
-                    ? null
-                    : () => onMessageTap(member.userId),
+                onMessageTap:
+                    member.userId == state.me.userId || onMessageTap == null
+                        ? null
+                        : () => onMessageTap!(member.userId),
               ),
             ),
           ),

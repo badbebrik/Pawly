@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/config/feature_flags.dart';
 import '../../../../app/providers/theme_mode_controller.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../design_system/design_system.dart';
@@ -35,7 +36,7 @@ class SettingsPage extends ConsumerWidget {
     return PawlyScreenScaffold(
       title: 'Настройки',
       actions: const <Widget>[
-        ChatAppBarAction(),
+        if (PawlyFeatureFlags.chatEnabled) ChatAppBarAction(),
       ],
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
