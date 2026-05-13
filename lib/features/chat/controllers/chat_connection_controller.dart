@@ -6,8 +6,8 @@ import '../data/chat_socket_models.dart';
 import '../states/chat_connection_state.dart';
 import 'chat_dependencies.dart';
 
-final chatSocketConnectionControllerProvider = AsyncNotifierProvider<
-    ChatSocketConnectionController, ChatSocketConnectionState>(
+final chatSocketConnectionControllerProvider = AsyncNotifierProvider
+    .autoDispose<ChatSocketConnectionController, ChatSocketConnectionState>(
   ChatSocketConnectionController.new,
 );
 
@@ -34,13 +34,6 @@ class ChatSocketConnectionController
       unawaited(lifecycleSubscription.cancel().catchError((_) {}));
     });
 
-    try {
-      await service.ensureConnected();
-      if (service.isConnected) {
-        await service.subscribeInbox();
-      }
-    } catch (_) {}
-
     return ChatSocketConnectionState(
       status: service.isConnected
           ? ChatSocketLifecycleStatus.connected
@@ -63,9 +56,6 @@ class ChatSocketConnectionController
     await service.disconnect();
     try {
       await service.ensureConnected();
-      if (service.isConnected) {
-        await service.subscribeInbox();
-      }
     } catch (_) {}
   }
 }

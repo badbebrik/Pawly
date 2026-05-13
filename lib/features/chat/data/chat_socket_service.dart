@@ -31,10 +31,10 @@ class ChatSocketService {
 
   bool _disposed = false;
   bool _disconnectRequested = false;
-  bool _inboxSubscribed = false;
+  int _inboxSubscriptionCount = 0;
   int _reconnectAttempt = 0;
   int _connectionGeneration = 0;
-  final Set<String> _conversationSubscriptions = <String>{};
+  final Map<String, int> _conversationSubscriptionCounts = <String, int>{};
 
   Stream<ChatServerEvent> get events => _eventsController.stream;
   Stream<ChatSocketLifecycleEvent> get lifecycleEvents =>
@@ -115,7 +115,10 @@ class ChatSocketService {
 
   Future<void> send(ChatClientEvent event) async {
     await ensureConnected().timeout(_sendConnectionTimeout);
+    _sendOpen(event);
+  }
 
+  void _sendOpen(ChatClientEvent event) {
     final socket = _socket;
     if (socket == null || socket.readyState != WebSocket.open) {
       throw StateError('Chat socket is not connected.');
@@ -131,8 +134,25 @@ class ChatSocketService {
   }
 
   Future<void> subscribeInbox() async {
-    _inboxSubscribed = true;
+    final wasSubscribed = _inboxSubscriptionCount > 0;
+    _inboxSubscriptionCount += 1;
+    if (wasSubscribed && isConnected) {
+      return;
+    }
+
     await send(const SubscribeInboxEvent());
+  }
+
+  Future<void> unsubscribeInbox() async {
+    if (_inboxSubscriptionCount > 0) {
+      _inboxSubscriptionCount -= 1;
+    }
+
+    if (_inboxSubscriptionCount > 0 || hasActiveSubscriptions) {
+      return;
+    }
+
+    await disconnect();
   }
 
   Future<void> subscribeConversation(String conversationId) async {
@@ -140,7 +160,12 @@ class ChatSocketService {
       return;
     }
 
-    _conversationSubscriptions.add(conversationId);
+    final currentCount = _conversationSubscriptionCounts[conversationId] ?? 0;
+    _conversationSubscriptionCounts[conversationId] = currentCount + 1;
+    if (currentCount > 0 && isConnected) {
+      return;
+    }
+
     await send(
       SubscribeConversationEvent(conversationId: conversationId),
     );
@@ -151,16 +176,27 @@ class ChatSocketService {
       return;
     }
 
-    _conversationSubscriptions.remove(conversationId);
-    if (!isConnected) {
+    final currentCount = _conversationSubscriptionCounts[conversationId] ?? 0;
+    if (currentCount <= 1) {
+      _conversationSubscriptionCounts.remove(conversationId);
+    } else {
+      _conversationSubscriptionCounts[conversationId] = currentCount - 1;
       return;
     }
 
-    try {
-      await send(
-        UnsubscribeConversationEvent(conversationId: conversationId),
-      );
-    } catch (_) {}
+    if (isConnected) {
+      try {
+        _sendOpen(
+          UnsubscribeConversationEvent(conversationId: conversationId),
+        );
+      } catch (_) {}
+    }
+
+    if (hasActiveSubscriptions) {
+      return;
+    }
+
+    await disconnect();
   }
 
   Future<void> sendMessage({
@@ -200,12 +236,26 @@ class ChatSocketService {
   }
 
   Future<void> resumeIfNeeded() async {
-    if (!_inboxSubscribed && _conversationSubscriptions.isEmpty) {
+    if (!hasActiveSubscriptions) {
+      return;
+    }
+
+    final disconnecting = _disconnectFuture;
+    if (disconnecting != null) {
+      try {
+        await disconnecting;
+      } catch (_) {}
+    }
+
+    if (!hasActiveSubscriptions) {
       return;
     }
 
     await ensureConnected();
   }
+
+  bool get hasActiveSubscriptions =>
+      _inboxSubscriptionCount > 0 || _conversationSubscriptionCounts.isNotEmpty;
 
   Future<void> _connectInternal(int generation) async {
     _disconnectRequested = false;
@@ -271,7 +321,7 @@ class ChatSocketService {
           reconnectAttempt: _reconnectAttempt,
         ),
       );
-      if (!isAuthenticationFailure) {
+      if (!isAuthenticationFailure && hasActiveSubscriptions) {
         _scheduleReconnect();
       }
     } finally {
@@ -345,6 +395,7 @@ class ChatSocketService {
   void _scheduleReconnect() {
     if (_disposed ||
         _disconnectRequested ||
+        !hasActiveSubscriptions ||
         _connectFuture != null ||
         _reconnectTimer != null) {
       return;
@@ -365,15 +416,15 @@ class ChatSocketService {
   }
 
   Future<void> _restoreSubscriptions() async {
-    if (_inboxSubscribed) {
+    if (_inboxSubscriptionCount > 0) {
       try {
-        await send(const SubscribeInboxEvent());
+        _sendOpen(const SubscribeInboxEvent());
       } catch (_) {}
     }
 
-    for (final conversationId in _conversationSubscriptions) {
+    for (final conversationId in _conversationSubscriptionCounts.keys) {
       try {
-        await send(
+        _sendOpen(
           SubscribeConversationEvent(conversationId: conversationId),
         );
       } catch (_) {}

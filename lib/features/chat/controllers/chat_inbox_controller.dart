@@ -6,7 +6,6 @@ import '../data/chat_socket_models.dart';
 import '../models/chat_models.dart';
 import '../shared/mappers/chat_mappers.dart';
 import '../states/chat_inbox_state.dart';
-import 'chat_connection_controller.dart';
 import 'chat_dependencies.dart';
 
 final chatInboxControllerProvider = AsyncNotifierProvider.autoDispose
@@ -21,7 +20,6 @@ class ChatInboxController extends AsyncNotifier<ChatInboxState> {
 
   @override
   Future<ChatInboxState> build() async {
-    ref.read(chatSocketConnectionControllerProvider);
     final service = ref.read(chatSocketServiceProvider);
     final subscription = service.events.listen((event) {
       if (event is! ConversationUpdatedEvent) {
@@ -39,7 +37,10 @@ class ChatInboxController extends AsyncNotifier<ChatInboxState> {
     });
     ref.onDispose(() {
       unawaited(subscription.cancel().catchError((_) {}));
+      unawaited(service.unsubscribeInbox().catchError((_) {}));
     });
+
+    unawaited(service.subscribeInbox().catchError((_) {}));
 
     final base = ChatInboxState.initial(petIdFilter: _petIdFilter);
     return _loadInitial(base);

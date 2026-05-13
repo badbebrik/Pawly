@@ -1,3 +1,3 @@
 abstract final class PawlyFeatureFlags {
-  static const bool chatEnabled = false;
+  static const bool chatEnabled = true;
 }

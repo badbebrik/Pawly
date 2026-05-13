@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/chat_socket_models.dart';
 import '../models/chat_models.dart';
-import '../shared/mappers/chat_mappers.dart';
-import 'chat_connection_controller.dart';
 import 'chat_dependencies.dart';
+
+const _unreadPollingInterval = Duration(seconds: 30);
 
 final chatUnreadSummaryControllerProvider = AsyncNotifierProvider.autoDispose<
     ChatUnreadSummaryController, ChatUnreadSummary>(
@@ -14,20 +13,21 @@ final chatUnreadSummaryControllerProvider = AsyncNotifierProvider.autoDispose<
 );
 
 class ChatUnreadSummaryController extends AsyncNotifier<ChatUnreadSummary> {
+  Timer? _pollTimer;
+  bool _disposed = false;
+  bool _reloadInFlight = false;
+
   @override
   Future<ChatUnreadSummary> build() async {
-    ref.read(chatSocketConnectionControllerProvider);
-    final service = ref.read(chatSocketServiceProvider);
-
-    final subscription = service.events.listen((event) {
-      if (event is! GlobalUnreadUpdatedEvent) {
-        return;
-      }
-
-      patch(chatUnreadSummaryFromNetwork(event.summary));
+    _disposed = false;
+    _pollTimer = Timer.periodic(_unreadPollingInterval, (_) {
+      unawaited(_reloadSilently());
     });
+
     ref.onDispose(() {
-      unawaited(subscription.cancel().catchError((_) {}));
+      _disposed = true;
+      _pollTimer?.cancel();
+      _pollTimer = null;
     });
 
     return ref.read(chatRepositoryProvider).getUnreadSummary();
@@ -37,6 +37,20 @@ class ChatUnreadSummaryController extends AsyncNotifier<ChatUnreadSummary> {
     state = const AsyncLoading();
     state =
         AsyncData(await ref.read(chatRepositoryProvider).getUnreadSummary());
+  }
+
+  Future<void> _reloadSilently() async {
+    if (_disposed || _reloadInFlight) {
+      return;
+    }
+
+    _reloadInFlight = true;
+    try {
+      patch(await ref.read(chatRepositoryProvider).getUnreadSummary());
+    } catch (_) {
+    } finally {
+      _reloadInFlight = false;
+    }
   }
 
   void patch(ChatUnreadSummary value) {

@@ -9,7 +9,6 @@ import '../models/chat_models.dart';
 import '../shared/mappers/chat_mappers.dart';
 import '../shared/utils/chat_client_message_id.dart';
 import '../states/chat_conversation_state.dart';
-import 'chat_connection_controller.dart';
 import 'chat_dependencies.dart';
 import 'chat_inbox_controller.dart';
 import 'chat_unread_controller.dart';
@@ -37,7 +36,6 @@ class ChatConversationController extends AsyncNotifier<ChatConversationState> {
   @override
   Future<ChatConversationState> build() async {
     _disposed = false;
-    ref.read(chatSocketConnectionControllerProvider);
     final service = ref.read(chatSocketServiceProvider);
     final repository = ref.read(chatRepositoryProvider);
 
