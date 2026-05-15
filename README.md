@@ -1,18 +1,39 @@
-# pawly
+# Pawly
 
-A new Flutter project.
+## Установка через APK
 
-## Getting Started
+Скачайте APK: [pawly.apk](https://drive.google.com/file/d/1GLSQOSY1GK3nfhLFQIqE2IGOlA0oPXmW/view?usp=sharing)
 
-This project is a starting point for a Flutter application.
+На Android разрешите установку из неизвестных источников, затем откройте APK.
 
-A few resources to get you started if this is your first Flutter project:
+## Сборка из исходников
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Установите Flutter SDK по официальной инструкции: https://docs.flutter.dev/get-started/install
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter build apk --release --dart-define=API_BASE_URL=https://pawly-app.ru
+```
 
-/docs
+APK появится здесь:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+## iOS
+
+Для сборки на iOS нужен macOS, Xcode, установленный Flutter SDK.
+
+Для симулятора:
+
+```bash
+flutter pub get
+flutter run --dart-define=API_BASE_URL=https://pawly-app.ru
+```
+
+Для реального iPhone подключите устройство и запустите release:
+
+```bash
+flutter run --release --dart-define=API_BASE_URL=https://pawly-app.ru
+```
