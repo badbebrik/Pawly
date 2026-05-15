@@ -78,10 +78,7 @@ class PetsRepository {
       pet.id,
       network.UpdatePetPayload(
         rowVersion: pet.rowVersion,
-        payload: buildCreatePetPayloadFromDraft(
-          draft,
-          profilePhotoFileId: pet.profilePhotoFileId,
-        ),
+        payload: buildCreatePetPayloadFromDraft(draft),
       ),
     );
     return petFromNetwork(response.pet);

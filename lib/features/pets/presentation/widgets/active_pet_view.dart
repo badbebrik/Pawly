@@ -18,11 +18,13 @@ class ActivePetView extends ConsumerWidget {
   const ActivePetView({
     required this.petId,
     required this.entry,
+    this.onSwitchPet,
     super.key,
   });
 
   final String petId;
   final PetListEntry? entry;
+  final VoidCallback? onSwitchPet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,6 +73,7 @@ class ActivePetView extends ConsumerWidget {
                 petId: pet.id,
                 petName: pet.name,
                 canArchive: access.petWrite,
+                onChangePet: onSwitchPet,
               ),
             ),
             if (!access.petWrite) ...<Widget>[

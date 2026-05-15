@@ -11,7 +11,12 @@ import '../../models/chat_models.dart';
 import '../widgets/chat_inbox_list.dart';
 
 class ChatInboxPage extends ConsumerStatefulWidget {
-  const ChatInboxPage({super.key});
+  const ChatInboxPage({
+    this.petIdFilter,
+    super.key,
+  });
+
+  final String? petIdFilter;
 
   @override
   ConsumerState<ChatInboxPage> createState() => _ChatInboxPageState();
@@ -36,7 +41,9 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
 
   @override
   Widget build(BuildContext context) {
-    final inboxState = ref.watch(chatInboxControllerProvider(null));
+    final inboxState = ref.watch(
+      chatInboxControllerProvider(widget.petIdFilter),
+    );
 
     return PawlyScreenScaffold(
       title: 'Сообщения',
@@ -74,7 +81,9 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
   Future<void> _refresh() async {
     try {
       await Future.wait<void>(<Future<void>>[
-        ref.read(chatInboxControllerProvider(null).notifier).reload(),
+        ref
+            .read(chatInboxControllerProvider(widget.petIdFilter).notifier)
+            .reload(),
         ref.read(chatUnreadSummaryControllerProvider.notifier).reload(),
       ]);
     } catch (_) {}
@@ -92,7 +101,7 @@ class _ChatInboxPageState extends ConsumerState<ChatInboxPage> {
 
     unawaited(
       ref
-          .read(chatInboxControllerProvider(null).notifier)
+          .read(chatInboxControllerProvider(widget.petIdFilter).notifier)
           .loadMore()
           .catchError((_) {}),
     );

@@ -14,6 +14,7 @@ Future<void> showActivePetActionsSheet(
   required String petId,
   required String petName,
   required bool canArchive,
+  VoidCallback? onChangePet,
 }) async {
   final pageContext = context;
   await showPawlyBottomSheet<void>(
@@ -29,7 +30,12 @@ Future<void> showActivePetActionsSheet(
             title: const Text('Сменить питомца'),
             onTap: () async {
               Navigator.of(sheetContext).pop();
-              await _clearActivePet(pageContext, ref);
+              final changePet = onChangePet;
+              if (changePet != null) {
+                changePet();
+              } else {
+                await _clearActivePet(pageContext, ref);
+              }
             },
           ),
           ListTile(

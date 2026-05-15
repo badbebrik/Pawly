@@ -232,12 +232,7 @@ class _PetCreatePageState extends ConsumerState<PetCreatePage> {
                             .read(petsControllerProvider.notifier)
                             .refreshAfterPetMutation();
                         if (!context.mounted) return;
-                        context.goNamed(
-                          'petDetails',
-                          pathParameters: <String, String>{
-                            'petId': createdPet.id,
-                          },
-                        );
+                        context.goNamed('pets');
                       },
                     ),
                 ],

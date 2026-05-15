@@ -3,10 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_routes.dart';
 import '../../controllers/chat_unread_controller.dart';
 
 class ChatAppBarAction extends ConsumerWidget {
-  const ChatAppBarAction({super.key});
+  const ChatAppBarAction({
+    this.petId,
+    super.key,
+  });
+
+  final String? petId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,7 +28,7 @@ class ChatAppBarAction extends ConsumerWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => context.pushNamed('chatInbox'),
+            onTap: () => _openChat(context),
             customBorder: const CircleBorder(),
             child: Ink(
               width: 38,
@@ -75,6 +81,21 @@ class ChatAppBarAction extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _openChat(BuildContext context) {
+    final resolvedPetId = petId;
+    if (resolvedPetId == null || resolvedPetId.isEmpty) {
+      context.pushNamed('chatInbox');
+      return;
+    }
+
+    context.push(
+      Uri(
+        path: AppRoutes.chatInbox,
+        queryParameters: <String, String>{'pet_id': resolvedPetId},
+      ).toString(),
     );
   }
 }

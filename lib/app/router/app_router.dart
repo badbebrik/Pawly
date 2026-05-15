@@ -28,7 +28,6 @@ import '../../features/logs/presentation/pages/pet_log_type_picker_page.dart';
 import '../../features/logs/presentation/pages/pet_log_type_create_page.dart';
 import '../../features/logs/presentation/pages/pet_logs_page.dart';
 import '../../features/pets/presentation/pages/pet_create_page.dart';
-import '../../features/pets/presentation/pages/pet_details_page.dart';
 import '../../features/pets/presentation/pages/pet_edit_page.dart';
 import '../../features/pets/presentation/pages/pets_page.dart';
 import '../../features/health/presentation/pages/home/pet_health_home_page.dart';
@@ -125,7 +124,9 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
         name: 'chatInbox',
         redirect: (_, __) =>
             PawlyFeatureFlags.chatEnabled ? null : AppRoutes.pets,
-        builder: (_, __) => const ChatInboxPage(),
+        builder: (_, state) => ChatInboxPage(
+          petIdFilter: state.uri.queryParameters['pet_id'],
+        ),
         routes: <RouteBase>[
           GoRoute(
             path: 'conversations/:conversationId',
@@ -164,245 +165,238 @@ GoRouter buildAppRouter({required AuthSessionStore authSessionStore}) {
                 ),
                 routes: <RouteBase>[
                   GoRoute(
-                    path: ':petId',
-                    name: 'petDetails',
-                    builder: (_, state) => PetDetailsPage(
+                    path: ':petId/edit',
+                    name: 'petEdit',
+                    builder: (_, state) => PetEditPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':petId/log-types/create',
+                    name: 'petLogTypeCreate',
+                    builder: (_, state) => PetLogTypeCreatePage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':petId/log-types/pick',
+                    name: 'petLogTypePicker',
+                    builder: (_, state) => PetLogTypePickerPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':petId/metrics/create',
+                    name: 'petMetricCreate',
+                    builder: (_, state) => PetMetricCreatePage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':petId/metrics/pick',
+                    name: 'petMetricPicker',
+                    builder: (_, state) => PetMetricPickerPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':petId/reminders',
+                    name: 'petReminders',
+                    builder: (_, state) => PetRemindersPage(
                       petId: state.pathParameters['petId']!,
                     ),
                     routes: <RouteBase>[
                       GoRoute(
-                        path: 'edit',
-                        name: 'petEdit',
-                        builder: (_, state) => PetEditPage(
+                        path: 'create',
+                        name: 'petReminderCreate',
+                        builder: (_, state) => PetReminderCreatePage(
                           petId: state.pathParameters['petId']!,
                         ),
                       ),
                       GoRoute(
-                        path: 'log-types/create',
-                        name: 'petLogTypeCreate',
-                        builder: (_, state) => PetLogTypeCreatePage(
+                        path: ':itemId/edit',
+                        name: 'petReminderEdit',
+                        builder: (_, state) => PetReminderEditPage(
+                          petId: state.pathParameters['petId']!,
+                          itemId: state.pathParameters['itemId']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: ':petId/health',
+                    name: 'petHealthHome',
+                    builder: (_, state) => PetHealthHomePage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'documents',
+                        name: 'petDocuments',
+                        builder: (_, state) => DocumentsPage(
                           petId: state.pathParameters['petId']!,
                         ),
                       ),
                       GoRoute(
-                        path: 'log-types/pick',
-                        name: 'petLogTypePicker',
-                        builder: (_, state) => PetLogTypePickerPage(
-                          petId: state.pathParameters['petId']!,
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'metrics/create',
-                        name: 'petMetricCreate',
-                        builder: (_, state) => PetMetricCreatePage(
-                          petId: state.pathParameters['petId']!,
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'metrics/pick',
-                        name: 'petMetricPicker',
-                        builder: (_, state) => PetMetricPickerPage(
-                          petId: state.pathParameters['petId']!,
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'reminders',
-                        name: 'petReminders',
-                        builder: (_, state) => PetRemindersPage(
+                        path: 'visits',
+                        name: 'petVetVisits',
+                        builder: (_, state) => PetVetVisitsPage(
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
                           GoRoute(
-                            path: 'create',
-                            name: 'petReminderCreate',
-                            builder: (_, state) => PetReminderCreatePage(
+                            path: ':visitId',
+                            name: 'petVetVisitDetails',
+                            builder: (_, state) => PetVetVisitDetailsPage(
                               petId: state.pathParameters['petId']!,
-                            ),
-                          ),
-                          GoRoute(
-                            path: ':itemId/edit',
-                            name: 'petReminderEdit',
-                            builder: (_, state) => PetReminderEditPage(
-                              petId: state.pathParameters['petId']!,
-                              itemId: state.pathParameters['itemId']!,
+                              visitId: state.pathParameters['visitId']!,
                             ),
                           ),
                         ],
                       ),
                       GoRoute(
-                        path: 'health',
-                        name: 'petHealthHome',
-                        builder: (_, state) => PetHealthHomePage(
+                        path: 'vaccinations',
+                        name: 'petVaccinations',
+                        builder: (_, state) => PetVaccinationsPage(
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
                           GoRoute(
-                            path: 'documents',
-                            name: 'petDocuments',
-                            builder: (_, state) => DocumentsPage(
+                            path: ':vaccinationId',
+                            name: 'petVaccinationDetails',
+                            builder: (_, state) => PetVaccinationDetailsPage(
                               petId: state.pathParameters['petId']!,
+                              vaccinationId:
+                                  state.pathParameters['vaccinationId']!,
                             ),
-                          ),
-                          GoRoute(
-                            path: 'visits',
-                            name: 'petVetVisits',
-                            builder: (_, state) => PetVetVisitsPage(
-                              petId: state.pathParameters['petId']!,
-                            ),
-                            routes: <RouteBase>[
-                              GoRoute(
-                                path: ':visitId',
-                                name: 'petVetVisitDetails',
-                                builder: (_, state) => PetVetVisitDetailsPage(
-                                  petId: state.pathParameters['petId']!,
-                                  visitId: state.pathParameters['visitId']!,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GoRoute(
-                            path: 'vaccinations',
-                            name: 'petVaccinations',
-                            builder: (_, state) => PetVaccinationsPage(
-                              petId: state.pathParameters['petId']!,
-                            ),
-                            routes: <RouteBase>[
-                              GoRoute(
-                                path: ':vaccinationId',
-                                name: 'petVaccinationDetails',
-                                builder: (_, state) =>
-                                    PetVaccinationDetailsPage(
-                                  petId: state.pathParameters['petId']!,
-                                  vaccinationId:
-                                      state.pathParameters['vaccinationId']!,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GoRoute(
-                            path: 'procedures',
-                            name: 'petProcedures',
-                            builder: (_, state) => PetProceduresPage(
-                              petId: state.pathParameters['petId']!,
-                            ),
-                            routes: <RouteBase>[
-                              GoRoute(
-                                path: ':procedureId',
-                                name: 'petProcedureDetails',
-                                builder: (_, state) => PetProcedureDetailsPage(
-                                  petId: state.pathParameters['petId']!,
-                                  procedureId:
-                                      state.pathParameters['procedureId']!,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GoRoute(
-                            path: 'medical-records',
-                            name: 'petMedicalRecords',
-                            builder: (_, state) => PetMedicalRecordsPage(
-                              petId: state.pathParameters['petId']!,
-                            ),
-                            routes: <RouteBase>[
-                              GoRoute(
-                                path: ':recordId',
-                                name: 'petMedicalRecordDetails',
-                                builder: (_, state) =>
-                                    PetMedicalRecordDetailsPage(
-                                  petId: state.pathParameters['petId']!,
-                                  recordId: state.pathParameters['recordId']!,
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),
                       GoRoute(
-                        path: 'analytics',
-                        name: 'petAnalytics',
-                        builder: (_, state) => PetAnalyticsPage(
-                          petId: state.pathParameters['petId']!,
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'logs',
-                        name: 'petLogs',
-                        builder: (_, state) => PetLogsPage(
+                        path: 'procedures',
+                        name: 'petProcedures',
+                        builder: (_, state) => PetProceduresPage(
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
                           GoRoute(
-                            path: 'create',
-                            name: 'petLogCreate',
-                            builder: (_, state) => PetLogCreatePage(
+                            path: ':procedureId',
+                            name: 'petProcedureDetails',
+                            builder: (_, state) => PetProcedureDetailsPage(
                               petId: state.pathParameters['petId']!,
-                              initialLogTypeId:
-                                  state.uri.queryParameters['logTypeId'],
+                              procedureId: state.pathParameters['procedureId']!,
                             ),
-                          ),
-                          GoRoute(
-                            path: ':logId',
-                            name: 'petLogDetails',
-                            builder: (_, state) => PetLogDetailsPage(
-                              petId: state.pathParameters['petId']!,
-                              logId: state.pathParameters['logId']!,
-                            ),
-                            routes: <RouteBase>[
-                              GoRoute(
-                                path: 'edit',
-                                name: 'petLogEdit',
-                                builder: (_, state) => PetLogEditPage(
-                                  petId: state.pathParameters['petId']!,
-                                  logId: state.pathParameters['logId']!,
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),
                       GoRoute(
-                        path: 'access',
-                        name: 'aclAccess',
-                        builder: (_, state) => AclAccessPage(
+                        path: 'medical-records',
+                        name: 'petMedicalRecords',
+                        builder: (_, state) => PetMedicalRecordsPage(
                           petId: state.pathParameters['petId']!,
                         ),
                         routes: <RouteBase>[
                           GoRoute(
-                            path: 'members/:memberId',
-                            name: 'aclMemberDetails',
-                            builder: (_, state) => AclMemberDetailsPage(
+                            path: ':recordId',
+                            name: 'petMedicalRecordDetails',
+                            builder: (_, state) => PetMedicalRecordDetailsPage(
                               petId: state.pathParameters['petId']!,
-                              memberId: state.pathParameters['memberId']!,
+                              recordId: state.pathParameters['recordId']!,
                             ),
-                          ),
-                          GoRoute(
-                            path: 'invite',
-                            name: 'aclCreateInvite',
-                            builder: (_, state) => AclInviteFormPage(
-                              petId: state.pathParameters['petId']!,
-                            ),
-                          ),
-                          GoRoute(
-                            path: 'invites/:inviteId',
-                            name: 'aclInviteDetails',
-                            builder: (_, state) => AclInviteDetailsPage(
-                              petId: state.pathParameters['petId']!,
-                              inviteId: state.pathParameters['inviteId']!,
-                            ),
-                            routes: <RouteBase>[
-                              GoRoute(
-                                path: 'edit',
-                                name: 'aclInviteEdit',
-                                builder: (_, state) => AclInviteFormPage(
-                                  petId: state.pathParameters['petId']!,
-                                  inviteId: state.pathParameters['inviteId']!,
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),
                     ],
+                  ),
+                  GoRoute(
+                    path: ':petId/analytics',
+                    name: 'petAnalytics',
+                    builder: (_, state) => PetAnalyticsPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':petId/logs',
+                    name: 'petLogs',
+                    builder: (_, state) => PetLogsPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'create',
+                        name: 'petLogCreate',
+                        builder: (_, state) => PetLogCreatePage(
+                          petId: state.pathParameters['petId']!,
+                          initialLogTypeId:
+                              state.uri.queryParameters['logTypeId'],
+                        ),
+                      ),
+                      GoRoute(
+                        path: ':logId',
+                        name: 'petLogDetails',
+                        builder: (_, state) => PetLogDetailsPage(
+                          petId: state.pathParameters['petId']!,
+                          logId: state.pathParameters['logId']!,
+                        ),
+                        routes: <RouteBase>[
+                          GoRoute(
+                            path: 'edit',
+                            name: 'petLogEdit',
+                            builder: (_, state) => PetLogEditPage(
+                              petId: state.pathParameters['petId']!,
+                              logId: state.pathParameters['logId']!,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: ':petId/access',
+                    name: 'aclAccess',
+                    builder: (_, state) => AclAccessPage(
+                      petId: state.pathParameters['petId']!,
+                    ),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'members/:memberId',
+                        name: 'aclMemberDetails',
+                        builder: (_, state) => AclMemberDetailsPage(
+                          petId: state.pathParameters['petId']!,
+                          memberId: state.pathParameters['memberId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'invite',
+                        name: 'aclCreateInvite',
+                        builder: (_, state) => AclInviteFormPage(
+                          petId: state.pathParameters['petId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'invites/:inviteId',
+                        name: 'aclInviteDetails',
+                        builder: (_, state) => AclInviteDetailsPage(
+                          petId: state.pathParameters['petId']!,
+                          inviteId: state.pathParameters['inviteId']!,
+                        ),
+                        routes: <RouteBase>[
+                          GoRoute(
+                            path: 'edit',
+                            name: 'aclInviteEdit',
+                            builder: (_, state) => AclInviteFormPage(
+                              petId: state.pathParameters['petId']!,
+                              inviteId: state.pathParameters['inviteId']!,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: ':petId',
+                    name: 'petDetails',
+                    redirect: (_, __) => AppRoutes.pets,
                   ),
                 ],
               ),
